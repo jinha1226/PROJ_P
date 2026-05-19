@@ -155,6 +155,10 @@ export function buildGameView(
   const uiStack: UiPushMsg[] = []
   const crtLines = new Map<number, string>()
   let crtActive = false
+  // True while a server `show_dialog` HTML overlay is up (e.g. trunk's
+  // save-transfer prompt on resume). Tracked like crtActive so it can't be
+  // orphaned if the server proceeds without an explicit hide_dialog.
+  let dialogActive = false
   let crtTag: string | undefined
   // Server tracks a menu stack (open_menu pushes, close_menu pops one,
   // close_all_menus clears). Mirroring it is what lets close_menu restore
@@ -293,7 +297,7 @@ export function buildGameView(
   // Refuse while a server-side prompt is up so we don't drop the user out
   // of an in-progress targeting/menu/etc.
   monsterListView.element.addEventListener('click', (e) => {
-    if (uiStack.length > 0 || crtActive || activeMenu) return
+    if (uiStack.length > 0 || crtActive || dialogActive || activeMenu) return
     if (monsterListView.element.childElementCount === 0) return
     e.stopPropagation()
     openMonsterPanel()
@@ -421,8 +425,45 @@ export function buildGameView(
 
   function handleMsg(msg: ServerMsg): void {
     switch (msg.msg) {
+      // Trunk sends bare `layer`; 0.34 sends `set_layer`. Reference client
+      // maps both to the same handler (client.js: "layer": do_set_layer).
+      case 'layer':
       case 'set_layer':
-        if (msg.layer === 'game') { uiStack.length = 0; crtActive = false; crtTag = undefined; menuStack.length = 0; activeMenu = null; monsterPanelOpen = false; hideOverlay() }
+        if (msg.layer === 'game') { uiStack.length = 0; crtActive = false; dialogActive = false; crtTag = undefined; menuStack.length = 0; activeMenu = null; monsterPanelOpen = false; hideOverlay() }
+        break
+
+      // Raw-HTML modal pushed by the server (save-transfer prompt on trunk
+      // resume, end-of-game prompts, etc.). Mirrors reference handle_dialog:
+      // inject the HTML, wire [data-key] buttons to send that key. Without
+      // this the game blocks on an invisible prompt — a black screen.
+      case 'show_dialog': {
+        const html = msg.html ?? ''
+        dialogActive = true
+        renderOverlay('', () => {
+          const body = document.createElement('div')
+          body.className = 'dialog-body'
+          body.innerHTML = html
+          // Group the server's [data-key] buttons into one flex row. The
+          // server appends them in reverse visual order and floats them
+          // right (e.g. [No, Yes] → renders "Yes  No"); .dialog-buttons
+          // uses row-reverse to reproduce that intent for any button set.
+          const btnRow = document.createElement('div')
+          btnRow.className = 'dialog-buttons'
+          body.querySelectorAll<HTMLElement>('[data-key]').forEach((el) => {
+            el.addEventListener('click', () => {
+              const k = el.getAttribute('data-key') ?? ''
+              if (k) conn.send({ msg: 'input', text: k })
+            })
+            btnRow.appendChild(el)
+          })
+          if (btnRow.children.length) body.appendChild(btnRow)
+          uiOverlay.appendChild(body)
+        })
+        break
+      }
+
+      case 'hide_dialog':
+        if (dialogActive) { dialogActive = false; hideOverlay() }
         break
 
       case 'game_client': {
@@ -772,6 +813,7 @@ export function buildGameView(
       case 'close_all_menus':
         uiStack.length = 0
         crtActive = false
+        dialogActive = false
         crtTag = undefined
         menuStack.length = 0
         activeMenu = null

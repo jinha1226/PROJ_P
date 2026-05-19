@@ -1303,6 +1303,56 @@ html, body {
 .overlay-line { min-height: 1lh; white-space: pre-wrap; }
 .overlay-line--nowrap { white-space: pre; }
 
+/* Server `show_dialog` modal (save-transfer prompt on trunk resume,
+   end-of-game prompts). The server HTML carries class="button" and inline
+   float:right; we neutralize that and present a content-sized card centered
+   in the overlay. Buttons are grouped into .dialog-buttons (row-reverse to
+   mirror the server's float:right order, e.g. "Yes  No") as equal-width
+   touch targets. */
+.dialog-body {
+  flex: 0 1 auto;
+  height: auto;
+  max-height: 100%;
+  margin: auto;
+  width: 100%;
+  max-width: 30rem;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 1.5rem 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  text-align: center;
+  font-size: 1.05rem;
+  line-height: 1.5;
+  overflow: auto;
+}
+.dialog-body p { margin: 0; }
+.dialog-buttons {
+  display: flex;
+  flex-direction: row-reverse;
+  gap: 0.75rem;
+}
+.dialog-body .button,
+.dialog-body input[type="button"] {
+  float: none !important;
+  display: block;
+  flex: 1 1 0;
+  min-width: 0;
+  margin: 0;
+  padding: 0.85rem 1rem;
+  font: bold 1rem var(--font-mono);
+  color: var(--bg);
+  background: var(--accent);
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.dialog-body .button:active,
+.dialog-body input[type="button"]:active { filter: brightness(0.85); }
+
 .overlay-stat-row {
   display: flex;
   flex-wrap: wrap;

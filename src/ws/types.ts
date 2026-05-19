@@ -107,6 +107,9 @@ export type ServerMsg =
   | { msg: 'ping' }
   | { msg: 'close'; reason?: string }
   | { msg: 'set_layer'; layer: 'lobby' | 'game' | 'crt' }
+  | { msg: 'layer'; layer: 'lobby' | 'game' | 'crt' }
+  | { msg: 'show_dialog'; html: string }
+  | { msg: 'hide_dialog' }
   | { msg: 'game_started' }
   | { msg: 'watching_started'; username: string }
   | { msg: 'game_ended'; reason: string; message?: string; dump?: string }
