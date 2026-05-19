@@ -1709,9 +1709,47 @@ export function buildGameView(
     syncMenuShiftLabels()
   }
 
-  function fillMenuItems(listEl: HTMLElement, items: MenuItem[]): void {
+  // DCSS's "examine visible things" menu (directn.cc _full_describe_menu)
+  // pre-wraps each monster's equipment description for an 80-col terminal and
+  // emits it as several entries: one hotkeyed lead row plus hotkey-less
+  // continuation rows whose text is prefixed with exactly 9 literal spaces
+  // (directn.cc:621). Rendering each as its own row double-wraps on a phone
+  // and loses the grouping. Fold continuations back into their lead so the
+  // whole description is one tappable item that wraps to the live viewport.
+  //
+  // The ≥6-space threshold is load-bearing, not cosmetic. Inventory
+  // (invent.cc:73), spellbook, quiver and mutation menus set
+  // `indent_no_hotkeys`, giving every hotkey-less item a *5-space* preface
+  // (menu.cc:2355); matching ≥2 would wrongly merge an indented hotkey-less
+  // inventory line into the hotkeyed line above it. directn.cc is the only
+  // menu emitting the lead+continuation idiom, and its 9-space prefix is the
+  // only menu source of ≥6-space leading indent — so ≥6 captures exactly it
+  // and nothing else (both the 9 and the 5 are hardcoded literals, stable
+  // across versions). Clone the lead before mutating — fillMenuItems re-runs
+  // on the same activeMenu.items array on every update_menu_items patch.
+  function coalesceMenuItems(items: MenuItem[]): { item: MenuItem; idx: number }[] {
+    const out: { item: MenuItem; idx: number }[] = []
+    let lead: { item: MenuItem; idx: number } | null = null
     for (let i = 0; i < items.length; i++) {
       const item = items[i]
+      const isItem = item.level !== 0 && item.level !== 1
+      const noHotkey = !item.hotkeys || item.hotkeys.length === 0
+      const raw = String(item.text ?? '')
+      if (lead && isItem && noHotkey && /^\s{6,}\S/.test(raw)) {
+        lead.item = { ...lead.item, text: `${lead.item.text ?? ''} ${raw.trim()}` }
+        continue
+      }
+      const entry = { item, idx: i }
+      out.push(entry)
+      lead = isItem && !noHotkey ? entry : null
+    }
+    return out
+  }
+
+  function fillMenuItems(listEl: HTMLElement, rawItems: MenuItem[]): void {
+    const coalesced = coalesceMenuItems(rawItems)
+    for (let c = 0; c < coalesced.length; c++) {
+      const { item, idx: i } = coalesced[c]
       if (item.level === 0) continue  // separator
       if (item.level === 1) {         // section header
         const hdr = document.createElement('div')
