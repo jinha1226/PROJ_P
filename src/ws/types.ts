@@ -223,3 +223,4 @@ export type ClientMsg =
   | { msg: 'menu_hover'; hover: number; mouse: boolean }
   | { msg: 'menu_scroll'; first: number; last: number; hover: number }
   | { msg: 'click_cell'; x: number; y: number; button: 1 | 2 | 3; force?: boolean }
+  | { msg: 'formatted_scroller_scroll'; scroll: number }

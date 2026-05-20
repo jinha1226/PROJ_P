@@ -106,6 +106,12 @@ interface UiPushMsg {
   // msgwin-get-line: stamped by the server; required so our ui_state_sync
   // echoes back the same id (server drops mismatched syncs).
   generation_id?: number
+  // formatted-scroller (message log, lookup help, morgue, …): server-side
+  // FS_START_AT_END flag (scroller.cc emits it alongside the push). The push
+  // is followed by ui-state scroll=INT32_MAX, but those may arrive in a
+  // separate WS frame — honoring this flag during the initial render
+  // guarantees the first paint is at the bottom even when they don't batch.
+  start_at_end?: boolean
 }
 
 interface MenuItem {
@@ -344,6 +350,7 @@ export function buildGameView(
       if (msg.keycode === CK_END) { jumpMenu(true); return }
       if (msg.keycode === CK_HOME) { jumpMenu(false); return }
     }
+    if (msg.msg === 'key' && handleScrollerKeycode(msg.keycode)) return
     conn.send(msg)
   })
 
@@ -442,6 +449,7 @@ export function buildGameView(
       return
     }
     if (handleMenuNavKey(e)) return
+    if (handleScrollerKey(e)) return
     handleKeydown(e, (msg) => conn.send(msg))
   }
   document.addEventListener('keydown', docKeyHandler)
@@ -585,6 +593,7 @@ export function buildGameView(
         const body = raw['body'] as string | undefined
         const highlight = raw['highlight'] as string | undefined
         const scroll = raw['scroll'] as number | undefined
+        const fromWebtiles = raw['from_webtiles'] === true
         const actions = raw['actions'] as string | undefined
         if (text) {
           const entry: UiPushMsg = { type: 'formatted-scroller', text, ...(highlight ? { highlight } : {}), ...(actions ? { actions } : {}) }
@@ -602,13 +611,25 @@ export function buildGameView(
           uiStack[uiStack.length - 1].body = body
           showUiPush(uiStack[uiStack.length - 1])
         }
-        if (scroll !== undefined) scrollOverlayBody(scroll)
+        // from_webtiles=true is the server echoing our own
+        // formatted_scroller_scroll back — our scroll position is already
+        // correct (we set it locally before sending).
+        if (scroll !== undefined && !fromWebtiles) scrollOverlayBody(scroll)
         break
       }
 
       case 'ui-scroller-scroll': {
-        const scroll = (msg as unknown as Record<string, unknown>)['scroll'] as number | undefined
-        if (scroll !== undefined) scrollOverlayBody(scroll)
+        // The reference client skips this entirely when the top popup is a
+        // formatted-scroller (ui-layouts.js:1066-1073: "formatted scrollers
+        // send their own synchronization messages"). The server emits these
+        // with a hardcoded from_webtiles=false (ui.cc:1501-1503), so without
+        // the popup-type guard we'd ricochet our own scroll position back
+        // through this channel.
+        if (formattedScrollerActive()) break
+        const raw = msg as unknown as Record<string, unknown>
+        const scroll = raw['scroll'] as number | undefined
+        const fromWebtiles = raw['from_webtiles'] === true
+        if (scroll !== undefined && !fromWebtiles) scrollOverlayBody(scroll)
         break
       }
 
@@ -990,6 +1011,18 @@ export function buildGameView(
           bodyEl.innerHTML = renderBodyLines(rawBody, msg.highlight ?? '')
         }
         uiOverlay.appendChild(bodyEl)
+        // formatted-scroller is a client-owned scroll widget (see the block
+        // comment at scrollOverlayBody). Hook the scroll listener so touch
+        // swipes and our own page-key handler sync back to the server; honor
+        // FS_START_AT_END synchronously (reading scrollHeight forces a
+        // layout flush, so the position lands before the first paint).
+        if (msg.type === 'formatted-scroller') {
+          if (msg.start_at_end) {
+            suppressScrollerSync()
+            bodyEl.scrollTop = bodyEl.scrollHeight
+          }
+          attachScrollerListener(bodyEl)
+        }
       }
       if (msg.actions) {
         uiOverlay.appendChild(buildActionsBar(msg.actions))
@@ -2036,31 +2069,139 @@ export function buildGameView(
     view.focus({ preventScroll: true })
   }
 
+  // --- formatted-scroller: client-owned scroll widget ---
+  //
+  // Per the reference client (ui-layouts.js:613 scroller_handle_key,
+  // :720 update_server_scroll, :1066 recv_ui_scroll), the formatted-scroller's
+  // scrollbar is owned by the *client*: page/arrow/home/end keys scroll the
+  // body locally, the new position is debounced back to the server as
+  // `formatted_scroller_scroll`, and server-pushed scrolls with
+  // `from_webtiles=true` are skipped (they're the server echoing our own
+  // request). `ui-scroller-scroll` messages are ignored entirely when the
+  // top popup is a formatted-scroller — the server emits them with a
+  // hardcoded `from_webtiles: false` (ui.cc:1501-1503 says "always false,
+  // since we do not yet synchronize webtiles client-side scrolls"), so the
+  // ui-state pair is the sole valid sync channel here.
+  //
+  // We follow this model. Passing End/Home/PgUp/PgDn through as raw
+  // keycodes doesn't work on phone widths because we wrap differently from
+  // the server, so the server-clamped scroll value lands above our real
+  // bottom and the user sees a visible jump-back-up.
+
+  const SCROLLER_SYNC_DEBOUNCE_MS = 100
+
+  function formattedScrollerActive(): boolean {
+    return uiStack.length > 0
+      && uiStack[uiStack.length - 1].type === 'formatted-scroller'
+      && !!uiOverlay.querySelector('.overlay-body')
+  }
+
+  let scrollerSyncTimer: number | undefined
+  function scheduleScrollerSync(): void {
+    if (scrollerSyncTimer !== undefined) return
+    scrollerSyncTimer = window.setTimeout(flushScrollerSync, SCROLLER_SYNC_DEBOUNCE_MS)
+  }
+  function flushScrollerSync(): void {
+    scrollerSyncTimer = undefined
+    if (!formattedScrollerActive()) return
+    const el = uiOverlay.querySelector<HTMLElement>('.overlay-body')
+    if (!el) return
+    // Reference client: `Math.round(scrollTop / line_height)`. The value the
+    // server stores is opaque to it (m_scroll is just a saved position; see
+    // scroller.cc:166); a wrap-induced drift of a few rows on the server's
+    // side is harmless because we never read it back — from_webtiles=true
+    // skips the echo.
+    const lineH = parseFloat(getComputedStyle(el).lineHeight) || 19
+    const line = Math.max(0, Math.round(el.scrollTop / lineH))
+    conn.send({ msg: 'formatted_scroller_scroll', scroll: line })
+  }
+
+  // Programmatic scrollTop assignment fires a scroll event asynchronously.
+  // Suppress sync for a short window so a server-driven scrollOverlayBody
+  // doesn't bounce its value straight back through formatted_scroller_scroll.
+  let scrollerSyncSuppressUntil = 0
+  function suppressScrollerSync(): void {
+    scrollerSyncSuppressUntil = performance.now() + 50
+  }
+  function onScrollerScroll(): void {
+    if (performance.now() < scrollerSyncSuppressUntil) return
+    scheduleScrollerSync()
+  }
+  function attachScrollerListener(bodyEl: HTMLElement): void {
+    bodyEl.addEventListener('scroll', onScrollerScroll, { passive: true })
+  }
+
+  // Client-side scroll-key interception. Returns true when handled so the
+  // caller stops routing the key further (mirrors handleMenuNavKey).
+  function handleScrollerKey(e: KeyboardEvent): boolean {
+    if (!formattedScrollerActive()) return false
+    if (e.ctrlKey || e.altKey || e.metaKey || e.shiftKey) return false
+    const el = uiOverlay.querySelector<HTMLElement>('.overlay-body')
+    if (!el) return false
+    const lineH = parseFloat(getComputedStyle(el).lineHeight) || 19
+    const page = Math.max(lineH, el.clientHeight - 2 * lineH)
+    switch (e.key) {
+      case 'ArrowUp':   el.scrollTop -= lineH; break
+      case 'ArrowDown': el.scrollTop += lineH; break
+      case 'PageUp': case '<': case '-': case ';':
+        el.scrollTop -= page; break
+      case 'PageDown': case ' ': case '>': case '+': case "'":
+        el.scrollTop += page; break
+      case 'Home': el.scrollTop = 0; break
+      case 'End':  el.scrollTop = el.scrollHeight; break
+      default: return false
+    }
+    e.preventDefault()
+    return true
+  }
+
+  // Touch-controls equivalent (the d-pad / macro buttons emit wire keycodes
+  // through the connection send path, not DOM key events).
+  function handleScrollerKeycode(keycode: number): boolean {
+    if (!formattedScrollerActive()) return false
+    const el = uiOverlay.querySelector<HTMLElement>('.overlay-body')
+    if (!el) return false
+    const lineH = parseFloat(getComputedStyle(el).lineHeight) || 19
+    const page = Math.max(lineH, el.clientHeight - 2 * lineH)
+    switch (keycode) {
+      case CK_UP:   el.scrollTop -= lineH; return true
+      case CK_DOWN: el.scrollTop += lineH; return true
+      case CK_PGUP: el.scrollTop -= page; return true
+      case CK_PGDN: el.scrollTop += page; return true
+      case CK_HOME: el.scrollTop = 0; return true
+      case CK_END:  el.scrollTop = el.scrollHeight; return true
+    }
+    return false
+  }
+
   function scrollOverlayBody(line: number): void {
     const el = uiOverlay.querySelector('.overlay-body') as HTMLElement | null
     if (!el) return
+    // Setting scrollTop synchronously (reading scrollHeight/offsetTop forces
+    // a layout flush) lands the position before the next paint; an rAF wait
+    // would let the user see one paint at the wrong position on a fresh
+    // open. Suppress the resulting scroll event so the listener doesn't
+    // echo our value back to the server.
+    suppressScrollerSync()
     if (line === 2147483647) {
-      requestAnimationFrame(() => {
-        requestAnimationFrame(() => { el.scrollTop = el.scrollHeight })
-      })
+      el.scrollTop = el.scrollHeight
       return
     }
     // The server sends `line` as a source-text line index (count of `\n`s
-    // before the section header — see _get_help_section in command.cc).
-    // renderBodyLines emits one `.overlay-line` per source line, so the index
-    // maps directly. We can't use `line * lineHeight` like the reference
-    // client does because long manual lines wrap on a phone-width body, so
-    // source lines and rendered rows diverge.
-    requestAnimationFrame(() => {
-      const lines = el.querySelectorAll<HTMLElement>('.overlay-line')
-      const target = lines[line]
-      if (target) {
-        el.scrollTop = target.offsetTop - el.offsetTop
-        return
-      }
-      const lineH = parseFloat(getComputedStyle(el).lineHeight) || 19
-      el.scrollTop = Math.round(line * lineH)
-    })
+    // before the section header — see _get_help_section in command.cc, where
+    // webtiles-mode line_height is 1). renderBodyLines emits one
+    // `.overlay-line` per source line, so the index maps directly. We can't
+    // use `line * lineHeight` like the reference client does because long
+    // manual lines wrap on a phone-width body, so source lines and rendered
+    // rows diverge.
+    const lines = el.querySelectorAll<HTMLElement>('.overlay-line')
+    const target = lines[line]
+    if (target) {
+      el.scrollTop = target.offsetTop - el.offsetTop
+      return
+    }
+    const lineH = parseFloat(getComputedStyle(el).lineHeight) || 19
+    el.scrollTop = Math.round(line * lineH)
   }
 
   function hideOverlay(): void {
