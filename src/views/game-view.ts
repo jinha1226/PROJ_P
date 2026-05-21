@@ -1,5 +1,5 @@
 import type { WsConnection } from '../ws/connection'
-import type { ServerMsg } from '../ws/types'
+import type { ClientMsg, ServerMsg } from '../ws/types'
 import { MapStore } from '../game/map/map-store'
 import { MapView } from '../game/map/map-view'
 import { TileMapView } from '../game/map/tile-map-view'
@@ -352,6 +352,28 @@ export function buildGameView(
   // The d-pad calls this send directly (it doesn't dispatch a keydown), so
   // the menu-nav redirect has to happen here too — otherwise phone users get
   // the raw-arrow / dead-keypress behaviour the keyboard path now avoids.
+  // Post-dispatch hook for outbound user keystrokes (from touch and physical
+  // keyboard). X-mode 'R' (CMD_MAP_EXCLUDE_RADIUS, viewmap.cc) blocks
+  // on getchm() for one digit char with no `init_input` / `text_cursor` to
+  // anchor a touch UI on; pop the numpad here so the user has a way to
+  // enter the radius. Outside X-mode, 'R' falls through normally (e.g. the
+  // macro tab's 'R' = "Remove jewellery").
+  //
+  // If the radius numpad is already up, any subsequent outbound keystroke
+  // (typically a digit / nav key from the physical keyboard) has just
+  // resolved the server's getchm() — close the now-stale numpad. Without
+  // this, kbd users see a phantom numpad after pressing R+digit on hardware.
+  let radiusNumpadActive = false
+  function afterUserSend(msg: ClientMsg): void {
+    if (radiusNumpadActive) {
+      removeNumpadInput()
+      return
+    }
+    if (inXMode && msg.msg === 'input' && msg.text === 'R') {
+      showNumpadInput('Exclusion radius (0–9):', { closeAfterDigit: true })
+    }
+  }
+
   const touchControls: TouchControls = buildTouchControls((msg) => {
     if (msg.msg === 'key' && menuNavActive()) {
       if (msg.keycode === CK_DOWN) { cycleMenuHover(false); return }
@@ -363,6 +385,7 @@ export function buildGameView(
     }
     if (msg.msg === 'key' && handleScrollerKeycode(msg.keycode)) return
     conn.send(msg)
+    afterUserSend(msg)
   })
 
   const menuControls = document.createElement('div')
@@ -461,7 +484,7 @@ export function buildGameView(
     }
     if (handleMenuNavKey(e)) return
     if (handleScrollerKey(e)) return
-    handleKeydown(e, (msg) => conn.send(msg))
+    handleKeydown(e, (msg) => { conn.send(msg); afterUserSend(msg) })
   }
   document.addEventListener('keydown', docKeyHandler)
 
@@ -2330,6 +2353,7 @@ export function buildGameView(
     if (numpadInput.style.display === 'none') return
     numpadInput.style.display = 'none'
     numpadInput.innerHTML = ''
+    radiusNumpadActive = false
   }
 
   // On-screen numpad for numeric `init_input` prompts (e.g. skill targets).
@@ -2337,9 +2361,15 @@ export function buildGameView(
   // echoes back via `txt` directly into the highlighted cell — no local
   // input buffer needed. The server's line_reader sits in OVERWRITE mode
   // with the prefill selected, so the first keypress replaces it.
-  function showNumpadInput(prompt: string): void {
+  //
+  // `closeAfterDigit` mode services X-mode 'R' (exclusion radius), where
+  // the server's getchm() reads exactly one digit and resumes immediately.
+  // No prompt is sent for this — we open it client-side after seeing the
+  // outbound 'R' (see afterUserSend).
+  function showNumpadInput(prompt: string, opts?: { closeAfterDigit?: boolean }): void {
     removeNumpadInput()
     numpadInput.style.display = ''
+    radiusNumpadActive = opts?.closeAfterDigit ?? false
 
     if (prompt) {
       const header = document.createElement('div')
@@ -2351,11 +2381,21 @@ export function buildGameView(
     const grid = document.createElement('div')
     grid.className = 'numpad-grid'
 
+    // When radiusNumpadActive, the server is blocked in a getchm()
+    // (CMD_MAP_EXCLUDE_RADIUS, viewmap.cc:1101) reading exactly one keystroke.
+    // Whatever we send is computed as `key - '0'` and passed to set_exclude();
+    // for any non-digit key the resulting negative radius is visibly
+    // equivalent to 0 (single cell), because add_exclude_points'
+    // radius_iterator gives up for r < 1 while the root cell still gets
+    // PD_EXCLUDED. So we just close on any tap and dispatch the button's
+    // native message — matches upstream wire behavior exactly.
     function sendChar(ch: string): void {
       conn.send({ msg: 'input', text: ch })
+      if (radiusNumpadActive) removeNumpadInput()
     }
     function sendKey(keycode: number): void {
       conn.send({ msg: 'key', keycode })
+      if (radiusNumpadActive) removeNumpadInput()
     }
 
     type Btn = { label: string; kind: 'digit' | 'action' | 'primary'; onTap: () => void }
