@@ -15,6 +15,9 @@ Notable changes to PocketZot, newest first.
   in-game popups.
 - Fixed a jump-back when scrolling those popups to the bottom on phone-width
   screens.
+- In tile mode, the highlight marking cells you can Rampage to now shows.
+- In tile mode, mangroves rooted in water now show the water through their
+  bases.
 
 ## 2026-05-19
 
