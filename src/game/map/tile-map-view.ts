@@ -23,6 +23,8 @@ import {
   BG_NEW_STAIR, BG_NEW_TRANSPORTER,
   BG_CURSOR_MASK, BG_CURSOR1, BG_CURSOR2, BG_CURSOR3, BG_TUT_CURSOR,
   BG_KRAKEN_NW, BG_KRAKEN_NE, BG_KRAKEN_SE,
+  BG_RAMPAGE_HI,
+  bgLo, bgHi,
 } from './cell-flags'
 
 // Tile-mode minimum viewport. Square because tile cells are square; 21×21
@@ -130,32 +132,41 @@ interface DecodedBg {
   // defines KRAKEN_*), but cell_renderer dispatches them too — leave fields
   // here returning false so the draw code branches uniformly.
   ELDRITCH_NW: boolean; ELDRITCH_NE: boolean; ELDRITCH_SE: boolean; ELDRITCH_SW: boolean
+  // RAMPAGE marks rampage-target cells (winged-boot icon overlay). Lives in
+  // the bg hi word, so a cell with RAMPAGE arrives as `bg: [lo, hi]` — see
+  // BG_RAMPAGE_HI / bgLo / bgHi in cell-flags.ts.
+  RAMPAGE: boolean
 }
-function decodeBg(bg: number | undefined): DecodedBg {
-  const v = (bg ?? 0) >>> 0
-  const cursor = v & BG_CURSOR_MASK
+function decodeBg(bg: number | number[] | undefined): DecodedBg {
+  // bg arrives as `number` or `[lo, hi]`; see bgLo/bgHi in cell-flags.ts for
+  // the rationale (hi-word flags like RAMPAGE would silently wipe the dngn
+  // tile id if coerced through `& 0xFFFF`).
+  const lo = bgLo(bg)
+  const hi = bgHi(bg)
+  const cursor = lo & BG_CURSOR_MASK
   return {
-    value: v & BG_TILE_ID_MASK,
-    MM_UNSEEN: (v & BG_MM_UNSEEN) !== 0,
-    UNSEEN: (v & BG_UNSEEN) !== 0,
-    TRAV_EXCL: (v & BG_TRAV_EXCL) !== 0,
-    EXCL_CTR: (v & BG_EXCL_CTR) !== 0,
-    OOR: (v & BG_OOR) !== 0,
-    WATER: (v & BG_WATER) !== 0,
-    NEW_STAIR: (v & BG_NEW_STAIR) !== 0,
-    NEW_TRANSPORTER: (v & BG_NEW_TRANSPORTER) !== 0,
+    value: lo & BG_TILE_ID_MASK,
+    MM_UNSEEN: (lo & BG_MM_UNSEEN) !== 0,
+    UNSEEN: (lo & BG_UNSEEN) !== 0,
+    TRAV_EXCL: (lo & BG_TRAV_EXCL) !== 0,
+    EXCL_CTR: (lo & BG_EXCL_CTR) !== 0,
+    OOR: (lo & BG_OOR) !== 0,
+    WATER: (lo & BG_WATER) !== 0,
+    NEW_STAIR: (lo & BG_NEW_STAIR) !== 0,
+    NEW_TRANSPORTER: (lo & BG_NEW_TRANSPORTER) !== 0,
     CURSOR1: cursor === BG_CURSOR1,
     CURSOR2: cursor === BG_CURSOR2,
     CURSOR3: cursor === BG_CURSOR3,
-    TUT_CURSOR: (v & BG_TUT_CURSOR) !== 0,
-    KRAKEN_NW: (v & BG_KRAKEN_NW) !== 0,
-    KRAKEN_NE: (v & BG_KRAKEN_NE) !== 0,
-    KRAKEN_SE: (v & BG_KRAKEN_SE) !== 0,
-    // KRAKEN_SW lives in a high word per enums.js but v0.34 never sends one;
+    TUT_CURSOR: (lo & BG_TUT_CURSOR) !== 0,
+    KRAKEN_NW: (lo & BG_KRAKEN_NW) !== 0,
+    KRAKEN_NE: (lo & BG_KRAKEN_NE) !== 0,
+    KRAKEN_SE: (lo & BG_KRAKEN_SE) !== 0,
+    // KRAKEN_SW lives in the hi word per enums.js but v0.34 never sends one;
     // ELDRITCH_* aren't defined in 0.34's bg flag table at all. Fields kept
     // returning false so the draw branches in drawCell stay uniform.
     KRAKEN_SW: false,
     ELDRITCH_NW: false, ELDRITCH_NE: false, ELDRITCH_SE: false, ELDRITCH_SW: false,
+    RAMPAGE: (hi & BG_RAMPAGE_HI) !== 0,
   }
 }
 
@@ -430,10 +441,18 @@ export class TileMapView {
     // Blood beneath feature tiles (when bg is a feature ≥ WALL_MAX).
     if (bg.value > this.wallMax) this.drawBloodOverlay(cell, px, py, false)
 
-    // Main bg tile. The reference splits this into water-clipped halves when
-    // mangrove_water is set; we draw it whole — the split-alpha is a subtle
-    // effect that matters mostly for visual polish.
-    if (bg.value > 0) this.paintDngn(bg.value, px, py)
+    // Main bg tile. When mangrove_water is set the reference (cell_renderer.js
+    // `draw_background`, mangrove_water branch) paints the mangrove twice —
+    // top half α=1.0, bottom half α=0.3 — so the shallow water laid down above
+    // shows through the trunk's lower portion. Without the split the trees
+    // look opaque on dry ground instead of standing in the swamp.
+    if (bg.value > 0) {
+      if (cell.mangrove_water) {
+        this.withWaterSplit(true, py, 1.0, 0.3, () => this.paintDngn(bg.value, px, py))
+      } else {
+        this.paintDngn(bg.value, px, py)
+      }
+    }
 
     if (bg.value > this.dngnUnseen) {
       // Blood on top of walls (the WALL_BLOOD_* / WALL_OLD_BLOOD variants).
@@ -542,9 +561,18 @@ export class TileMapView {
           const offsetMap = hasMcache
             ? new Map<number, [number, number]>((cell.mcache as Array<[number, number, number]>).map(([t, x, y]) => [t, [x, y]]))
             : undefined
-          for (const [t] of cell.doll) {
+          for (const [t, ymax] of cell.doll) {
+            // Doll parts carry a y-clip (`ymax`, in cell-relative atlas pixels)
+            // so the renderer can crop the body sprite for non-humanoid
+            // races whose lower half is supplied by the base tile rather than
+            // legs — `TilesFramework::send_doll` in tileweb.cc writes 18 for
+            // any part flagged TILEP_FLAG_CUT_BOTTOM (naga/armataur torso,
+            // merfolk/djinni torso, some helms; see `tilep_calc_flags` in
+            // tilepick-p.cc). Without honoring ymax the torso paints all the
+            // way to y=32 and overlaps the snake base, leaving a doubled belly
+            // across the bottom half of the cell.
             const off = offsetMap?.get(t)
-            this.paintTile(TEX.PLAYER, t & TILE_ID_MASK, px, py, off?.[0] ?? 0, off?.[1] ?? 0)
+            this.paintTile(TEX.PLAYER, t & TILE_ID_MASK, px, py, off?.[0] ?? 0, off?.[1] ?? 0, ymax)
           }
         }
         if (cell.mcache) {
@@ -620,6 +648,10 @@ export class TileMapView {
     if (bg.UNSEEN && hasContent) this.paintIcon('MESH', px, py)
     if (bg.OOR && hasContent) this.paintIcon('OOR_MESH', px, py)
     if (bg.MM_UNSEEN && hasContent) this.paintIcon('MAGIC_MAP_MESH', px, py)
+
+    // Rampage-target marker (winged-boot icon). Reference draws it after the
+    // mesh overlays and before NEW_STAIR — cell_renderer.js `draw_foreground`.
+    if (bg.RAMPAGE) this.paintIcon('RAMPAGE', px, py)
 
     if (bg.NEW_STAIR && status_shift === 0) this.paintIcon('NEW_STAIR', px, py)
     if (bg.NEW_TRANSPORTER && status_shift === 0) this.paintIcon('NEW_TRANSPORTER', px, py)
@@ -797,13 +829,32 @@ export class TileMapView {
     }
   }
 
-  private paintTile(tex: number, id: number, px: number, py: number, xofs = 0, yofs = 0): void {
+  private paintTile(
+    tex: number, id: number,
+    px: number, py: number,
+    xofs = 0, yofs = 0,
+    ymax = 0,
+  ): void {
     const s = tileLoader.getSync(tex, id)
     if (!s) return
     // We draw in atlas-pixel space (1 cell = ATLAS_CELL px), so sprite offsets
     // and sizes pass through unscaled — the canvas itself is CSS-scaled to the
     // display size, which keeps tile edges aligned.
-    this.ctx.drawImage(s.img, s.sx, s.sy, s.w, s.h, px + s.ox + xofs, py + s.oy + yofs, s.w, s.h)
+    //
+    // `ymax` is a cell-relative clip line (in atlas pixels, 0..ATLAS_CELL); 0
+    // means no clip. When set, only the top `ymax - dyTop` rows of the sprite
+    // are taken from the atlas — matches the `y_max` clamp in cell_renderer.js
+    // `draw_tile` and the doll-part CUT_BOTTOM mechanic used for naga/merfolk
+    // torsos. Mirrors the reference behavior of reducing both source and
+    // destination height by the same amount, never letting the lower edge of
+    // the sprite spill below the clip line.
+    const dyTop = s.oy + yofs
+    let h = s.h
+    if (ymax > 0 && ymax < dyTop + s.h) {
+      if (ymax <= dyTop) return
+      h = ymax - dyTop
+    }
+    this.ctx.drawImage(s.img, s.sx, s.sy, s.w, h, px + s.ox + xofs, py + dyTop, s.w, h)
   }
 
   private updateCursorEl(): void {

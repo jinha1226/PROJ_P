@@ -45,8 +45,13 @@ export function renderTiles(tiles: TileRef[], scale = 1, opts?: { expand?: boole
 // Layering, in order:
 //   1. doll parts (PLAYER atlas), each picking up per-part xofs/yofs from
 //      mcache when a matching part_id appears in both lists. doll's second
-//      tuple slot (ymax, used for water clipping in the reference) is
-//      currently dropped — we don't render water effects.
+//      tuple slot (ymax) is dropped here — it's the y-clip line that
+//      `TilesFramework::send_doll` in tileweb.cc sets to 18 for
+//      TILEP_FLAG_CUT_BOTTOM parts (naga / armataur / merfolk-water / djinni
+//      torsos, and some helms), and is honored by the in-game canvas renderer
+//      (tile-map-view.ts paintTile). Replicating it on this DOM-tile path
+//      would need a per-part CSS height crop; not done because nagas etc. in
+//      the monster panel are a polish issue, not a correctness one.
 //   2. mcache parts (PLAYER atlas), drawn at their own xofs/yofs.
 //   3. fg_idx as a single MAIN tile, only when doll *and* mcache are both
 //      empty (small natural monsters that ship a single MAIN sprite id).

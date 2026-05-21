@@ -17,6 +17,7 @@ import {
   prependDngnIndex, prependDngnLayer,
 } from '../tiles/tile-view'
 import { tileLoader } from '../tiles/tile-loader'
+import { bgLo } from '../map/cell-flags'
 
 // Up to MAX_ROWS top-sorted groups are listed. When more groups exist, a
 // short ml-more strip is appended below them (centered chevron) — not a
@@ -285,7 +286,7 @@ export class MonsterListView {
       if (baseSpec.length > 0) appendTiles(stack, baseSpec, TILE_SCALE)
       const halo = fgHaloDngnName(mc.fg)
       if (halo) prependDngnLayer(stack, halo, TILE_SCALE)
-      if (mc.t_bg !== undefined) prependDngnIndex(stack, mc.t_bg & 0xFFFF, TILE_SCALE)
+      if (mc.t_bg !== undefined) prependDngnIndex(stack, bgLo(mc.t_bg) & 0xFFFF, TILE_SCALE)
 
       const iconNames = fgOverlayIcons(mc.fg)
       const iconIds = mc.icons ?? []

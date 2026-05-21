@@ -1,5 +1,6 @@
 import type { MonsterCell } from '../map/map-store'
 import { decodeColor } from '../map/colors'
+import { bgLo } from '../map/cell-flags'
 import { appendTiles, appendIconOverlays, monsterTileSpec, prependDngnIndex, prependDngnLayer } from '../tiles/tile-view'
 import {
   MDAM_COLORS,
@@ -85,7 +86,7 @@ export class MonsterPanelView {
     if (halo) prependDngnLayer(tileEl, halo, TILE_SCALE)
     // Order matters: each prepend slots in at index 0, so the floor (called
     // last) ends up at the bottom of the DOM stack, halo above, sprite on top.
-    if (mc.t_bg !== undefined) prependDngnIndex(tileEl, mc.t_bg & 0xFFFF, TILE_SCALE)
+    if (mc.t_bg !== undefined) prependDngnIndex(tileEl, bgLo(mc.t_bg) & 0xFFFF, TILE_SCALE)
 
     const mdam = decodeMdam(mc.fg)
     const tier = mdamTier(mdam)

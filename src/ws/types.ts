@@ -33,7 +33,11 @@ export interface MonsterInfo {
 // closes it at line 1860; only g/col/f/mf/mon/flc/fla escape that block.
 export interface TileInfo {
   fg?: number | number[]  // number[] = [lo, hi] 32-bit words when MDAM/flag bits overflow 32 bits
-  bg?: number
+  // bg follows the same [lo, hi] convention as fg. The dngn tile id and most
+  // FOV/cursor/water/stair flags fit in the lo word, but a few flags (RAMPAGE,
+  // KRAKEN_SW) live in the hi word and trigger the array form — see
+  // `TilesFramework::write_tileidx` in tileweb.cc.
+  bg?: number | number[]
   cloud?: number
   icons?: number[]
   // Player-atlas composition for humanoids: doll = body parts, mcache = body+equipment.

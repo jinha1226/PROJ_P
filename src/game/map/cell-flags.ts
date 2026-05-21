@@ -7,10 +7,14 @@
 // ATTRIBUTION.md.
 //
 // `t.fg` arrives as `number` (low word) or `[lo, hi]` (when high-word bits
-// are set — poison, threat tier, ghost, MDAM_SEV/ADEAD). `t.bg` is a single
-// 32-bit word in v0.34. Use `>>> 0` to coerce to uint32 before masking
-// high-bit values; bitwise `&` in JS yields int32 and `0x80000000` would
-// otherwise compare as a negative number.
+// are set — poison, threat tier, ghost, MDAM_SEV/ADEAD). `t.bg` uses the
+// same encoding: a single number when only lo-word bits are set, or
+// `[lo, hi]` when any hi-word flag fires (RAMPAGE, KRAKEN_SW). Coercing
+// the array form with `& 0xFFFF` silently yields 0 (NaN >>> 0), which kills
+// the floor paint — always go through `bgLo()` / `bgHi()` (below).
+// Use `>>> 0` to coerce to uint32 before masking high-bit values; bitwise
+// `&` in JS yields int32 and `0x80000000` would otherwise compare as a
+// negative number.
 
 // ── fg low-word ────────────────────────────────────────────────────────────
 
@@ -68,7 +72,7 @@ export const FG_THREAT_NASTY   = 0x80000000
 // place of the threat-color border.
 export const FG_THREAT_UNUSUAL = 0xE0000000
 
-// ── bg (single word in v0.34) ──────────────────────────────────────────────
+// ── bg low-word ────────────────────────────────────────────────────────────
 
 export const BG_TILE_ID_MASK     = 0xFFFF
 
@@ -100,3 +104,25 @@ export const BG_KRAKEN_NE        = 0x40000000
 export const BG_KRAKEN_SE        = 0x80000000
 // KRAKEN_SW lives in a high bg word per enums.js, but v0.34 never sends one
 // so it has no constant here.
+
+// ── bg hi-word ─────────────────────────────────────────────────────────────
+// RAMPAGE marks cells the player can rampage-attack to (winged-boot icon
+// overlay). Defined in enums.js as `bg_flags.flags.RAMPAGE = [0, 0x020]` —
+// always arrives as `[lo, hi]`, never as a plain number, so a cell with
+// RAMPAGE set will have its `t.bg` be an array on the wire.
+export const BG_RAMPAGE_HI       = 0x020
+
+// Returns the lo / hi 32-bit words of a (possibly array-encoded) bg field.
+// bg arrives as a single number when all flags fit in 32 bits, and as
+// `[lo, hi]` when any hi-word flag (RAMPAGE, KRAKEN_SW) fires. Callers that
+// just want the dngn tile id (low 16 bits) or the lo-word flag mask should
+// use `bgLo`; rampage / hi-only flags use `bgHi`.
+export function bgLo(bg: number | number[] | undefined): number {
+  if (bg === undefined) return 0
+  if (typeof bg === 'number') return bg >>> 0
+  return (bg[0] ?? 0) >>> 0
+}
+export function bgHi(bg: number | number[] | undefined): number {
+  if (bg === undefined || typeof bg === 'number') return 0
+  return (bg[1] ?? 0) >>> 0
+}

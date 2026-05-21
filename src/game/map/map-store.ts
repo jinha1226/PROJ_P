@@ -1,9 +1,12 @@
 import type { CellUpdate, MonsterInfo } from '../../ws/types'
+import { bgLo } from './cell-flags'
 
 export interface Cell {
   g: string   // glyph
   col: number // packed color byte
-  t_bg?: number // tile background; bits MM_UNSEEN=0x20000 / UNSEEN=0x40000 indicate out-of-FOV
+  // tile background; bits MM_UNSEEN=0x20000 / UNSEEN=0x40000 (lo word) indicate
+  // out-of-FOV. Same [lo, hi] encoding as `fg` — see TileInfo.bg / cell-flags.ts.
+  t_bg?: number | number[]
   // Tile foreground + overlays. Carried per cell (not just per monster) so
   // TileMapView can render items, clouds, ground icons, and the player avatar
   // — same fields the reference cell_renderer.js consumes from each cell.
@@ -63,7 +66,8 @@ export interface MonsterCell {
   // hold the dngn tile id (floor/wall/feat dispatch via tileinfo-dngn) so
   // the monster panel can stamp the dungeon background under each sprite,
   // matching what the reference's draw_background draws in the dungeon view.
-  t_bg?: number
+  // Same [lo, hi] encoding as Cell.t_bg — extract via bgLo() from cell-flags.
+  t_bg?: number | number[]
 }
 
 // From reference enums.js: MM_UNSEEN=0x00020000, UNSEEN=0x00040000.
@@ -161,7 +165,8 @@ export class MapStore {
       const existingMonCell = this.monsterMap.get(key)
       // A cell is out of FOV when its t.bg has the UNSEEN or MM_UNSEEN bit set.
       // Only treat as out-of-FOV when we have definitive t_bg evidence; if unknown, assume visible.
-      const outOfFov = cell.t_bg !== undefined && (cell.t_bg & UNSEEN_MASK) !== 0
+      // UNSEEN/MM_UNSEEN live in the lo word — bgLo handles the [lo, hi] form.
+      const outOfFov = cell.t_bg !== undefined && (bgLo(cell.t_bg) & UNSEEN_MASK) !== 0
 
       // Track monster presence. 'mon' in u distinguishes explicit null from absent.
       if ('mon' in u) {
