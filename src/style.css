@@ -247,6 +247,7 @@ html, body {
   justify-content: space-between;
   align-items: center;
   gap: 0.5rem;
+  min-height: 36px;
 }
 
 .lobby-account-chip-wrap {
@@ -267,14 +268,24 @@ html, body {
   cursor: pointer;
 }
 
+/* Static identity badge (non-interactive). Pill shape distinguishes it from
+   the back button next to it so the user doesn't read it as tappable. */
 .lobby-account-chip.is-guest {
   cursor: default;
+  background: var(--surface);
+  border: none;
+  border-radius: 999px;
   color: var(--text-dim);
+  padding: 0.3rem 0.7rem;
 }
 
 .lobby-chip-user { color: var(--accent); }
 .lobby-chip-sep  { color: var(--text-dim); }
 .lobby-chip-tag  { color: var(--accent); }
+.lobby-chip-role {
+  color: var(--text-dim);
+}
+.lobby-account-chip.is-guest .lobby-chip-sep { opacity: 0.55; }
 .lobby-chip-caret {
   color: var(--text-dim);
   margin-left: 0.1rem;
@@ -337,6 +348,34 @@ html, body {
   padding: 0.4rem 0.6rem;
   cursor: pointer;
   white-space: nowrap;
+}
+
+/* Ghost nav button used for "← Back"-style header actions in the lobby and
+   spectator header. No static border so it doesn't compete with the identity
+   pill beside it; press feedback comes from a tinted background. */
+.lobby-btn-ghost {
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  color: var(--text);
+  font-family: var(--font-mono);
+  font-size: 0.9rem;
+  padding: 0.4rem 0.65rem 0.4rem 0.5rem;
+  cursor: pointer;
+  white-space: nowrap;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.2rem;
+  min-height: 32px;
+}
+.lobby-btn-ghost:hover {
+  background: var(--surface);
+  border-color: var(--border);
+}
+.lobby-btn-ghost:active { background: var(--surface2); }
+.lobby-btn-ghost:focus-visible {
+  outline: 1px solid var(--accent);
+  outline-offset: 1px;
 }
 
 .lobby-actions {
@@ -1596,29 +1635,19 @@ html, body {
 
 #touch-controls.x-mode { border-top-color: var(--accent); }
 
+/* Spectator bar: occupies the same `touch` slot the d-pad would, so swapping
+   from playing to spectating doesn't change overall vertical layout.
+   Layout mirrors the lobby header ("← Lobby" ghost button on the left,
+   "Spectating · @user" pill on the right). */
 #spectator-bar {
   grid-area: touch;
   display: flex;
-  align-items: center;
   justify-content: space-between;
+  align-items: center;
   gap: 0.5rem;
-  padding: 0.5rem 0.75rem;
+  padding: 0.3rem 0.55rem;
   background: var(--bg);
   border-top: 1px solid var(--border);
-}
-
-.spectator-label {
-  color: var(--fg);
-  font-size: 0.95rem;
-}
-
-.spectator-exit {
-  background: var(--surface2);
-  color: var(--fg);
-  border: 1px solid var(--border);
-  border-radius: 4px;
-  padding: 0.4rem 0.9rem;
-  font-size: 0.95rem;
 }
 
 /* D-pad: 3×3 CSS grid of large buttons */
@@ -2037,14 +2066,16 @@ html, body {
      while a CRT/menu is active. */
   #menu-controls { grid-area: panel; }
 
-  /* Spectator mode has no touch controls; place the bar in the
-     panel cell (under the HUD) so it doesn't spawn an implicit
-     empty column to the right. */
-  #spectator-bar { grid-area: panel; border-top: 1px solid var(--border); }
-
-  /* Spectator mode has no d-pad either; let the message log
-     extend into the empty bottom-left cell. */
-  #game-view:has(#spectator-bar) #game-messages { grid-row: 1 / span 2; }
+  /* Spectator mode: bar sits under the message log (bottom-left, where the
+     d-pad would be). The chip is hidden — the column is too narrow to fit
+     it without clipping, and the watched player's name already shows in
+     the HUD stats line. No border-right: matches the d-pad area when
+     playing — column borders end at the row boundary. */
+  #spectator-bar {
+    grid-area: dpad;
+    border-top: 0;
+  }
+  #spectator-bar .lobby-account-chip { display: none; }
 
   /* When an overlay is shown, the JS sets inline display:none on these
      elements to maximize overlay space (a portrait-mode assumption).

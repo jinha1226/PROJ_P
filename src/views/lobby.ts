@@ -23,7 +23,11 @@ export function buildLobbyView(
 
   const serverTag = tagFor(conn.wsUrl)
   const headerRight = guest
-    ? `<div class="lobby-account-chip is-guest">Guest · ${escHtml(serverTag)}</div>`
+    ? `<div class="lobby-account-chip is-guest">
+         <span class="lobby-chip-role">Guest</span>
+         <span class="lobby-chip-sep">·</span>
+         <span class="lobby-chip-tag">${escHtml(serverTag)}</span>
+       </div>`
     : `
       <div class="lobby-account-chip-wrap">
         <button id="lobby-account-chip" class="lobby-account-chip" type="button"
@@ -44,7 +48,7 @@ export function buildLobbyView(
 
   view.innerHTML = `
     <div class="lobby-header">
-      <button id="lobby-back" class="lobby-btn-secondary">← Back</button>
+      <button id="lobby-back" class="lobby-btn-ghost" aria-label="Back to login">← Back</button>
       ${headerRight}
     </div>
     <div id="lobby-notice" class="lobby-notice" hidden></div>

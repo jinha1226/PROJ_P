@@ -412,18 +412,23 @@ export function buildGameView(
   if (spectating) {
     const bar = document.createElement('div')
     bar.id = 'spectator-bar'
-    const label = document.createElement('span')
-    label.className = 'spectator-label'
-    label.textContent = `Spectating ${spectating.username}`
     const exitBtn = document.createElement('button')
-    exitBtn.className = 'spectator-exit'
-    exitBtn.textContent = 'Exit'
+    exitBtn.className = 'lobby-btn-ghost'
+    exitBtn.setAttribute('aria-label', 'Back to lobby')
+    exitBtn.textContent = '← Lobby'
     exitBtn.addEventListener('click', () => {
       conn.send({ msg: 'go_lobby' })
       onLobby()
     })
-    bar.appendChild(label)
+    const chip = document.createElement('div')
+    chip.className = 'lobby-account-chip is-guest'
+    chip.innerHTML = `
+      <span class="lobby-chip-role">Spectating</span>
+      <span class="lobby-chip-sep">·</span>
+      <span class="lobby-chip-tag">${escHtml(spectating.username)}</span>
+    `
     bar.appendChild(exitBtn)
+    bar.appendChild(chip)
     view.appendChild(bar)
   } else {
     view.appendChild(touchControls.element)
