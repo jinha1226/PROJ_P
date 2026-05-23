@@ -282,11 +282,11 @@ describe('monsterSort', () => {
 describe('filterAndSortMonsters', () => {
   it('drops excluded entries and sorts the rest', () => {
     const cells = new Map<string, MonsterCell>([
-      ['1,1', { x: 1, y: 1, g: 'P', col: 2,
+      ['1,1', { x: 1, y: 1, g: 'P',
         mon: { id: 1, name: 'plant', typedata: { no_exp: true } } }],
-      ['2,2', { x: 2, y: 2, g: 'g', col: 7,
+      ['2,2', { x: 2, y: 2, g: 'g',
         mon: { id: 2, name: 'goblin', att: 0, type: 5, typedata: { avghp: 5 } } }],
-      ['3,3', { x: 3, y: 3, g: 'D', col: 4,
+      ['3,3', { x: 3, y: 3, g: 'D',
         mon: { id: 3, name: 'dragon', att: 0, type: 8, typedata: { avghp: 100 } } }],
     ])
     const sorted = filterAndSortMonsters(cells)

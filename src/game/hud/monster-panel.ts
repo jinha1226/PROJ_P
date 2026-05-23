@@ -69,7 +69,10 @@ export class MonsterPanelView {
     const glyphEl = document.createElement('div')
     glyphEl.className = 'mp-glyph'
     glyphEl.textContent = mc.g || ' '
-    const c = decodeColor(mc.col)
+    // col read live from the cell, not snapshotted on MonsterCell: mon-less
+    // cell deltas (e.g. sleep→wake) won't refresh MonsterCell, so a snapshot
+    // would keep stale status backgrounds after the monster activated.
+    const c = decodeColor(cell?.col ?? 7)
     glyphEl.style.color = c.fg
     if (c.bg) glyphEl.style.background = c.bg
     row.appendChild(glyphEl)

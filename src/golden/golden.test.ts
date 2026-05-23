@@ -84,7 +84,7 @@ describe('golden replays', () => {
           // First few cells (sorted) as starter samples
           cellSamples: Array.from(store.getMonsters().values())
             .slice(0, 3)
-            .map(m => ({ x: m.x, y: m.y, g: m.g, col: m.col })),
+            .map(m => ({ x: m.x, y: m.y, g: m.g, col: store.get(m.x, m.y)?.col })),
         }, null, 2))
       }
 

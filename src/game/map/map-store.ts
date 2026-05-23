@@ -46,17 +46,18 @@ export interface Cell {
 
 // Index of which cells currently hold a displayable monster. Mirrors the
 // reference's monster_list.js `monsters[[loc.x,loc.y]] = {mon, loc}`:
-// per-cell tile fields (fg / doll / mcache / icons / t_bg) live only on
-// Cell, and renderers fetch them via MapStore.get(x, y) at draw time. Do
-// not re-introduce a shadow of those fields here — out-of-FOV deletes
-// this entry while the Cell retains the memorized values, so a shadow
-// would go stale across the memorize → re-FOV transition. `g` is the
-// *canonical* glyph (first-sighting), distinct from Cell.g which can
-// flip briefly for spell animations.
+// per-cell render fields (col / fg / doll / mcache / icons / t_bg) live
+// only on Cell, and renderers fetch them via MapStore.get(x, y) at draw
+// time. Do not re-introduce a shadow of those fields here — out-of-FOV
+// deletes this entry while the Cell retains the memorized values, so a
+// shadow would go stale across the memorize → re-FOV transition, and
+// (the bug this comment was written for) `col` changes on mon-less cell
+// deltas like sleep→wake would never propagate to the monster list.
+// `g` is the *canonical* glyph (first-sighting), distinct from Cell.g
+// which can flip briefly for spell animations.
 export interface MonsterCell {
   mon: MonsterInfo
   g: string
-  col: number
   x: number
   y: number
 }
@@ -231,10 +232,11 @@ export class MapStore {
               }
               this.monsterRefs.set(id, (this.monsterRefs.get(id) ?? 0) + 1)
             }
-            // Tile-render fields (fg, doll, mcache, icons, t_bg) live only on
-            // Cell; renderers fetch them via MapStore.get(x, y) at draw time.
+            // Per-cell render fields (col, fg, doll, mcache, icons, t_bg)
+            // live only on Cell; renderers fetch them via MapStore.get(x, y)
+            // at draw time.
             this.monsterMap.set(key, {
-              mon: merged, g: cellGlyph, col: cell.col, x: curX, y: curY,
+              mon: merged, g: cellGlyph, x: curX, y: curY,
             })
           }
         }

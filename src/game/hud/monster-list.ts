@@ -136,12 +136,15 @@ export class MonsterListView {
 
       // Render up to MAX_GLYPHS individual glyph spans, each with its own col byte
       // so per-monster status backgrounds (sleeping=blue, wandering=brown, etc.)
-      // are visible even when the group is mixed.
+      // are visible even when the group is mixed. Read col live from the cell
+      // — mon-less cell deltas (e.g. sleep→wake) don't refresh MonsterCell, so
+      // the snapshot would keep the stab bg after the monster activated.
       const showCount = Math.min(group.length, MAX_GLYPHS)
       const glyphSpans: string[] = []
       for (let g = 0; g < showCount; g++) {
         const mc = group[g]
-        const dec = decodeColor(mc.col)
+        const col = this.store.get(mc.x, mc.y)?.col ?? 7
+        const dec = decodeColor(col)
         const style = dec.bg ? `background:${dec.bg};color:${dec.fg}` : `color:${dec.fg}`
         glyphSpans.push(`<span class="ml-glyph" style="${style}">${escHtml(mc.g)}</span>`)
       }
