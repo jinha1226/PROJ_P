@@ -87,6 +87,7 @@ export function buildLoginView(
       <section class="login-section login-spectate-section">
         <div class="login-section-label">Spectate as guest</div>
         <select id="spectate-select" class="login-spectate-select" aria-label="Server"></select>
+        <div id="spectate-error" class="login-error" style="display:none" role="alert"></div>
         <button id="spectate-btn" type="button" class="login-btn login-btn-spectate">Spectate →</button>
       </section>
 
@@ -99,6 +100,7 @@ export function buildLoginView(
   const userInput = view.querySelector<HTMLInputElement>('#login-user')!
   const passInput = view.querySelector<HTMLInputElement>('#login-pass')!
   const errorEl = view.querySelector<HTMLElement>('#login-error')!
+  const spectateErrorEl = view.querySelector<HTMLElement>('#spectate-error')!
   const btn = view.querySelector<HTMLButtonElement>('#login-btn')!
 
   for (const s of KNOWN_SERVERS) {
@@ -152,7 +154,7 @@ export function buildLoginView(
   }
 
   async function resumeWithToken(s: StoredSession, card: HTMLButtonElement): Promise<void> {
-    errorEl.style.display = 'none'
+    clearErrors()
     card.disabled = true
 
     const conn = new WsConnection(s.wsUrl)
@@ -187,7 +189,7 @@ export function buildLoginView(
   const form = view.querySelector<HTMLFormElement>('#login-form')!
   form.addEventListener('submit', async (e) => {
     e.preventDefault()
-    errorEl.style.display = 'none'
+    clearErrors()
 
     const wsUrl = formSelect.value
     const username = userInput.value.trim()
@@ -229,7 +231,7 @@ export function buildLoginView(
 
   const spectateBtn = view.querySelector<HTMLButtonElement>('#spectate-btn')!
   spectateBtn.addEventListener('click', async () => {
-    errorEl.style.display = 'none'
+    clearErrors()
     const wsUrl = spectateSelect.value
     setLastSpectateServer(wsUrl)
     spectateBtn.disabled = true
@@ -239,7 +241,7 @@ export function buildLoginView(
     try {
       await conn.connect()
     } catch {
-      showError(`Could not connect to ${labelFor(wsUrl)}`)
+      showSpectateError(`Could not connect to ${labelFor(wsUrl)}`)
       spectateBtn.disabled = false
       spectateBtn.textContent = 'Spectate →'
       return
@@ -249,8 +251,20 @@ export function buildLoginView(
   })
 
   function showError(msg: string): void {
+    spectateErrorEl.style.display = 'none'
     errorEl.textContent = msg
     errorEl.style.display = ''
+  }
+
+  function showSpectateError(msg: string): void {
+    errorEl.style.display = 'none'
+    spectateErrorEl.textContent = msg
+    spectateErrorEl.style.display = ''
+  }
+
+  function clearErrors(): void {
+    errorEl.style.display = 'none'
+    spectateErrorEl.style.display = 'none'
   }
 
   return view
