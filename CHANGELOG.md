@@ -9,6 +9,11 @@ formatting and HTML chrome differ. Drift is a bug.
 
 Notable changes to PocketZot, newest first.
 
+## 2026-05-23
+
+- The Gods list under `?/` no longer renders each entry with a duplicated
+  hotkey letter.
+
 ## 2026-05-22
 
 - Tapping a shop item to view its description no longer swaps the shop's
