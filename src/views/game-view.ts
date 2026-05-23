@@ -2078,10 +2078,16 @@ export function buildGameView(
         // (e.g. "<lightgreen>a - </lightgreen><lightgrey>72 gold ...</lightgrey>").
         // Capture that first tag and use it for the key span; otherwise fall
         // back to item.colour.
-        const stateMatch = rawText.match(/^(?:<[^>]+>)*.\s([-+# $])\s/)
+        //
+        // The gods menu (god-menu.cc) is unique among menus in wrapping *just*
+        // the hotkey letter in a colour tag: " <yellow>A</yellow> - Ashenzari".
+        // Allow closing tags between the hotkey character and the separator
+        // whitespace so the prefix gets stripped and we don't render
+        // "A - A - Ashenzari".
+        const stateMatch = rawText.match(/^(?:<[^>]+>)*.(?:<\/[^>]+>)*\s([-+# $])\s/)
         const separator = stateMatch?.[1] ?? '-'
         const keyTagName = rawText.match(/^<([a-zA-Z]+)>/)?.[1]?.toLowerCase()
-        rawText = rawText.replace(/^((?:<[^>]+>)*).\s[-+# $]\s/, '$1')
+        rawText = rawText.replace(/^((?:<[^>]+>)*).(?:<\/[^>]+>)*\s[-+# $]\s/, '$1')
         const labelHtml = dcssToHtml(rawText)
         const itemColor = item.colour != null ? uiColor(item.colour) : undefined
         const keyColor = (keyTagName && DCSS_COLOR_MAP[keyTagName]) || itemColor
