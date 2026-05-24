@@ -118,12 +118,16 @@ export class MonsterListView {
       const mon = leader.mon
       const att = mon.att ?? 0
       const threat = mon.threat ?? 0
+      // Whole-bar gate: the bar signals "watch out" (named unique,
+      // top-tier threat, or unusual loadout). None of those are
+      // actionable on an ally, and DCSS gives nearly every individuated
+      // monster a clientid (spectrals, zombies, bound souls), so an
+      // `isNamed`-only path lets the bar leak onto ally rows — including
+      // a red bar on an allied iron troll zombie whose threat tier reads
+      // 3 by HD. Suppress for everything non-hostile.
+      const isHostile = ATTITUDE_CLASSES[att] === 'hostile'
       const isNamed = 'clientid' in mon
-      // Gated on hostile: reference's `.friendly` CSS rule overrides `.nasty`
-      // via source order, and tile reference doesn't pack threat bits for
-      // allies — so neither channel signals threat on a non-hostile, and
-      // neither should the gutter bar.
-      const isNasty = threat === 3 && ATTITUDE_CLASSES[att] === 'hostile'
+      const isNasty = threat === 3
       // UNUSUAL is read from the leader's fg high bits; it indicates the
       // monster carries items unusual for its species (worth examining).
       // Reference renderer paints a magenta tile-border in place of the
@@ -131,9 +135,7 @@ export class MonsterListView {
       const isUnusual = decodeFgThreatTier(leaderCell?.fg) === 'unusual'
       const color = nameColor(att, threat)
 
-      // Row highlight: named, unnamed-nasty, or unusual-items get a left
-      // gutter bar rendered by .ml-bar::before in the panel's left padding.
-      const hasBar = isNamed || isNasty || isUnusual
+      const hasBar = isHostile && (isNamed || isNasty || isUnusual)
       const barColor = isUnusual ? UNUSUAL_COLOR : threatColor(threat)
       const rowCls = hasBar ? 'ml-row ml-bar' : 'ml-row'
       const rowStyle = hasBar ? `--bar-color:${barColor}` : ''
@@ -186,9 +188,11 @@ export class MonsterListView {
       const mon = group[0].mon
       const att = mon.att ?? 0
       const threat = mon.threat ?? 0
+      // See ASCII path: whole-bar gate on hostile so spectrals / zombies /
+      // bound souls (all carrying clientids) don't pick up the bar.
+      const isHostile = ATTITUDE_CLASSES[att] === 'hostile'
       const isNamed = 'clientid' in mon
-      // See ASCII path: gated on hostile to match reference behaviour.
-      const isNasty = threat === 3 && ATTITUDE_CLASSES[att] === 'hostile'
+      const isNasty = threat === 3
       const color = nameColor(att, threat)
 
       // Per-group identity. monsterSort only collapses entries with matching
@@ -206,7 +210,7 @@ export class MonsterListView {
       const leaderFg = memberCells[0]?.fg
 
       const isUnusual = decodeFgThreatTier(leaderFg) === 'unusual'
-      const hasBar = isNamed || isNasty || isUnusual
+      const hasBar = isHostile && (isNamed || isNasty || isUnusual)
       const barColor = isUnusual ? UNUSUAL_COLOR : threatColor(threat)
 
       const hpColor = group.length === 1
