@@ -504,6 +504,11 @@ html, body {
   opacity: 0.85;
 }
 
+.lobby-game-version {
+  font-style: italic;
+  opacity: 0.7;
+}
+
 /* ── Game view ────────────────────────────────────────────── */
 #game-view {
   position: relative;
