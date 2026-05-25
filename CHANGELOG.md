@@ -9,6 +9,10 @@ formatting and HTML chrome differ. Drift is a bug.
 
 Notable changes to PocketZot, newest first.
 
+## 2026-05-24
+
+- Lobby rows now include game version.
+
 ## 2026-05-23
 
 - The Gods list under `?/` no longer renders each entry with a duplicated
