@@ -11,6 +11,8 @@ Notable changes to PocketZot, newest first.
 
 ## 2026-05-26
 
+- Skill-menu hotkey buttons no longer drop right-column skills whose
+  partner skill has a training manual.
 - Add inline buttons for more prompts (e.g. `* to list` on the cast-spell
   confirmation).
 

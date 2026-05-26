@@ -15,6 +15,7 @@ import { handleKeydown, CK_UP, CK_DOWN, CK_PGUP, CK_PGDN, CK_HOME, CK_END } from
 import { createShiftToggle } from '../game/input/shift-state'
 import { uiColor, escHtml, dcssToHtml, DCSS_COLOR_MAP } from '../game/dcss-colors'
 import { parsePromptText, PROMPT_TRIGGER_RE } from './prompt-parse'
+import { extractSkillHotkeys } from './skill-hotkeys'
 import { tileLoader, TEX } from '../game/tiles/tile-loader'
 import { renderTiles, appendIconOverlays, monsterTileSpec, prependDngnLayer, type TileRef } from '../game/tiles/tile-view'
 
@@ -1610,17 +1611,11 @@ export function buildGameView(
   }
 
   function updateSkillLetterButtons(): void {
-    const seen = new Set<string>()
+    const lines: string[] = []
     uiOverlay.querySelectorAll<HTMLElement>('.crt-line').forEach(line => {
-      const text = line.textContent ?? ''
-      // Skill rows are formatted "  X S Name…" where S is a training sign
-      // (+/-/*). The set-target prefill renders as "  0      " in the target
-      // column, so `[+\-*]` is required — accepting space here would catch
-      // that "0" as a fake hotkey.
-      for (const m of text.matchAll(/  ([a-z0-9]) [+\-*]/g)) seen.add(m[1])
+      lines.push(line.textContent ?? '')
     })
-    const order = 'abcdefghijklmnopqrstuvwxyz0123456789'
-    const letters = [...order].filter(c => seen.has(c))
+    const letters = extractSkillHotkeys(lines)
     let row = menuControls.querySelector<HTMLElement>('.skill-letter-row')
     if (!row) {
       row = document.createElement('div')
