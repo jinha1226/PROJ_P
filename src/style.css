@@ -620,10 +620,14 @@ html, body {
 .msg-turn-mark {
   display: inline-block;
   min-width: 1ch;
-  color: var(--text-dim);
   user-select: none;
   -webkit-user-select: none;
 }
+/* Reference colors (style.css:276-281): command_marker darkgrey (fg8),
+   turn_marker lightgrey (fg7). Rule order matters: when both classes
+   land on the same glyph, `turn` wins (later rule, equal specificity). */
+.msg-turn-mark.cmd  { color: #555753; }
+.msg-turn-mark.turn { color: #babdb6; }
 
 .game-prompt .action-btn {
   vertical-align: middle;

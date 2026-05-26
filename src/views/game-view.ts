@@ -597,6 +597,7 @@ export function buildGameView(
         inventoryStore.update(msg.inv)
         statsView.update(msg)
         if (msg.status !== undefined) statusView.update(msg.status)
+        if (msg.time !== undefined) markLastMsg('turn')
         break
       }
 
@@ -799,13 +800,15 @@ export function buildGameView(
       }
 
       case 'input_mode': {
+        const prevInputMode = currentInputMode
         currentInputMode = msg.mode
         if (msg.mode === 1) {  // COMMAND: normal play resumed
           hideMoreBtn()
           disableActivePrompt()
           removeTextInput()
-          const lastMark = msgLog.querySelector<HTMLElement>('.game-msg:last-child .msg-turn-mark')
-          if (lastMark) lastMark.textContent = '_'
+          // Reference only marks on the COMMAND transition, not on every
+          // COMMAND-while-COMMAND repeat (game.js set_input_mode early-returns).
+          if (prevInputMode !== 1) markLastMsg('cmd')
         }
         // YESNO (8) prompts inside a shop menu need a Y/N row instead of
         // the standard shop controls; rebuild whenever the mode changes.
@@ -2543,6 +2546,13 @@ export function buildGameView(
   function makePromptRow(text: string): HTMLElement {
     const row = document.createElement('p')
     row.className = 'game-msg game-prompt'
+    // Carry a prefix-glyph slot like other .game-msg rows so markLastMsg
+    // can land turn/cmd markers here too (matches reference, where every
+    // .game_message has a .prefix_glyph).
+    const mark = document.createElement('span')
+    mark.className = 'msg-turn-mark'
+    mark.textContent = ' '
+    row.appendChild(mark)
     const parsed = parsePromptText(text)
     if (parsed.color) row.style.color = parsed.color
     // Trigger gate is wider than the per-token matcher, so a message can
@@ -2551,7 +2561,9 @@ export function buildGameView(
     // the body in one shot through dcssToHtml — that preserves any
     // inline markup the comma/or split would have broken.
     if (!parsed.hasButton) {
-      row.innerHTML = dcssToHtml(parsed.body)
+      const body = document.createElement('span')
+      body.innerHTML = dcssToHtml(parsed.body)
+      row.appendChild(body)
       return row
     }
     for (const seg of parsed.segments) {
@@ -2604,6 +2616,17 @@ export function buildGameView(
       }
     }
     return bar
+  }
+
+  // Mirrors the reference's `set_last_prefix_glyph` (messages.js): set the
+  // last message's prefix glyph to `_` and tag it `turn` or `cmd` so CSS
+  // can color it (lightgrey turn, darkgrey cmd). If both classes land on
+  // the same span the `turn` color wins, matching reference rule order.
+  function markLastMsg(kind: 'turn' | 'cmd'): void {
+    const mark = msgLog.querySelector<HTMLElement>('.game-msg:last-child .msg-turn-mark')
+    if (!mark) return
+    mark.textContent = '_'
+    mark.classList.add(kind)
   }
 
   function appendMessage(text: string, html = false): void {
