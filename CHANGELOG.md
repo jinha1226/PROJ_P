@@ -9,6 +9,12 @@ formatting and HTML chrome differ. Drift is a bug.
 
 Notable changes to PocketZot, newest first.
 
+## 2026-05-27
+
+- The floating monster list can now be collapsed to a one-row summary
+  via a chevron in its top-right corner; the choice is remembered across
+  sessions.
+
 ## 2026-05-26
 
 - Skill-menu hotkey buttons no longer drop right-column skills whose
