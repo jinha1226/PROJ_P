@@ -19,6 +19,10 @@ import { extractSkillHotkeys } from './skill-hotkeys'
 import { tileLoader, TEX } from '../game/tiles/tile-loader'
 import { renderTiles, appendIconOverlays, monsterTileSpec, prependDngnLayer, type TileRef } from '../game/tiles/tile-view'
 
+// MOUSE_MODE_YESNO from DCSS defines.h. Set inside yesno() (prompt.cc:219)
+// for the duration of the y/N read, regardless of whether a menu is open.
+const MOUSE_MODE_YESNO = 8
+
 // --- local protocol interfaces ---
 
 interface NewgameButton {
@@ -811,10 +815,22 @@ export function buildGameView(
           // COMMAND-while-COMMAND repeat (game.js set_input_mode early-returns).
           if (prevInputMode !== 1) markLastMsg('cmd')
         }
-        // YESNO (8) prompts inside a shop menu need a Y/N row instead of
-        // the standard shop controls; rebuild whenever the mode changes.
-        if (activeMenu?.tag === 'shop') {
-          buildMenuControls(activeMenu.tag, activeMenu.flags)
+        // YESNO prompts fire inside any menu that calls yesno() while open:
+        // shop purchase (shopping.cc), acquirement (acquire.cc), Nemelex
+        // StackFive (decks.cc:708). Menus with their own permanent bar
+        // (shop/stash/acquirement) rebuild on every mode change so the bar
+        // can swap to ⎋ Y N. Other menus get a bar only for the duration of
+        // the YESNO prompt — shown on the entering edge, hidden on the
+        // leaving edge.
+        if (activeMenu) {
+          const tag = activeMenu.tag
+          const tagHasBar = tag === 'shop' || tag === 'stash' || tag === 'acquirement'
+          const enteringYesno = msg.mode === MOUSE_MODE_YESNO
+          const leavingYesno = prevInputMode === MOUSE_MODE_YESNO && !enteringYesno
+          if (tagHasBar || enteringYesno || leavingYesno) {
+            buildMenuControls(tag, activeMenu.flags)
+            if (!tagHasBar) menuControls.style.display = enteringYesno ? '' : 'none'
+          }
         }
         break
       }
@@ -1118,9 +1134,9 @@ export function buildGameView(
         uiOverlay.appendChild(buildActionsBar(msg.actions))
       }
     })
-    // A ui-push layered over a shop/stash menu (e.g. describe-item after `!`)
-    // should keep the menu's bottom row.
-    if (activeMenu?.tag === 'shop' || activeMenu?.tag === 'stash') {
+    // A ui-push layered over a shop/stash/acquirement menu (e.g. describe-item
+    // after `!`) should keep the menu's bottom row.
+    if (activeMenu?.tag === 'shop' || activeMenu?.tag === 'stash' || activeMenu?.tag === 'acquirement') {
       buildMenuControls(activeMenu.tag, activeMenu.flags)
       menuControls.style.display = ''
       touchControls.element.style.display = 'none'
@@ -1675,7 +1691,6 @@ export function buildGameView(
   function buildMenuControls(tag?: string, flags?: number): void {
     menuControls.innerHTML = ''
     type BtnDef = { label: string; key?: string; keycode?: number; dynamic?: true; shift?: true }
-    const MOUSE_MODE_YESNO = 8
     // Server keeps the menu open for a (y/N) confirmation (e.g. shop purchase)
     // and signals it via input_mode=YESNO. Swap the row to Y/N so the user
     // has a way to answer without a keyboard.
@@ -1694,6 +1709,14 @@ export function buildGameView(
         { label: '/', key: '/' },
         { label: '⇧', shift: true },
         { label: '⏎', keycode: 13, dynamic: true },
+      ]
+    } else if (tag === 'acquirement') {
+      // AcquireMenu (acquire.cc): single-select, item hotkeys a-i via row taps.
+      // ! cycles acquire/examine mode; selecting an item flips input_mode to
+      // YESNO, which the yesnoActive branch above swaps in for confirmation.
+      btns = [
+        { label: '⎋', keycode: 27 },
+        { label: '!', key: '!' },
       ]
     } else if (tag === 'stash') {
       // Stash-search results (Ctrl-F). Tap a row to open the X-mode preview;
@@ -1976,7 +1999,7 @@ export function buildGameView(
       footerEl.innerHTML = formatMoreHtml(msg.more ?? '', 'top')
       uiOverlay.appendChild(footerEl)
     })
-    if (msg.tag === 'shop' || msg.tag === 'stash') {
+    if (msg.tag === 'shop' || msg.tag === 'stash' || msg.tag === 'acquirement') {
       buildMenuControls(msg.tag, msg.flags)
       menuControls.style.display = ''
       touchControls.element.style.display = 'none'
