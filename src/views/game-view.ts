@@ -350,6 +350,11 @@ export function buildGameView(
 
   const hud = document.createElement('div')
   hud.id = 'game-hud'
+  // Hidden until the first `player` message — between layer:"game" and the
+  // first stats payload the HUD would otherwise show empty HP/MP bars and
+  // floating AC/EV/SH/… captions with no values. `visibility` so the later
+  // display:none/'' toggles on overlay open/close don't unhide it early.
+  hud.style.visibility = 'hidden'
   hud.appendChild(hudTop)
   hud.appendChild(statusView.element)
 
@@ -606,6 +611,7 @@ export function buildGameView(
         statsView.update(msg)
         if (msg.status !== undefined) statusView.update(msg.status)
         if (msg.time !== undefined) markLastMsg('turn')
+        hud.style.visibility = ''
         break
       }
 
