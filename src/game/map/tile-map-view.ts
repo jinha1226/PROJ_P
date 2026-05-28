@@ -202,6 +202,13 @@ export class TileMapView {
   // drop the round-to-even-pixels constraint that previously left ~9 px of
   // dead space on each side of the binding axis.
   private cellPx = 16
+  // Cached canvas offsets. Reading offsetLeft/offsetTop on every cursor
+  // update forces synchronous layout — measurable in tile mode (p95 ~2 ms
+  // during examine). We refresh these in setViewportSize, which already
+  // runs in a layout-affecting path; otherwise updateCursorEl uses the
+  // cached values without touching the layout engine.
+  private canvasOffsetLeft = 0
+  private canvasOffsetTop = 0
   // Flipped true once every PRELOAD_TEX atlas + tileinfo + tileinfo-dngn has
   // loaded. Until then we draw ASCII glyphs on the canvas — same shape, lets
   // the user see the map while ~10 MB of atlas downloads.
@@ -367,19 +374,26 @@ export class TileMapView {
     const cssH = h * this.cellPx
     const same = w === this.viewportW && h === this.viewportH
       && this.canvas.style.width === `${cssW}px`
-    if (same) return
-    this.viewportW = w
-    this.viewportH = h
-    // Backing store at native atlas resolution. CSS scales it up/down to the
-    // float display size; `image-rendering: pixelated` keeps the scale
-    // nearest-neighbor so we don't need a DPR multiplier on the backing.
-    this.canvas.width = w * ATLAS_CELL
-    this.canvas.height = h * ATLAS_CELL
-    this.canvas.style.width = `${cssW}px`
-    this.canvas.style.height = `${cssH}px`
-    this.ctx.setTransform(1, 0, 0, 1, 0, 0)
-    this.ctx.imageSmoothingEnabled = false
-    this.fullRender()
+    if (!same) {
+      this.viewportW = w
+      this.viewportH = h
+      // Backing store at native atlas resolution. CSS scales it up/down to the
+      // float display size; `image-rendering: pixelated` keeps the scale
+      // nearest-neighbor so we don't need a DPR multiplier on the backing.
+      this.canvas.width = w * ATLAS_CELL
+      this.canvas.height = h * ATLAS_CELL
+      this.canvas.style.width = `${cssW}px`
+      this.canvas.style.height = `${cssH}px`
+      this.ctx.setTransform(1, 0, 0, 1, 0, 0)
+      this.ctx.imageSmoothingEnabled = false
+      this.fullRender()
+    }
+    // Refresh cached canvas offsets even when size didn't change — the
+    // canvas can still shift if surrounding panels (monster list, HUD)
+    // resized. fitToContainer is the caller in that case and already
+    // forced a layout via getBoundingClientRect, so these reads are free.
+    this.canvasOffsetLeft = this.canvas.offsetLeft
+    this.canvasOffsetTop = this.canvas.offsetTop
   }
 
   resetViewportSize(): void {
@@ -899,9 +913,11 @@ export class TileMapView {
     // the cursor at the container origin while the painted cells are at the
     // canvas offset, producing the disconnected cursor + map seen during
     // X-mode pans where the canvas shrinks to the lower portion of the area.
+    // Offsets are cached in setViewportSize (see canvasOffsetLeft) so this
+    // hot path doesn't force layout.
     this.cursorEl.style.display = ''
-    this.cursorEl.style.left = `${this.canvas.offsetLeft + col * this.cellPx}px`
-    this.cursorEl.style.top = `${this.canvas.offsetTop + row * this.cellPx}px`
+    this.cursorEl.style.left = `${this.canvasOffsetLeft + col * this.cellPx}px`
+    this.cursorEl.style.top = `${this.canvasOffsetTop + row * this.cellPx}px`
     this.cursorEl.style.width = `${this.cellPx}px`
     this.cursorEl.style.height = `${this.cellPx}px`
   }
