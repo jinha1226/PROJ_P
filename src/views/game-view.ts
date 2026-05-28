@@ -869,8 +869,10 @@ export function buildGameView(
 
       case 'msgs': {
         if (msg.rollback) {
+          // msgLog is column-reverse: most-recent message is firstChild, so
+          // rollback (remove the last N appended) walks the DOM head.
           let n = msg.rollback
-          while (n-- > 0 && msgLog.lastChild) msgLog.lastChild.remove()
+          while (n-- > 0 && msgLog.firstChild) msgLog.firstChild.remove()
         }
         for (const m of msg.messages ?? []) {
           if (!m.text) continue
@@ -878,9 +880,10 @@ export function buildGameView(
             disableActivePrompt()
             const row = makePromptRow(m.text)
             activePromptEl = row
-            msgLog.appendChild(row)
-            while (msgLog.children.length > 50) msgLog.firstChild?.remove()
-            msgLog.scrollTop = msgLog.scrollHeight
+            // Same column-reverse flip as appendMessage: prepend to land at
+            // visual bottom, prune the visual-top (DOM lastChild) on overflow.
+            msgLog.prepend(row)
+            while (msgLog.children.length > 50) msgLog.lastChild?.remove()
           } else {
             appendMessage(m.text, true)
           }
@@ -2558,8 +2561,7 @@ export function buildGameView(
       }
     })
     row.appendChild(input)
-    msgLog.appendChild(row)
-    msgLog.scrollTop = msgLog.scrollHeight
+    msgLog.prepend(row)
     requestAnimationFrame(() => input.focus())
     autoOpenKbd()
   }
@@ -2644,7 +2646,8 @@ export function buildGameView(
   // can color it (lightgrey turn, darkgrey cmd). If both classes land on
   // the same span the `turn` color wins, matching reference rule order.
   function markLastMsg(kind: 'turn' | 'cmd'): void {
-    const mark = msgLog.querySelector<HTMLElement>('.game-msg:last-child .msg-turn-mark')
+    // msgLog is column-reverse: visual "last" = DOM :first-child.
+    const mark = msgLog.querySelector<HTMLElement>('.game-msg:first-child .msg-turn-mark')
     if (!mark) return
     mark.textContent = '_'
     mark.classList.add(kind)
@@ -2661,9 +2664,12 @@ export function buildGameView(
     if (html) content.innerHTML = dcssToHtml(text)
     else content.textContent = text
     p.appendChild(content)
-    msgLog.appendChild(p)
-    while (msgLog.children.length > 50) msgLog.firstChild?.remove()
-    msgLog.scrollTop = msgLog.scrollHeight
+    // msgLog uses flex column-reverse: prepend places this at the visual
+    // bottom and the browser pins scroll there for free. Pruning the
+    // *oldest* message means removing the visual-top one, which under
+    // column-reverse is the DOM lastChild.
+    msgLog.prepend(p)
+    while (msgLog.children.length > 50) msgLog.lastChild?.remove()
   }
 
   return view
