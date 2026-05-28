@@ -9,6 +9,12 @@ formatting and HTML chrome differ. Drift is a bug.
 
 Notable changes to PocketZot, newest first.
 
+## 2026-05-28
+
+- Optimized map rendering to be ~40% faster during movement-heavy play.
+- Rewrote message log handling to be an order of magnitude faster when many
+  messages are arriving.
+
 ## 2026-05-27
 
 - Acquirement now shows a dedicated ⎋ / `!` control row.
