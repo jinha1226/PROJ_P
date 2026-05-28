@@ -35,9 +35,14 @@ export class MapView {
     return this.container
   }
 
-  // Set the absolute viewport center (from vgrdc or playerPos).
-  setViewCenter(c: { x: number; y: number }): void {
+  // Set the absolute viewport center (from vgrdc or playerPos). Returns
+  // true if the center actually moved — the server resends vgrdc on every
+  // map message (even when nothing panned), so callers gate fullRender on
+  // this to keep the dirty-render path live in steady state.
+  setViewCenter(c: { x: number; y: number }): boolean {
+    const changed = c.x !== this.viewCenter.x || c.y !== this.viewCenter.y
     this.viewCenter = { ...c }
+    return changed
   }
 
   // Multiplier applied to the chosen font size in fitToContainer. Smaller

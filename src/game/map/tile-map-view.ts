@@ -312,7 +312,13 @@ export class TileMapView {
 
   get element(): HTMLElement { return this.container }
 
-  setViewCenter(c: { x: number; y: number }): void { this.viewCenter = { ...c } }
+  // Returns true if the center actually moved — see MapView.setViewCenter for
+  // the rationale (vgrdc is resent on every map message in steady state).
+  setViewCenter(c: { x: number; y: number }): boolean {
+    const changed = c.x !== this.viewCenter.x || c.y !== this.viewCenter.y
+    this.viewCenter = { ...c }
+    return changed
+  }
   // Mirrors MapView.setFontScale. Stored as a multiplier on cellPx, applied
   // in fitToContainer. X-mode calls this with 0.7 to zoom out (smaller cells
   // ⇒ more of them fit, courtesy of the symmetric slack-fill); back to 1.0

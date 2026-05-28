@@ -581,9 +581,12 @@ export function buildGameView(
 
       case 'map': {
         if (msg.clear) store.clear()
-        if (msg.vgrdc) mapView.setViewCenter(msg.vgrdc)
+        // vgrdc is resent on every map message even when it equals the
+        // current view center; setViewCenter returns true only on a real
+        // pan, so we can keep the dirty-render path live in steady state.
+        const panned = msg.vgrdc ? mapView.setViewCenter(msg.vgrdc) : false
         const dirty = store.merge(msg.cells ?? [])
-        if (msg.clear || msg.vgrdc) mapView.fullRender()
+        if (msg.clear || panned) mapView.fullRender()
         else mapView.render(dirty)
         monsterListView.update(store.getMonsters())
         if (monsterPanelOpen) monsterPanel.update(store.getMonsters())
