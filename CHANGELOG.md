@@ -11,6 +11,9 @@ Notable changes to PocketZot, newest first.
 
 ## 2026-05-27
 
+- Acquirement now shows a dedicated ⎋ / `!` control row.
+- y/N confirmation buttons now appear during any open menu, not
+  just shops.
 - The floating monster list can now be collapsed to a one-row summary.
   Collapsed state is remembered across sessions.
 
