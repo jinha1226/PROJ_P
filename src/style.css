@@ -1555,6 +1555,11 @@ html, body {
   flex-direction: row-reverse;
   gap: 0.75rem;
 }
+/* Quiet outlined buttons, matching the lobby exit dialog's tone: a prompt
+   like "Transfer? / No" is a real either/or, so neither choice should shout
+   as a filled accent CTA. Normal weight, body text on a transparent fill with
+   a hairline border for tap affordance; the dim surface2 on :active is the
+   same press feedback as .lobby-exit-close. */
 .dialog-body .button,
 .dialog-body input[type="button"] {
   float: none !important;
@@ -1562,17 +1567,17 @@ html, body {
   flex: 1 1 0;
   min-width: 0;
   margin: 0;
-  padding: 0.85rem 1rem;
-  font: bold 1rem var(--font-mono);
-  color: var(--bg);
-  background: var(--accent);
-  border: none;
+  padding: 0.6rem 1rem;
+  font: 0.95rem var(--font-mono);
+  color: var(--text);
+  background: transparent;
+  border: 1px solid var(--border);
   border-radius: 6px;
   cursor: pointer;
   -webkit-tap-highlight-color: transparent;
 }
 .dialog-body .button:active,
-.dialog-body input[type="button"]:active { filter: brightness(0.85); }
+.dialog-body input[type="button"]:active { background: var(--surface2); }
 
 .overlay-stat-row {
   display: flex;
