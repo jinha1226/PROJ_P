@@ -357,9 +357,14 @@ export function buildGameView(
   hud.id = 'game-hud'
   // Hidden until the first `player` message — between layer:"game" and the
   // first stats payload the HUD would otherwise show empty HP/MP bars and
-  // floating AC/EV/SH/… captions with no values. `visibility` so the later
-  // display:none/'' toggles on overlay open/close don't unhide it early.
-  hud.style.visibility = 'hidden'
+  // floating AC/EV/SH/… captions with no values. One display-based mechanism:
+  // showHud() is the sole un-hide and no-ops until hudRevealed flips on that
+  // first message, so the overlay/X-mode restore paths can call it
+  // unconditionally without revealing the HUD early. Hide paths set
+  // display:none directly.
+  hud.style.display = 'none'
+  let hudRevealed = false
+  const showHud = (): void => { if (hudRevealed) hud.style.display = '' }
   hud.appendChild(hudTop)
   hud.appendChild(statusView.element)
 
@@ -624,7 +629,7 @@ export function buildGameView(
         statsView.update(msg)
         if (msg.status !== undefined) statusView.update(msg.status)
         if (msg.time !== undefined) markLastMsg('turn')
-        hud.style.visibility = ''
+        if (!hudRevealed) { hudRevealed = true; showHud() }
         break
       }
 
@@ -1016,7 +1021,7 @@ export function buildGameView(
       mapView.element.style.display = 'none'
       touchControls.element.style.display = 'none'
     } else {
-      hud.style.display = ''
+      showHud()
       msgLog.style.display = ''
     }
   }
@@ -2439,7 +2444,7 @@ export function buildGameView(
     menuControls.innerHTML = ''
     if (!inXMode) {
       msgLog.style.display = ''
-      hud.style.display = ''
+      showHud()
     }
     touchControls.element.style.display = ''
     requestAnimationFrame(() => {
