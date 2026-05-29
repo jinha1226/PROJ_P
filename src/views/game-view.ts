@@ -169,6 +169,10 @@ export function buildGameView(
   // also avoids surprise downloads on launch.
   let renderMode: 'ascii' | 'tiles' = 'ascii'
   let mapView: MapView | TileMapView = new MapView(store)
+  // Running HP/MP snapshot (merged across player deltas) for the tile view's
+  // under-tile mini-bars. Kept here so a render-mode swap can seed the freshly
+  // created view, which otherwise starts at zero until the next player message.
+  const playerStats: { hp?: number; hp_max?: number; mp?: number; mp_max?: number } = {}
   const inventoryStore = new InventoryStore()
   const statsView = new StatsView(inventoryStore)
   const statusView = new StatusView()
@@ -485,6 +489,7 @@ export function buildGameView(
     // is the source of truth (global flag), so re-apply directly.
     if (inXMode) next.setFontScale(X_MODE_SCALE)
     if (cursorLoc) next.setCursor(cursorLoc)
+    next.setPlayerStats(playerStats)
     oldEl.replaceWith(next.element)
     mapView = next
     fontScaleObserver.observe(mapView.element)
@@ -606,6 +611,14 @@ export function buildGameView(
           // as the 'map' case — full redraw only on a real pan.)
           if (mapView.setViewCenter(store.playerPos)) mapView.fullRender()
         }
+        // Feed HP/MP to the renderer (tile mode draws under-tile mini-bars).
+        // After any fullRender above, so the player cell repaints with fresh
+        // values; merged into playerStats so a later tile-mode swap can seed.
+        if (msg.hp !== undefined) playerStats.hp = msg.hp
+        if (msg.hp_max !== undefined) playerStats.hp_max = msg.hp_max
+        if (msg.mp !== undefined) playerStats.mp = msg.mp
+        if (msg.mp_max !== undefined) playerStats.mp_max = msg.mp_max
+        mapView.setPlayerStats(playerStats)
         inventoryStore.update(msg.inv)
         statsView.update(msg)
         if (msg.status !== undefined) statusView.update(msg.status)

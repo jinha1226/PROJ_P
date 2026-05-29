@@ -46,6 +46,11 @@ export class MapView {
     return changed
   }
 
+  // No-op in ASCII mode: HP/MP live in the HUD, not under the player glyph.
+  // Present so callers can treat MapView and TileMapView uniformly (the tile
+  // view draws under-tile mini-bars from these stats).
+  setPlayerStats(_p: { hp?: number; hp_max?: number; mp?: number; mp_max?: number }): void {}
+
   // Multiplier applied to the chosen font size in fitToContainer. Smaller
   // scale ⇒ smaller glyphs ⇒ viewport expansion fits more cells. Caller is
   // expected to invoke fitToContainer() next, matching setViewCenter's pattern.

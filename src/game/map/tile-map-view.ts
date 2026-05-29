@@ -195,6 +195,13 @@ export class TileMapView {
   private renderScale = 1.0
   private viewCenter = { x: 0, y: 0 }
   private cursorLoc: { x: number; y: number } | null = null
+  // Latest player HP/MP, for the mini-bars drawn under the player tile (the
+  // reference's draw_minibars reads these from its global `player`). Fed from
+  // the 'player' handler via setPlayerStats; carried forward across deltas.
+  private hp = 0
+  private hpMax = 0
+  private mp = 0
+  private mpMax = 0
   // CSS pixel size of one rendered cell — a float, picked to fill the binding
   // axis exactly. The backing canvas always renders at ATLAS_CELL per cell
   // (native atlas resolution); the canvas is then CSS-scaled to this size,
@@ -426,6 +433,65 @@ export class TileMapView {
   private paintCell(col: number, row: number, mx: number, my: number): void {
     this.drawCell(col, row, mx, my)
     this.paintCursorIfHere(mx, my, col * ATLAS_CELL, row * ATLAS_CELL)
+    // Mini HP/MP bars under the player tile, mirroring cell_renderer.js
+    // draw_minibars (called for the player cell at the tail of do_render_cell,
+    // right after render_cursors). Player-cell-only, like the reference.
+    if (mx === this.store.playerPos.x && my === this.store.playerPos.y) {
+      this.paintMinibars(col * ATLAS_CELL, row * ATLAS_CELL)
+    }
+  }
+
+  // Latest player HP/MP for the under-tile mini-bars. Only defined fields
+  // update (player messages are deltas), so values carry forward like
+  // StatsView's merged state. Repaints the player cell on a change so the bar
+  // refreshes even when the turn brought no movement (e.g. damage in place).
+  setPlayerStats(p: { hp?: number; hp_max?: number; mp?: number; mp_max?: number }): void {
+    let changed = false
+    if (p.hp !== undefined && p.hp !== this.hp) { this.hp = p.hp; changed = true }
+    if (p.hp_max !== undefined && p.hp_max !== this.hpMax) { this.hpMax = p.hp_max; changed = true }
+    if (p.mp !== undefined && p.mp !== this.mp) { this.mp = p.mp; changed = true }
+    if (p.mp_max !== undefined && p.mp_max !== this.mpMax) { this.mpMax = p.mp_max; changed = true }
+    if (changed) this.redrawPlayerCell()
+  }
+
+  private redrawPlayerCell(): void {
+    if (!this.ready) return
+    const p = this.store.playerPos
+    const col = p.x - this.offX
+    const row = p.y - this.offY
+    if (this.inView(col, row)) this.paintCell(col, row, p.x, p.y)
+  }
+
+  // Mirrors cell_renderer.js draw_minibars: a magic bar (bottom row) and an HP
+  // bar stacked above it, each ATLAS_CELL/16 tall, drawn full-width as the
+  // "spent" colour with the current fraction painted over in the "full" colour.
+  // Skipped when both bars would be full (or a max is 0). Colours match our HUD
+  // HP/MP bars (style.css .hud-bar-seg.*), which are the reference's values.
+  private paintMinibars(px: number, py: number): void {
+    const showHp = this.hpMax > 0
+    const showMp = this.mpMax > 0
+    const hpFull = !showHp || this.hp >= this.hpMax
+    const mpFull = !showMp || this.mp >= this.mpMax
+    if (hpFull && mpFull) return
+
+    const barH = Math.max(1, Math.floor(ATLAS_CELL / 16))
+    const ctx = this.ctx
+    let hpOffset = barH
+    if (showMp) {
+      const pct = Math.max(0, Math.min(1, this.mp / this.mpMax))
+      ctx.fillStyle = '#000000'        // magic_spend
+      ctx.fillRect(px, py + ATLAS_CELL - barH, ATLAS_CELL, barH)
+      ctx.fillStyle = '#5e78ff'        // magic (DCSS lightblue)
+      ctx.fillRect(px, py + ATLAS_CELL - barH, ATLAS_CELL * pct, barH)
+      hpOffset += barH
+    }
+    if (showHp) {
+      const pct = Math.max(0, Math.min(1, this.hp / this.hpMax))
+      ctx.fillStyle = '#b30009'        // hp_spend (DCSS red)
+      ctx.fillRect(px, py + ATLAS_CELL - hpOffset, ATLAS_CELL, barH)
+      ctx.fillStyle = '#8ae234'        // healthy (DCSS lightgreen)
+      ctx.fillRect(px, py + ATLAS_CELL - hpOffset, ATLAS_CELL * pct, barH)
+    }
   }
 
   fullRender(): void {
