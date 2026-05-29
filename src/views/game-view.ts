@@ -1117,6 +1117,15 @@ export function buildGameView(
       if (rawBody) {
         const bodyEl = document.createElement('div')
         bodyEl.className = 'overlay-body fg7'
+        // The end-of-game screen (the "Goodbye, …" character summary + the
+        // server's high-score table) is a single fixed-width terminal block,
+        // not a prose panel: every line shares one 80-column coordinate
+        // system. renderBodyLines' per-line isTabularLine heuristic shreds it
+        // — score rows with short names get multi-space padding (nowrap) while
+        // long-name rows wrap — so render it as one nowrap block and scale the
+        // font so the widest line fits the viewport (mirrors the morgue / the
+        // official client). describe-monster/item/god panels stay per-line.
+        const terminal = msg.type === 'game-over'
         if (spellset?.length && rawBody.includes('SPELLSET_PLACEHOLDER')) {
           // Reference client splits the body on SPELLSET_PLACEHOLDER and
           // renders the spellset between the halves (ui-layouts.js:24-31).
@@ -1131,12 +1140,18 @@ export function buildGameView(
                 bodyEl.appendChild(renderSpellbook(book, colourSpells, onSpell))
               }
             }
-            if (part) bodyEl.insertAdjacentHTML('beforeend', renderBodyLines(part, msg.highlight ?? ''))
+            if (part) bodyEl.insertAdjacentHTML('beforeend', renderBodyLines(part, msg.highlight ?? '', terminal))
           })
         } else {
-          bodyEl.innerHTML = renderBodyLines(rawBody, msg.highlight ?? '')
+          bodyEl.innerHTML = renderBodyLines(rawBody, msg.highlight ?? '', terminal)
         }
         uiOverlay.appendChild(bodyEl)
+        // Reading scrollWidth forces a synchronous layout flush, so the scaled
+        // size lands before first paint; rAF re-fits once fonts settle.
+        if (terminal) {
+          fitTerminalBody(bodyEl)
+          requestAnimationFrame(() => fitTerminalBody(bodyEl))
+        }
         // formatted-scroller is a client-owned scroll widget (see the block
         // comment at scrollOverlayBody). Hook the scroll listener so touch
         // swipes and our own page-key handler sync back to the server; honor
@@ -2819,14 +2834,40 @@ function propagateDarkgreyColor(body: string): string {
   return result
 }
 
-function renderBodyLines(rawBody: string, highlight: string): string {
+// `terminal` renders the body as one fixed-width block: every line is nowrap
+// and the stat-row/per-line-tabular reformatting is skipped, so the caller can
+// scale the whole block to fit (see fitTerminalBody). Used for the game-over
+// screen; the describe-* panels keep the per-line heuristic (terminal=false).
+function renderBodyLines(rawBody: string, highlight: string, terminal = false): string {
   return balanceColorTagsAcrossLines(rawBody).split('\n').map(line => {
-    const stat = tryStatRow(line)
-    if (stat) return stat
-    const cls = isTabularLine(line) ? 'overlay-line overlay-line--nowrap' : 'overlay-line'
+    if (!terminal) {
+      const stat = tryStatRow(line)
+      if (stat) return stat
+    }
+    const cls = terminal || isTabularLine(line)
+      ? 'overlay-line overlay-line--nowrap'
+      : 'overlay-line'
     const html = applyHighlight(dcssToHtml(line), highlight) || '&nbsp;'
     return `<div class="${cls}">${html}</div>`
   }).join('')
+}
+
+// Shrink a nowrap terminal body's font so its widest line fits the viewport,
+// preserving column alignment without horizontal scroll. line-height is
+// unitless (1.5) so it scales with font-size, keeping the aspect ratio. The
+// 7px floor keeps it legible; below that the content was never going to fit.
+function fitTerminalBody(bodyEl: HTMLElement): void {
+  bodyEl.style.fontSize = ''
+  const avail = bodyEl.clientWidth
+  if (avail <= 0) return
+  let widest = 0
+  bodyEl.querySelectorAll<HTMLElement>('.overlay-line').forEach(l => {
+    if (l.scrollWidth > widest) widest = l.scrollWidth
+  })
+  if (widest <= avail) return
+  const basePx = parseFloat(getComputedStyle(bodyEl).fontSize)
+  // 0.99 nudge absorbs sub-pixel rounding so the widest line never re-overflows.
+  bodyEl.style.fontSize = `${Math.max(7, basePx * (avail / widest) * 0.99)}px`
 }
 
 // renderBodyLines splits the body on `\n` and runs dcssToHtml per line with
