@@ -1,5 +1,6 @@
 import type { WsConnection } from '../ws/connection'
-import type { ClientMsg, ServerMsg } from '../ws/types'
+import type { ClientMsg, ServerMsg, GameExit } from '../ws/types'
+import { fitToWidth } from './fit-terminal'
 import { MapStore } from '../game/map/map-store'
 import { MapView } from '../game/map/map-view'
 import { TileMapView } from '../game/map/tile-map-view'
@@ -158,7 +159,7 @@ const X_MODE_SCALE = 0.7
 
 export function buildGameView(
   conn: WsConnection,
-  onLobby: () => void,
+  onLobby: (exit?: GameExit) => void,
   spectating?: { username: string },
 ): HTMLElement {
   const store = new MapStore()
@@ -956,9 +957,21 @@ export function buildGameView(
         break
 
       case 'go_lobby':
-      case 'game_ended':
       case 'close':
         onLobby()
+        break
+
+      case 'game_ended':
+        // Forward exit details so the lobby renders the exit dialog after the
+        // layer switch. The trailing go_lobby + lobby list (often batched with
+        // this) land on the lobby's message handler, not ours.
+        onLobby({
+          reason: msg.reason,
+          message: msg.message,
+          dump: msg.dump,
+          spectated: !!spectating,
+          spectatedName: spectating?.username,
+        })
         break
     }
   }
@@ -1146,11 +1159,10 @@ export function buildGameView(
           bodyEl.innerHTML = renderBodyLines(rawBody, msg.highlight ?? '', terminal)
         }
         uiOverlay.appendChild(bodyEl)
-        // Reading scrollWidth forces a synchronous layout flush, so the scaled
-        // size lands before first paint; rAF re-fits once fonts settle.
+        // rAF re-fits once fonts settle (the sync call lands before paint).
         if (terminal) {
-          fitTerminalBody(bodyEl)
-          requestAnimationFrame(() => fitTerminalBody(bodyEl))
+          fitToWidth(bodyEl)
+          requestAnimationFrame(() => fitToWidth(bodyEl))
         }
         // formatted-scroller is a client-owned scroll widget (see the block
         // comment at scrollOverlayBody). Hook the scroll listener so touch
@@ -2850,24 +2862,6 @@ function renderBodyLines(rawBody: string, highlight: string, terminal = false): 
     const html = applyHighlight(dcssToHtml(line), highlight) || '&nbsp;'
     return `<div class="${cls}">${html}</div>`
   }).join('')
-}
-
-// Shrink a nowrap terminal body's font so its widest line fits the viewport,
-// preserving column alignment without horizontal scroll. line-height is
-// unitless (1.5) so it scales with font-size, keeping the aspect ratio. The
-// 7px floor keeps it legible; below that the content was never going to fit.
-function fitTerminalBody(bodyEl: HTMLElement): void {
-  bodyEl.style.fontSize = ''
-  const avail = bodyEl.clientWidth
-  if (avail <= 0) return
-  let widest = 0
-  bodyEl.querySelectorAll<HTMLElement>('.overlay-line').forEach(l => {
-    if (l.scrollWidth > widest) widest = l.scrollWidth
-  })
-  if (widest <= avail) return
-  const basePx = parseFloat(getComputedStyle(bodyEl).fontSize)
-  // 0.99 nudge absorbs sub-pixel rounding so the widest line never re-overflows.
-  bodyEl.style.fontSize = `${Math.max(7, basePx * (avail / widest) * 0.99)}px`
 }
 
 // renderBodyLines splits the body on `\n` and runs dcssToHtml per line with

@@ -1,4 +1,5 @@
 import type { WsConnection } from './ws/connection'
+import type { GameExit } from './ws/types'
 import { buildLoginView } from './views/login'
 import { buildLobbyView } from './views/lobby'
 import { buildGameView } from './views/game-view'
@@ -29,7 +30,7 @@ function showLogin(): void {
   }))
 }
 
-function showLobby(username: string, guest: boolean): void {
+function showLobby(username: string, guest: boolean, exit?: GameExit): void {
   state = 'lobby'
   setView(buildLobbyView(
     conn!,
@@ -37,6 +38,7 @@ function showLobby(username: string, guest: boolean): void {
     guest,
     (spectating) => showGame(spectating),
     () => showLogin(),
+    exit,
   ))
 }
 
@@ -44,7 +46,7 @@ function showGame(spectating?: { username: string }): void {
   state = 'game'
   setView(buildGameView(
     conn!,
-    () => showLobby(currentUsername, currentIsGuest),
+    (exit) => showLobby(currentUsername, currentIsGuest, exit),
     spectating,
   ))
 }
