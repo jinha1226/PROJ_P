@@ -6,6 +6,7 @@
 // work. See ATTRIBUTION.md and LICENSE.
 
 import type { Cell, MapStore } from './map-store'
+import { parseCellKey } from './map-store'
 import { decodeColor, DEFAULT_FG, flashColor } from './colors'
 import { tileLoader, TEX } from '../tiles/tile-loader'
 import {
@@ -26,6 +27,8 @@ import {
   BG_RAMPAGE_HI,
   bgLo, bgHi,
 } from './cell-flags'
+import { buildStatusIconSizeMap } from './icon-sizes'
+import { buildStatusOverlays, resolveOverlayId } from '../hud/monster-style'
 
 // Tile-mode minimum viewport. Square because tile cells are square; 21×21
 // is roughly the smallest cell count where a phone-sized container still
@@ -217,6 +220,9 @@ export class TileMapView {
   // few KB and keeps us robust against renamed constants between versions.
   private dngn: Record<string, number> = {}
   private icons: Record<string, number> = {}
+  // id→width table for cell.icons stacking, built once from the icons module
+  // (see icon-sizes.ts). Shared with the DOM overlay path via buildStatusOverlays.
+  private iconSizes: ReadonlyMap<number, number> = new Map()
   // Per-tile-run variant count from tileinfo-dngn. Used to pick an animation
   // frame for blood/mold/liquefaction via `cell.flv.s % tileCount(id)`.
   private tileCount: ((id: number) => number) | null = null
@@ -275,6 +281,7 @@ export class TileMapView {
       for (const [k, v] of Object.entries(iconsMod as Record<string, unknown>)) {
         if (typeof v === 'number') this.icons[k] = v
       }
+      this.iconSizes = buildStatusIconSizeMap(iconsMod as Record<string, unknown>)
       const tc = (dngnMod as Record<string, unknown>).tile_count
       if (typeof tc === 'function') this.tileCount = tc as (id: number) => number
       this.dngnUnseen = this.dngn.DNGN_UNSEEN ?? 0
@@ -361,20 +368,19 @@ export class TileMapView {
     const cssH = h * this.cellPx
     const same = w === this.viewportW && h === this.viewportH
       && this.canvas.style.width === `${cssW}px`
-    if (!same) {
-      this.viewportW = w
-      this.viewportH = h
-      // Backing store at native atlas resolution. CSS scales it up/down to the
-      // float display size; `image-rendering: pixelated` keeps the scale
-      // nearest-neighbor so we don't need a DPR multiplier on the backing.
-      this.canvas.width = w * ATLAS_CELL
-      this.canvas.height = h * ATLAS_CELL
-      this.canvas.style.width = `${cssW}px`
-      this.canvas.style.height = `${cssH}px`
-      this.ctx.setTransform(1, 0, 0, 1, 0, 0)
-      this.ctx.imageSmoothingEnabled = false
-      this.fullRender()
-    }
+    if (same) return
+    this.viewportW = w
+    this.viewportH = h
+    // Backing store at native atlas resolution. CSS scales it up/down to the
+    // float display size; `image-rendering: pixelated` keeps the scale
+    // nearest-neighbor so we don't need a DPR multiplier on the backing.
+    this.canvas.width = w * ATLAS_CELL
+    this.canvas.height = h * ATLAS_CELL
+    this.canvas.style.width = `${cssW}px`
+    this.canvas.style.height = `${cssH}px`
+    this.ctx.setTransform(1, 0, 0, 1, 0, 0)
+    this.ctx.imageSmoothingEnabled = false
+    this.fullRender()
   }
 
   resetViewportSize(): void {
@@ -382,28 +388,44 @@ export class TileMapView {
     this.setViewportSize(axis, axis)
   }
 
+  // Screen↔dungeon origin: the top-left dungeon coord of the viewport. Screen
+  // cell (col,row) ↔ dungeon (offX+col, offY+row). One definition each so the
+  // centering rule lives in a single place (see CLAUDE.md coordinate system).
+  private get offX(): number { return this.viewCenter.x - Math.floor(this.viewportW / 2) }
+  private get offY(): number { return this.viewCenter.y - Math.floor(this.viewportH / 2) }
+  private inView(col: number, row: number): boolean {
+    return col >= 0 && col < this.viewportW && row >= 0 && row < this.viewportH
+  }
+
   render(dirty?: Set<string>): void {
-    const offX = this.viewCenter.x - Math.floor(this.viewportW / 2)
-    const offY = this.viewCenter.y - Math.floor(this.viewportH / 2)
+    const offX = this.offX
+    const offY = this.offY
     if (dirty) {
       // Iterate dirty cells directly; skip those outside the viewport.
       // See MapView.render for the rationale.
       for (const key of dirty) {
-        const comma = key.indexOf(',')
-        const mx = +key.slice(0, comma)
-        const my = +key.slice(comma + 1)
+        const { x: mx, y: my } = parseCellKey(key)
         const col = mx - offX
         const row = my - offY
-        if (col < 0 || col >= this.viewportW || row < 0 || row >= this.viewportH) continue
-        this.drawCell(col, row, mx, my)
+        if (!this.inView(col, row)) continue
+        this.paintCell(col, row, mx, my)
       }
       return
     }
     for (let row = 0; row < this.viewportH; row++) {
       for (let col = 0; col < this.viewportW; col++) {
-        this.drawCell(col, row, offX + col, offY + row)
+        this.paintCell(col, row, offX + col, offY + row)
       }
     }
+  }
+
+  // Single seam for "draw the cell, then layer the examine/map cursor on top
+  // if it lives here". drawCell stays cursor-free so a future early-return in
+  // its tile stack can't silently drop the cursor; every caller that paints a
+  // cell goes through here instead.
+  private paintCell(col: number, row: number, mx: number, my: number): void {
+    this.drawCell(col, row, mx, my)
+    this.paintCursorIfHere(mx, my, col * ATLAS_CELL, row * ATLAS_CELL)
   }
 
   fullRender(): void {
@@ -418,16 +440,16 @@ export class TileMapView {
     if ((prev?.x ?? null) === (next?.x ?? null) && (prev?.y ?? null) === (next?.y ?? null)) return
     this.cursorLoc = next
     // Repaint the old cell (clears the previous cursor sprite) and the new
-    // cell (paints the new one). drawCell layers the cursor on top when
+    // cell (paints the new one). paintCell layers the cursor on top when
     // (mx,my) === cursorLoc — see paintCursorIfHere.
-    const offX = this.viewCenter.x - Math.floor(this.viewportW / 2)
-    const offY = this.viewCenter.y - Math.floor(this.viewportH / 2)
+    const offX = this.offX
+    const offY = this.offY
     const redraw = (p: { x: number; y: number } | null): void => {
       if (!p) return
       const col = p.x - offX
       const row = p.y - offY
-      if (col < 0 || col >= this.viewportW || row < 0 || row >= this.viewportH) return
-      this.drawCell(col, row, p.x, p.y)
+      if (!this.inView(col, row)) return
+      this.paintCell(col, row, p.x, p.y)
     }
     redraw(prev)
     redraw(next)
@@ -440,14 +462,10 @@ export class TileMapView {
     this.ctx.fillRect(px, py, ATLAS_CELL, ATLAS_CELL)
 
     const cell = this.store.get(mx, my)
-    if (!cell) {
-      this.paintCursorIfHere(mx, my, px, py)
-      return
-    }
+    if (!cell) return
 
     if (!this.ready) {
       this.drawAsciiFallback(cell, px, py)
-      this.paintCursorIfHere(mx, my, px, py)
       return
     }
 
@@ -643,37 +661,17 @@ export class TileMapView {
 
     // ── draw_foreground (cell_renderer.js:898-1090) ────────────────────────
 
-    // Trap markers / item-underneath indicator.
-    if (fg.NET) this.paintIcon('TRAP_NET', px, py)
-    if (fg.WEB) this.paintIcon('TRAP_WEB', px, py)
-    if (fg.S_UNDER) this.paintIcon('SOMETHING_UNDER', px, py)
-
-    // Attitude indicator (small overlay, distinct from the halo).
-    if (fg.PET) this.paintIcon('FRIENDLY', px, py)
-    else if (fg.GD_NEUTRAL) this.paintIcon('GOOD_NEUTRAL', px, py)
-    else if (fg.NEUTRAL) this.paintIcon('NEUTRAL', px, py)
-
-    // Behavior status (mutually exclusive; status_shift accumulates so the
-    // next status icons (poison, cell.icons) stack to the left).
-    let status_shift = 0
-    if (fg.PARALYSED) { this.paintIcon('PARALYSED', px, py); status_shift += 12 }
-    else if (fg.STAB) { this.paintIcon('STAB_BRAND', px, py); status_shift += 12 }
-    else if (fg.MAY_STAB) { this.paintIcon('UNAWARE', px, py); status_shift += 7 }
-    else if (fg.FLEEING) { this.paintIcon('FLEEING', px, py); status_shift += 3 }
-
-    if (fg.POISON) { this.paintIcon('POISON', px, py, -status_shift, 0); status_shift += 5 }
-    else if (fg.MORE_POISON) { this.paintIcon('MORE_POISON', px, py, -status_shift, 0); status_shift += 5 }
-    else if (fg.MAX_POISON) { this.paintIcon('MAX_POISON', px, py, -status_shift, 0); status_shift += 5 }
-
-    // Server-supplied generic status icons (HASTE, CONFUSED, summoning, etc.).
-    if (cell.icons) {
-      for (const id of cell.icons) {
-        if (id > 0) {
-          this.paintTile(TEX.ICONS, id & TILE_ID_MASK, px, py, -status_shift, 0)
-          status_shift += 5
-        }
-      }
+    // Monster-status icons (trap/under markers, attitude, behaviour, poison,
+    // and server-supplied cell.icons) — the ordering, status_shift fan-out, and
+    // per-icon width sizing all live in the shared buildStatusOverlays, the same
+    // decision the DOM list/panel/popup paths run. Only the paint primitive
+    // (canvas paintIcon/paintTile here) differs by substrate.
+    const status = buildStatusOverlays(cell.fg, cell.icons ?? [], this.iconSizes)
+    for (const o of status.overlays) {
+      const id = resolveOverlayId(o, this.icons)
+      if (id !== undefined) this.paintTile(TEX.ICONS, id, px, py, o.xofs, o.yofs)
     }
+    const status_shift = status.statusShift
 
     // Main-atlas overlays from cell.ov (zaps/effects, drawn on top of clouds).
     if (cell.ov) {
@@ -702,9 +700,9 @@ export class TileMapView {
 
     // Cursor stack (cell_renderer.js:1037-1053). Only CURSOR3 — the green
     // autopickup outline — actually fires in v0.34 WebTiles; the examine /
-    // tutorial / map cursors arrive as {msg:"cursor"} and are routed through
-    // paintCursorIfHere at the bottom of this function (mirrors render_cursors
-    // in cell_renderer.js). The other three branches here mirror the reference
+    // tutorial / map cursors arrive as {msg:"cursor"} and are composited by
+    // paintCursorIfHere via the paintCell wrapper after drawCell returns
+    // (mirrors render_cursors in cell_renderer.js). The other three branches here mirror the reference
     // bg-flag dispatch in case a future protocol revision sets them on the wire
     // (same dead-branch pattern as KRAKEN_SW / ELDRITCH_* in decodeBg).
     if (bg.TUT_CURSOR) this.paintIcon('TUTORIAL_CURSOR', px, py)
@@ -736,8 +734,6 @@ export class TileMapView {
       this.ctx.fillStyle = flash
       this.ctx.fillRect(px, py, ATLAS_CELL, ATLAS_CELL)
     }
-
-    this.paintCursorIfHere(mx, my, px, py)
   }
 
   // Reference's draw_blood_overlay (cell_renderer.js:628-663). Picks one of
@@ -902,9 +898,9 @@ export class TileMapView {
   // Mirrors cell_renderer.js render_cursors (line 171): if this cell is the
   // active examine/map cursor location, draw the CURSOR icon on top. The
   // sprite is rltiles/misc/cursor.png — four yellow corner brackets, drawn
-  // from the icons atlas. Called at the tail of every drawCell path so the
-  // cursor layers correctly over empty cells, ASCII-fallback cells, and the
-  // full tile stack.
+  // from the icons atlas. Called once by paintCell after drawCell returns, so
+  // the cursor layers correctly over empty cells, ASCII-fallback cells, and the
+  // full tile stack regardless of which path drawCell took.
   //
   // When the icons atlas hasn't preloaded yet (this.ready=false), the
   // paintIcon call no-ops; we draw a plain yellow outline via canvas strokes

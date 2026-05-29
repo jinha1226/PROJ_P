@@ -9,7 +9,7 @@ import { escHtml } from '../dcss-colors'
 import { decodeColor } from '../map/colors'
 import {
   ATTITUDE_CLASSES, MDAM_COLORS, UNUSUAL_COLOR, decodeFgThreatTier, decodeMdam,
-  fgHaloDngnName, fgOverlayIcons, fgTileIndex,
+  fgHaloDngnName, fgTileIndex,
   filterAndSortMonsters, monsterSort, nameColor, threatColor,
 } from './monster-style'
 import {
@@ -367,11 +367,8 @@ export class MonsterListView {
       if (halo) prependDngnLayer(stack, halo, TILE_SCALE)
       if (cell?.t_bg !== undefined) prependDngnIndex(stack, bgLo(cell.t_bg) & 0xFFFF, TILE_SCALE)
 
-      const iconNames = fgOverlayIcons(cell?.fg)
-      const iconIds = cell?.icons ?? []
-      if (iconNames.length > 0 || iconIds.length > 0) {
-        appendIconOverlays(stack, { names: iconNames, ids: iconIds }, TILE_SCALE)
-      }
+      // Damage shows as the ml-hp bar (rowData), so no MDAM overlay here.
+      appendIconOverlays(stack, cell?.fg, cell?.icons ?? [], TILE_SCALE)
 
       glyphs.appendChild(stack)
     }

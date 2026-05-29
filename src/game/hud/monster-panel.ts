@@ -6,20 +6,13 @@ import {
   MDAM_COLORS,
   decodeMdam, mdamTier,
   decodeFgStatuses,
-  fgHaloDngnName, fgOverlayIcons, fgTileIndex,
+  fgHaloDngnName, fgTileIndex,
   filterAndSortMonsters, nameColor,
 } from './monster-style'
 
 // Sprite scale on the row's left edge. The base tile is 32x32 logical px;
 // scale 1.5 lines up with the row's 48px height defined in .mp-tile / .mp-row.
 const TILE_SCALE = 1.5
-
-interface RowEntry {
-  cell: MonsterCell
-  tileEl: HTMLElement
-  iconNames: string[]
-  iconIds: number[]
-}
 
 export class MonsterPanelView {
   readonly element: HTMLElement
@@ -46,17 +39,10 @@ export class MonsterPanelView {
       return
     }
 
-    const entries: RowEntry[] = []
-    let anyOverlay = false
-    for (const mc of list) {
-      const entry = this.renderRow(mc)
-      entries.push(entry)
-      if (entry.iconNames.length > 0 || entry.iconIds.length > 0) anyOverlay = true
-    }
-    if (anyOverlay) this.applyOverlays(entries)
+    for (const mc of list) this.renderRow(mc)
   }
 
-  private renderRow(mc: MonsterCell): RowEntry {
+  private renderRow(mc: MonsterCell): void {
     const mon = mc.mon
     const att = mon.att ?? 0
     const threat = mon.threat ?? 0
@@ -122,17 +108,9 @@ export class MonsterPanelView {
     })
 
     this.element.appendChild(row)
-    return {
-      cell: mc, tileEl,
-      iconNames: fgOverlayIcons(cell?.fg),
-      iconIds: cell?.icons ?? [],
-    }
-  }
-
-  private applyOverlays(entries: RowEntry[]): void {
-    for (const e of entries) {
-      if (e.iconNames.length === 0 && e.iconIds.length === 0) continue
-      appendIconOverlays(e.tileEl, { names: e.iconNames, ids: e.iconIds }, TILE_SCALE)
-    }
+    // Damage shows as the mp-hp bar above, so no MDAM overlay (includeMdam off).
+    // appendIconOverlays self-defers on the icons tileinfo module, so layering
+    // it here per row is equivalent to a separate second pass.
+    appendIconOverlays(tileEl, cell?.fg, cell?.icons ?? [], TILE_SCALE)
   }
 }

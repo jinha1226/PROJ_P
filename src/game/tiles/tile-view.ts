@@ -4,7 +4,9 @@
 // GPL-2.0-or-later. Reused under the "or later" option as part of this
 // AGPL-3.0-or-later work. See ATTRIBUTION.md and LICENSE.
 
-import { tileLoader, TEX } from './tile-loader'
+import { tileLoader, TEX, type TileinfoModule } from './tile-loader'
+import { buildStatusOverlays, resolveOverlayId } from '../hud/monster-style'
+import { buildStatusIconSizeMap } from '../map/icon-sizes'
 
 // Native cell size used by all DCSS sprite atlases. Each tile occupies a
 // 32x32 logical cell; the actual sprite within is positioned via per-tile
@@ -88,27 +90,40 @@ export function monsterTileSpec(opts: {
   return []
 }
 
-// Resolves status-icon constant names (e.g. 'STAB_BRAND', 'POISON') and/or
-// raw numeric ids against the icons tileinfo module and appends them as
-// overlay tiles on top of an already-rendered base sprite. Shared by the
-// monster panel rows and the describe-monster popup so both surfaces
-// produce identical icon stacks.
+// Memoized id→width table for cell.icons stacking, rebuilt only when the
+// resolved icons module identity changes (configure() swaps it on reconnect).
+let iconSizeMapCache: ReadonlyMap<number, number> | null = null
+let iconSizeMapSource: TileinfoModule | null = null
+
+// Decodes a monster's t.fg (+ cell.icons) into ordered status overlays via the
+// shared buildStatusOverlays decision, resolves names→ids against the icons
+// tileinfo module, and appends them — with draw_foreground's status_shift
+// offsets — on top of an already-rendered base sprite. The DOM-tile substrate
+// for the monster list, the touch monster panel, and the describe-monster
+// popup; the canvas map runs the same buildStatusOverlays decision directly.
+// Pass `includeMdam` for surfaces (the popup) that show damage as an overlay
+// rather than a separate HP bar.
 export function appendIconOverlays(
   wrap: HTMLElement,
-  spec: { names?: string[]; ids?: number[] },
+  fg: number | number[] | undefined,
+  icons: readonly number[] = [],
   scale = 1,
+  opts: { includeMdam?: boolean } = {},
 ): void {
-  const names = spec.names ?? []
-  const ids = spec.ids ?? []
-  if (names.length === 0 && ids.length === 0) return
+  if (!tileLoader.configured) return
   tileLoader.getModule('icons').then((mod) => {
-    const overlays: TileRef[] = []
-    for (const name of names) {
-      const id = mod[name]
-      if (typeof id === 'number') overlays.push({ t: id, tex: TEX.ICONS })
+    if (iconSizeMapSource !== mod) {
+      iconSizeMapCache = buildStatusIconSizeMap(mod)
+      iconSizeMapSource = mod
     }
-    for (const id of ids) overlays.push({ t: id, tex: TEX.ICONS })
-    if (overlays.length > 0) appendTiles(wrap, overlays, scale)
+    const { overlays } = buildStatusOverlays(fg, icons, iconSizeMapCache!, opts)
+    if (overlays.length === 0) return
+    const tiles: TileRef[] = []
+    for (const o of overlays) {
+      const id = resolveOverlayId(o, mod)
+      if (id !== undefined) tiles.push({ t: id, tex: TEX.ICONS, xofs: o.xofs, yofs: o.yofs })
+    }
+    if (tiles.length > 0) appendTiles(wrap, tiles, scale)
   }).catch((err) => console.warn('icon module load failed:', err))
 }
 

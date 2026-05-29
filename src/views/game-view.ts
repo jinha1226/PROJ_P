@@ -7,7 +7,7 @@ import { StatsView } from '../game/hud/stats-view'
 import { StatusView } from '../game/hud/status-view'
 import { MonsterListView } from '../game/hud/monster-list'
 import { MonsterPanelView } from '../game/hud/monster-panel'
-import { fgHaloDngnName, loFlagOverlayIcons } from '../game/hud/monster-style'
+import { fgHaloDngnName } from '../game/hud/monster-style'
 import { InventoryStore } from '../game/inventory-store'
 import { buildTouchControls } from '../game/input/touch'
 import type { TouchControls } from '../game/input/touch'
@@ -83,7 +83,7 @@ interface UiPushMsg {
   fg_idx?: number  // describe-monster: monster's primary tile id (texture inferred)
   doll?: Array<[number, number]>  // describe-monster: player-doll part [tile_id, ymax] entries
   mcache?: Array<[number, number, number]> | null  // describe-monster: humanoid+equipment [tile_id, xofs, yofs]
-  flag?: number     // describe-monster: status overlay bitmask (attitude, behavior, etc.)
+  flag?: number | number[]  // describe-monster: status overlay bitmask (attitude, behavior, …); [lo, hi] when MDAM/threat bits overflow 32 bits
   icons?: number[]  // describe-monster: pre-decoded extra icon tile ids
   // describe-monster / describe-item: spell list rendered where SPELLSET_PLACEHOLDER
   // appears in the body. Each book has a header label and a list of spells.
@@ -600,12 +600,11 @@ export function buildGameView(
 
       case 'player': {
         if (msg.pos) {
-          const prev = { ...store.playerPos }
           store.playerPos = { x: msg.pos.x, y: msg.pos.y }
-          if (prev.x !== store.playerPos.x || prev.y !== store.playerPos.y) {
-            mapView.setViewCenter(store.playerPos)
-            mapView.fullRender()
-          }
+          // setViewCenter reports whether the center actually moved; reuse that
+          // instead of recomputing the prev/current comparison here. (Same gate
+          // as the 'map' case — full redraw only on a real pan.)
+          if (mapView.setViewCenter(store.playerPos)) mapView.fullRender()
         }
         inventoryStore.update(msg.inv)
         statsView.update(msg)
@@ -886,10 +885,7 @@ export function buildGameView(
             disableActivePrompt()
             const row = makePromptRow(m.text)
             activePromptEl = row
-            // Same column-reverse flip as appendMessage: prepend to land at
-            // visual bottom, prune the visual-top (DOM lastChild) on overflow.
-            msgLog.prepend(row)
-            while (msgLog.children.length > 50) msgLog.lastChild?.remove()
+            pushMsgRow(row)
           } else {
             appendMessage(m.text, true)
           }
@@ -1005,10 +1001,9 @@ export function buildGameView(
   // any pre-decoded numeric ids in msg.icons. Bitmask tables live in
   // monster-style.ts so the panel and this popup stay in lockstep.
   function appendMonsterStatusOverlays(wrap: HTMLElement, msg: UiPushMsg, scale: number): void {
-    appendIconOverlays(wrap, {
-      names: loFlagOverlayIcons(msg.flag ?? 0),
-      ids: msg.icons,
-    }, scale)
+    // The popup has no HP bar, so damage shows as the MDAM overlay (includeMdam),
+    // matching the reference's draw_foreground(prepare_fg_flags(desc.flag), desc.icons).
+    appendIconOverlays(wrap, msg.flag ?? 0, msg.icons ?? [], scale, { includeMdam: true })
   }
 
   // Map each ui-push variant's tile-bearing fields onto a uniform tile list
@@ -2567,7 +2562,7 @@ export function buildGameView(
       }
     })
     row.appendChild(input)
-    msgLog.prepend(row)
+    pushMsgRow(row, false)  // input row isn't pruned by the 50-row cap
     requestAnimationFrame(() => input.focus())
     autoOpenKbd()
   }
@@ -2659,6 +2654,19 @@ export function buildGameView(
     mark.classList.add(kind)
   }
 
+  // msgLog uses flex column-reverse: the visual bottom (newest) is DOM
+  // firstChild and the visual top (oldest) is DOM lastChild, so prepend places
+  // a row at the visual bottom (the browser pins scroll there for free) and
+  // pruning the oldest means dropping the DOM lastChild. All message insertion
+  // goes through here so that convention — and the 50-row cap — lives in one
+  // place; reach for appendChild or prune firstChild elsewhere and the log
+  // silently inverts. (rollback / markLastMsg read the newest as firstChild to
+  // match this same convention.)
+  function pushMsgRow(node: Node, prune = true): void {
+    msgLog.prepend(node)
+    if (prune) while (msgLog.children.length > 50) msgLog.lastChild?.remove()
+  }
+
   function appendMessage(text: string, html = false): void {
     const p = document.createElement('p')
     p.className = 'game-msg'
@@ -2670,12 +2678,7 @@ export function buildGameView(
     if (html) content.innerHTML = dcssToHtml(text)
     else content.textContent = text
     p.appendChild(content)
-    // msgLog uses flex column-reverse: prepend places this at the visual
-    // bottom and the browser pins scroll there for free. Pruning the
-    // *oldest* message means removing the visual-top one, which under
-    // column-reverse is the DOM lastChild.
-    msgLog.prepend(p)
-    while (msgLog.children.length > 50) msgLog.lastChild?.remove()
+    pushMsgRow(p)
   }
 
   return view
