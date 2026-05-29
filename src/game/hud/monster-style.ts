@@ -126,6 +126,23 @@ export interface StatusOverlays { overlays: IconOverlay[]; statusShift: number }
 const STATUS_LO_BITS = FG_NET | FG_WEB | FG_S_UNDER | FG_ATTITUDE_MASK | FG_BEHAVIOUR_MASK
 const EMPTY_STATUS_OVERLAYS: StatusOverlays = { overlays: [], statusShift: 0 }
 
+// Cheap, allocation-free predicate: could this (fg, icons) pair produce any
+// status overlay at all? The single source of truth for the empty case —
+// buildStatusOverlays' fast path uses it to skip allocating, and
+// appendIconOverlays uses it to skip the async icons-module load for the
+// (common) status-free monster before paying a Promise. includeMdam surfaces
+// always pass, since MDAM is decoded on the slow path.
+export function mayHaveStatusOverlays(
+  fg: number | number[] | undefined,
+  icons: readonly number[],
+  opts: { includeMdam?: boolean } = {},
+): boolean {
+  if (opts.includeMdam) return true
+  return (fgLo(fg) & STATUS_LO_BITS) !== 0
+    || (fgHi(fg) & FG_POISON_MASK_HI) !== 0
+    || icons.length > 0
+}
+
 // MDAM damage tier → icons tile-constant name; absent (→ undefined) when uninjured.
 const MDAM_ICON_NAMES: Record<string, string> = {
   lightly_damaged: 'MDAM_LIGHTLY_DAMAGED',
@@ -166,11 +183,7 @@ export function buildStatusOverlays(
   // canvas map calls this once per rendered cell, so bail before allocating an
   // overlays array + result object in the empty case. (includeMdam surfaces —
   // the describe popup — are rare and skip the fast path so MDAM still decodes.)
-  if (!opts.includeMdam
-      && (lo & STATUS_LO_BITS) === 0 && (hi & FG_POISON_MASK_HI) === 0
-      && icons.length === 0) {
-    return EMPTY_STATUS_OVERLAYS
-  }
+  if (!mayHaveStatusOverlays(fg, icons, opts)) return EMPTY_STATUS_OVERLAYS
 
   const overlays: IconOverlay[] = []
 
