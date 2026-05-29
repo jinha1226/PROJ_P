@@ -1198,19 +1198,44 @@ html, body {
   line-height: 1.2;
   overflow: hidden;
 }
+/* Non-shrinking, so the right-aligned .hg-noise on this row keeps its width.
+   Heads-up: we don't yet render drained stats as "St 5 (10)" (reference
+   update_stat appends " (max)" when val < max). When that lands, all three
+   stats drained with 2-digit maxes fits at >=386px (iPhone) but clips Noise on
+   the right at ~360px — let this shrink/wrap or drop the gap under a narrow
+   media query then. */
 .hg-stats-row .hg-inline-stats { flex: 0 0 auto; }
-.hg-noise-time {
-  flex: 0 1 auto;
-  min-width: 0;
-  margin-left: auto;
+/* Noise sits right-aligned on the stats row, stacked directly above Time (which
+   right-aligns on the XL row below), so the two read as a right-hand column.
+   inline-flex centers the small bar cell against the "N" cap; cap-to-bar spacing
+   comes from the shared .hg-caption + span rule (0.15em), like every other cap. */
+.hg-noise { margin-left: auto; display: inline-flex; align-items: center; white-space: nowrap; }
+
+/* Graphical noise bar, mirroring #stats_noise_bar in the reference client.
+   Trough is darker than the HP/MP cell (#555753) so the darkgray decrease
+   tail stays visible against it. Fixed width (the reference sizes the bar by
+   percentage of a wide desktop panel, which doesn't translate to our row). */
+.hg-noise-cell {
   display: inline-block;
-  white-space: nowrap;
+  width: 3rem;
+  height: 0.55rem;
+  background: #2f2f2f; /* reference #stats_noise_bar bg (dark slate) */
   overflow: hidden;
-  text-overflow: ellipsis;
 }
-.hg-noise { letter-spacing: 0.05em; white-space: nowrap; }
-.hg-noise span { margin-left: 0; }
-.hg-time { font-variant-numeric: tabular-nums; }
+.hud-bar-seg.noise-decrease { background-color: #555753; } /* DCSS darkgrey (--color-8) */
+.hg-noise-cell[data-level="quiet"]     .noise-full { background-color: #babdb6; } /* lightgrey */
+.hg-noise-cell[data-level="loud"]      .noise-full { background-color: #fce94f; } /* yellow */
+.hg-noise-cell[data-level="veryloud"]  .noise-full { background-color: #b30009; } /* red */
+.hg-noise-cell[data-level="superloud"] .noise-full { background-color: #fd59fa; } /* lightmagenta */
+/* When silenced the bar carries no info (noise is 0), so we hide it and let the
+   "Silenced" label stand in its place at the normal HUD size, spaced like any
+   other caption value. The reference overlays the label on its bar because that
+   bar gets its own wide row; ours shares a row with Time, so we reserve the
+   label's width instead of overlapping (which would collide with N and T). */
+.hg-noise-cell[data-level="blank"] { display: none; }
+.hg-noise-status { margin-left: 0.15em; color: #fd59fa; /* DCSS lightmagenta — reference #stats_noise_status */ }
+.hg-noise-status:empty { display: none; }
+.hg-time { margin-left: auto; font-variant-numeric: tabular-nums; }
 .hg-xl-row {
   display: flex;
   align-items: baseline;
@@ -1227,7 +1252,6 @@ html, body {
   overflow: hidden;
   text-overflow: ellipsis;
 }
-.noise-empty { color: #555753; /* DCSS darkgrey (.fg8) — empty bar slots */ }
 
 .hg-wq {
   font-size: 0.72rem;
