@@ -23,18 +23,18 @@ Web App.
 ## Features
 
 - ASCII-first design that fits the full standard console map onto a phone in
-  portrait mode, with a font still large enough to read. Graphical tiles are
-  supported too.
+  portrait mode, with a font still large enough to read.
+- Graphical tiles are also supported.
 - Log in with multiple WebTiles server accounts and switch between them.
-- Inline tap regions in many menus and descriptions for quick touch play.
+- Inline tap regions in many menus and descriptions for quick touch interaction.
 - Context-aware control sets for common situations.
 - Spectator mode with an expanded map view.
-- Floating, collapsible monster list; tap for the full view.
+- Floating, collapsible monster list; tap for details.
 - Map double-tap toggles zoom; two-finger long-press toggles tiles.
 - Installs to your home screen as a PWA.
 
-See [ABOUT.md](ABOUT.md) for the controls model and security details
-(credential handling, session cookies).
+See [ABOUT.md](ABOUT.md) for more, including the controls model and security
+details (credential handling, session cookies).
 
 ## Tech
 

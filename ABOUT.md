@@ -4,12 +4,12 @@ PocketZot is an unofficial [DCSS](https://crawl.develz.org) [WebTiles](https://c
 
 ## Features
 
-- Custom, ASCII-first design to maximize compactness and readability. PocketZot fits the full standard console map dimensions onto a standard iPhone in portrait mode, with a font still large enough to read.
+- Custom, ASCII-first design to maximize compactness and readability, fitting the full standard console map dimensions onto a standard iPhone in portrait mode, with a font still large enough to read
 - Tiles support
-- Login with multiple WebTiles server accounts and easily switch between them
+- Log in with multiple WebTiles server accounts and easily switch between them
 - Many menus and descriptions contain inline tap regions for quick touch interaction
 - Context-aware control sets for common situations
-- Spectator mode with expanded map view
+- Spectator mode with an expanded map view
 - Floating, collapsible monster list; tap for details
 - Installs to your home screen as a PWA
 
