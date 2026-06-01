@@ -9,6 +9,11 @@ formatting and HTML chrome differ. Drift is a bug.
 
 Notable changes to PocketZot, newest first.
 
+## 2026-06-01
+
+- Fixed the map shifting downward shortly after loading a game or starting to
+  spectate.
+
 ## 2026-05-30
 
 - Info (`?`) controls now include a `$` button (show gold / shopping list),
