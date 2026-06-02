@@ -698,14 +698,22 @@ export function buildGameView(
         if (msg.time !== undefined) markLastMsg('turn')
         if (!hudRevealed) {
           hudRevealed = true
-          showHud()
-          // First fit, now that the HUD occupies its row (showHud above) and
-          // statsView/statusView have populated it this same message — so the
-          // container is at its settled height. Synchronous (forces one
-          // layout) so a `map` message later in this same WS batch renders
-          // straight into the final viewport rather than the pre-fit size.
-          // The ResizeObserver stays gated until exactly here; see its comment.
-          mapView.fitToContainer()
+          // Don't reveal the HUD while an overlay covers the screen: the
+          // newgame-choice character-creation screens send `player` messages
+          // carrying placeholder stats ("the Conjurer — Yak", 0/0 HP, …)
+          // before any character exists. uiOverlay being shown is the signal
+          // a full overlay is up; when it closes, hideOverlay()/exitXMode()
+          // call showHud() (hudRevealed is now true) and reveal it then.
+          if (uiOverlay.style.display === 'none') {
+            showHud()
+            // First fit, now that the HUD occupies its row (showHud above) and
+            // statsView/statusView have populated it this same message — so the
+            // container is at its settled height. Synchronous (forces one
+            // layout) so a `map` message later in this same WS batch renders
+            // straight into the final viewport rather than the pre-fit size.
+            // The ResizeObserver stays gated until exactly here; see its comment.
+            mapView.fitToContainer()
+          }
         }
         break
       }

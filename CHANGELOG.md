@@ -15,6 +15,8 @@ Notable changes to PocketZot, newest first.
   servers where it previously only worked while spectating.
 - Fixed the map shifting downward shortly after loading a game or starting to
   spectate.
+- The status bar no longer appears with placeholder values while creating a
+  character.
 
 ## 2026-05-30
 
