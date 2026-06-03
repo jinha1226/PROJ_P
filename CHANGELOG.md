@@ -9,6 +9,12 @@ formatting and HTML chrome differ. Drift is a bug.
 
 Notable changes to PocketZot, newest first.
 
+## 2026-06-02
+
+- Latest stable and trunk versions now appear as lobby buttons on CPO, where
+  they were previously hidden inside "Show all versions".
+- The stable and trunk buttons now look distinct.
+
 ## 2026-06-01
 
 - Switching the map from ASCII to tiles now works during your own game on

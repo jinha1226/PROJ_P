@@ -351,6 +351,18 @@ html, body {
   white-space: nowrap;
 }
 
+/* Trunk headline button: same size/prominence as the filled stable primary,
+   but an outline (not filled) treatment. The two headline buttons render in a
+   fixed order (stable on top); differentiating trunk by fill vs. outline — not
+   just position — keeps a player who's used to a trunk-first server (CAO/CPO)
+   from launching stable by reflex. Overrides the .lobby-btn-primary fill via
+   later source order (equal specificity). */
+.lobby-btn-trunk {
+  background: transparent;
+  border: 1px solid var(--accent);
+  color: var(--accent);
+}
+
 /* Ghost nav button used for "← Back"-style header actions in the lobby and
    spectator header. No static border so it doesn't compete with the identity
    pill beside it; press feedback comes from a tinted background. */
