@@ -11,9 +11,9 @@ Notable changes to PocketZot, newest first.
 
 ## 2026-06-02
 
-- Latest stable and trunk versions now appear as lobby buttons on CPO, where
-  they were previously hidden inside "Show all versions".
 - The stable and trunk buttons now look distinct.
+- Stable and trunk now appear as lobby buttons on CPO, where they were
+  previously hidden inside "Show all versions".
 
 ## 2026-06-01
 
