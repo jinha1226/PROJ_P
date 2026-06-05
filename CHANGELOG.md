@@ -9,6 +9,10 @@ formatting and HTML chrome differ. Drift is a bug.
 
 Notable changes to PocketZot, newest first.
 
+## 2026-06-04
+
+- Prompts and messages no longer drop a literal `<` character.
+
 ## 2026-06-03
 
 - A stray "–" no longer appears before entries in the "Items not yet
