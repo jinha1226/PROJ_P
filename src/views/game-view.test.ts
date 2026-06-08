@@ -433,4 +433,122 @@ describe('spell harvest (silent I → ! → Esc) + preface parsing', () => {
       expect(sentInputI(h)).toHaveLength(2)
     })
   }
+
+  // A message can race into the brief harvest window that isn't part of our own
+  // `I` round-trip. The harvest looks like normal play (activeMenu stays null),
+  // so it must hand the channel back rather than mistake a foreign message for
+  // its own data — which would freeze input (phase stuck) or fire a stray
+  // Escape into a real menu (extra-phase hijack).
+  describe('foreign messages racing in mid-harvest', () => {
+    const escapes = (h: Harness) =>
+      sent(h).filter(m => m.msg === 'key' && (m as { keycode?: number }).keycode === 27)
+
+    it('aborts the harvest when a non-spell menu races in, instead of freezing input', () => {
+      const h = setup()
+      startHarvest()  // I #1; phase 'base'
+      // A non-spell menu arrives before the spell-menu reply. It can't be ours
+      // (our base menu is captured + swallowed), so the harvest must abort and
+      // let it render. Bug: harvestPhase stays 'base', isHarvesting() stays true,
+      // and every input handler early-returns until the 1.5s fallback fires.
+      h.dispatch({ msg: 'menu', tag: 'inventory', title: { text: 'Inv' }, items: [] })
+      expect(isHidden(overlay(h))).toBe(false)  // the real menu renders
+      h.dispatch({ msg: 'close_menu' })
+      // Phase must be idle now: a fresh harvest fires I #2 only if it was reset
+      // (harvestSpells bails while non-idle). With the bug it's still 'base'.
+      startHarvest()
+      expect(sentInputI(h)).toHaveLength(2)
+      feedBase(h); feedExtra(h)  // settle the new harvest's fallback timer
+    })
+
+    it('does not hijack a real menu opened during the extra phase, nor Escape it', () => {
+      const h = setup()
+      startHarvest()  // I; phase 'base'
+      feedBase(h)     // capture base, send `!`; phase 'extra', activeMenu still null
+      // A real menu opens mid-`!`-round-trip. It can't be ours — the extra
+      // re-send arrives as update_menu_items, never a fresh `menu` — so the
+      // harvest aborts and the menu renders (activeMenu set).
+      h.dispatch({ msg: 'menu', tag: 'inventory', title: { text: 'Inv' },
+                   items: [{ level: 1, text: 'old', hotkeys: [97] }] })
+      expect(isHidden(overlay(h))).toBe(false)
+      expect(overlay(h).textContent).toContain('old')
+      // Its own item refresh must PATCH the menu, not be consumed as the
+      // harvest's extra columns and answered with an Escape. The extra-phase
+      // `!activeMenu` guard is the backstop: with both guards gone, this update
+      // fires keycode 27 into the open menu and never patches it.
+      h.dispatch({ msg: 'update_menu_items', chunk_start: 0,
+                   items: [{ level: 1, text: 'new', hotkeys: [97] }] })
+      expect(escapes(h)).toHaveLength(0)            // no stray Escape to the server
+      expect(isHidden(overlay(h))).toBe(false)      // menu still open
+      expect(overlay(h).textContent).toContain('new')  // patched, not hijacked
+    })
+  })
+
+  // Keep the rail in sync with the letter→spell map: it casts `z<letter>`
+  // blindly, so a stale letter would fire the WRONG spell. Exactly three events
+  // change that map, each re-harvests via the spellsDirty path. The triggers are
+  // precise — routine play (casting, plain viewing, combat log) must NOT poll.
+  describe('re-harvest on a letter-map change', () => {
+    // Settle a re-harvest's own I → ! → Esc so its 1.5s fallback timer is cleared.
+    const settle = (h: Harness) => { feedBase(h); feedExtra(h) }
+
+    it('re-harvests when a spell is memorised (joined "finish memorising. Spell assigned to" line)', () => {
+      const h = setup()
+      fullHarvest(h)
+      expect(sentInputI(h)).toHaveLength(1)
+      // The REAL wire form: DCSS joins the two same-turn mprs ("You finish
+      // memorising." + "Spell assigned to 'b'.") onto one line, so the match
+      // must be a substring — an anchored `$` (the original bug) misses this.
+      // Memorise completes inside command mode (no input_mode transition fires),
+      // so the msgs handler itself must fire the refresh.
+      h.dispatch({ msg: 'msgs', messages: [{ text: "You finish memorising. Spell assigned to 'b'." }] })
+      expect(sentInputI(h)).toHaveLength(2)
+      settle(h)
+    })
+
+    it('re-harvests when a spell is lost ("Your memory of X unravels.")', () => {
+      const h = setup()
+      fullHarvest(h)
+      h.dispatch({ msg: 'msgs', messages: [{ text: 'Your memory of Freeze unravels.' }] })
+      expect(sentInputI(h)).toHaveLength(2)
+      settle(h)
+    })
+
+    it('does NOT re-harvest on unrelated messages (no needless polling)', () => {
+      const h = setup()
+      fullHarvest(h)
+      h.dispatch({ msg: 'msgs', messages: [{ text: 'You hit the rat.' }, { text: 'The rat dies.' }] })
+      expect(sentInputI(h)).toHaveLength(1)
+    })
+
+    it('re-harvests after a `=` letter reassign, once back at the command prompt', () => {
+      const h = setup()
+      // Spend the once-per-game auto-harvest first, so the resolving input_mode→1
+      // can't be mistaken for it.
+      h.dispatch({ msg: 'input_mode', mode: 1 })
+      settle(h)
+      expect(sentInputI(h)).toHaveLength(1)
+      // `=` opens the spell list titled "(adjust)" — all spell lists share
+      // tag:"spell", so the title is the discriminator. Flags dirty but does not
+      // harvest while the menu is up (the guard bails on the active menu).
+      h.dispatch({ msg: 'menu', tag: 'spell', title: { text: 'Your spells (adjust)' }, items: BASE })
+      expect(sentInputI(h)).toHaveLength(1)
+      // Reassign done → menu closes → command mode resumes → re-harvest fires.
+      h.dispatch({ msg: 'close_menu' })
+      h.dispatch({ msg: 'input_mode', mode: 1 })
+      expect(sentInputI(h)).toHaveLength(2)
+      settle(h)
+    })
+
+    it('does NOT re-harvest when the player merely views the spell list (I/describe)', () => {
+      const h = setup()
+      h.dispatch({ msg: 'input_mode', mode: 1 })
+      settle(h)
+      expect(sentInputI(h)).toHaveLength(1)
+      // Same tag, but a "(describe)" title — viewing changes no letters.
+      h.dispatch({ msg: 'menu', tag: 'spell', title: { text: 'Your spells (describe)' }, items: BASE })
+      h.dispatch({ msg: 'close_menu' })
+      h.dispatch({ msg: 'input_mode', mode: 1 })
+      expect(sentInputI(h)).toHaveLength(1)
+    })
+  })
 })

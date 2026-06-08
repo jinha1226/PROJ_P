@@ -1737,6 +1737,42 @@ html, body {
 }
 .overlay-spell-effect, .overlay-spell-range { flex: 0 0 auto; }
 
+/* Spell rail: persistent quick-cast column pinned to the map's right edge.
+   Lives inside #map-wrap (position:relative, overflow:hidden), so #ui-overlay
+   covers it during server overlays and it's clipped to the map. */
+#spell-rail {
+  position: absolute;
+  top: 0.3rem;
+  right: 0.3rem;
+  z-index: 3;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+.spell-rail-btn {
+  position: relative;
+  display: block;
+  padding: 2px;
+  line-height: 0;
+  background: rgba(10, 9, 8, 0.7);
+  border: 0px solid var(--border);
+  border-radius: 0px;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.spell-rail-btn:active { background: var(--surface); border-color: var(--accent); }
+.spell-rail-letter {
+  position: absolute;
+  right: 0;
+  bottom: -2px;
+  font-size: 0.62rem;
+  line-height: 1;
+  font-weight: bold;
+  color: var(--text);
+  text-shadow: 0 0 2px #000, 0 0 3px #000;
+  pointer-events: none;
+}
+
 /* Terminal-mode: engaged when server sends scroll positions */
 .overlay-body--term .overlay-line { white-space: nowrap; }
 

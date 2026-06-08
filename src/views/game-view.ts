@@ -282,6 +282,21 @@ export function buildGameView(
   // swallowed instead of popping/clearing our real overlay state.
   let pendingHarvestClose = false
 
+  // Spell rail: a persistent column of quick-cast buttons pinned to the map's
+  // right edge (inside #map-wrap, so #ui-overlay covers it and overflow clips
+  // it to the map). Always visible during play once spells are harvested.
+  const spellRail = document.createElement('div')
+  spellRail.id = 'spell-rail'
+  spellRail.style.display = 'none'
+  // Auto-harvest once per game (so the rail is populated without the player
+  // opening the tray). Reset on go_lobby for the next game.
+  let autoHarvestedThisGame = false
+  // Set when the letter→spell map changes (memorise / forget / `=` reassign) so
+  // the rail isn't left mapping a stale letter — which would cast the WRONG
+  // spell on tap. Resolved by reharvestIfDirty() at the next clean command-mode
+  // moment (it fires a fresh silent harvest). Event-driven, not timer-polled.
+  let spellsDirty = false
+
   let activePromptEl: HTMLElement | null = null
   let inXMode = false
   let exitedXModeForInput = false
@@ -344,6 +359,7 @@ export function buildGameView(
   mapWrap.id = 'map-wrap'
   mapWrap.appendChild(mapView.element)
   mapWrap.appendChild(monsterListView.element)
+  mapWrap.appendChild(spellRail)
 
   // Double-tap the map to toggle zoom. Bypassed while X-mode is active
   // (font scale is overridden there) — single-tap behavior is undefined on
@@ -601,12 +617,10 @@ export function buildGameView(
   if (import.meta.env.DEV) {
     (window as unknown as { __dcssTiles: (on?: boolean) => void }).__dcssTiles =
       (on) => setRenderMode(on === undefined ? (renderMode === 'tiles' ? 'ascii' : 'tiles') : (on ? 'tiles' : 'ascii'))
-    // Spell harvest (step 1): __dcssHarvestSpells() fires a silent `I` and
-    // fills __dcssSpellCache with the parsed memorised spells; the harvest
-    // traces its phases to the console and prints a console.table on
-    // completion. __dcssSpellTable() reprints that table on demand.
+    // Spell harvest: __dcssHarvestSpells() fires a silent `I` and fills
+    // __dcssSpellCache with the parsed memorised spells; the harvest traces its
+    // phases to the console (dbgSpell).
     ;(window as unknown as { __dcssHarvestSpells: () => void }).__dcssHarvestSpells = harvestSpells
-    ;(window as unknown as { __dcssSpellTable: () => void }).__dcssSpellTable = printSpellTable
     exposeSpellCache()
   }
 
@@ -906,10 +920,25 @@ export function buildGameView(
           armHarvestTimeout()
           break  // swallow: never render the menu
         }
+        // A `menu` arrived mid-harvest that isn't our spell menu (some other
+        // menu raced in after the silent `I`). It can't be ours: the base menu
+        // is captured + swallowed above, and the extra phase's re-send comes as
+        // `update_menu_items`, never a fresh `menu`. Abort the harvest so this
+        // renders now — otherwise harvestPhase stays non-idle, isHarvesting()
+        // stays true, and every input handler keeps early-returning until the
+        // 1.5s fallback, leaving a real menu the user can see but can't touch.
+        if (isHarvesting()) resetHarvest()
         // A real menu is opening, so any pending harvest-close expectation is
         // stale (its close_menu already came or never will). Drop the latch —
         // otherwise THIS menu's eventual close_menu would be wrongly swallowed.
         pendingHarvestClose = false
+        // The `=` spell-letter reassign is the one spell-menu flow that
+        // silently rewrites the letter→spell map yet emits no distinctive
+        // message. All spell-list flows share tag:"spell" (list_spells hardcodes
+        // it), so the title is the only discriminator — "Your spells (adjust)"
+        // vs "(describe)" etc. Flag the rail stale; it re-harvests once the
+        // player finishes and we're back at a command prompt (input_mode→1).
+        if (m.tag === 'spell' && /\(adjust\)/i.test(stripDcss(m.title?.text ?? ''))) spellsDirty = true
         if (m.type === 'crt') showCrt(m.tag)
         else {
           if (m.replace) menuStack.pop()
@@ -972,13 +1001,17 @@ export function buildGameView(
         const m = msg as unknown as { chunk_start?: number; items?: MenuItem[] }
         // Spell harvest, extra phase: this is the `!` toggle re-send carrying
         // the power/damage/range/noise columns. Merge them, then Escape.
-        if (harvestPhase === 'extra' && m.items) {
+        // `!activeMenu` confirms it's the harvest's own re-send, not an update
+        // for a real menu: the harvest never renders, so activeMenu stays null
+        // for its whole duration (it only starts from commandChannelIdle, which
+        // requires !activeMenu). A real menu's update has activeMenu set and
+        // must fall through to the patch path below — never hijacked + Escaped.
+        if (harvestPhase === 'extra' && m.items && !activeMenu) {
           clearTimeout(harvestTimer)
           harvestPhase = 'idle'
           mergeSpellExtra(m.items)
           exposeSpellCache()
           dbgSpell(`complete in ${Date.now() - harvestStartTs}ms`)
-          printSpellTable()
           pendingHarvestClose = true
           conn.send({ msg: 'key', keycode: 27 })  // Escape closes the menu
           break
@@ -1003,6 +1036,8 @@ export function buildGameView(
           // Reference only marks on the COMMAND transition, not on every
           // COMMAND-while-COMMAND repeat (game.js set_input_mode early-returns).
           if (prevInputMode !== 1) markLastMsg('cmd')
+          maybeAutoHarvest()  // populate the spell rail on first entry to play
+          reharvestIfDirty()  // refresh after a `=` reassign (or a deferred memorise/forget)
         }
         // YESNO prompts fire inside any menu that calls yesno() while open:
         // shop purchase (shopping.cc), acquirement (acquire.cc), Nemelex
@@ -1062,6 +1097,21 @@ export function buildGameView(
         }
         for (const m of msg.messages ?? []) {
           if (!m.text) continue
+          const plain = stripDcss(m.text).trim()
+          // Swallow the "You have no spells." that a silent harvest's `I`
+          // prints for a non-caster — it's an artifact of our probe, not
+          // something the player did. Only while the harvest is in flight.
+          if (isHarvesting() && /^You have no spells\b/.test(plain)) continue
+          // The letter→spell map just changed under us: memorising adds a spell
+          // (+ its letter); a forced forget removes one. Flag the rail stale so
+          // reharvestIfDirty() (after this loop) refreshes it — otherwise a tap
+          // would cast the wrong spell. (`=` reassign has no distinctive
+          // message — it's caught at its menu instead.)
+          // Match as SUBSTRINGS, never whole-line: DCSS joins same-turn,
+          // same-channel mprs onto one line, so the memorise line arrives as
+          // "You finish memorising. Spell assigned to 'b'." (the assignment is
+          // a second mpr concatenated on). An anchored `$` would miss it.
+          if (/You finish memorising\b/.test(plain) || /Your memory of .+ unravels\b/.test(plain)) spellsDirty = true
           if (m.channel === 2 && PROMPT_TRIGGER_RE.test(m.text)) {
             disableActivePrompt()
             const row = makePromptRow(m.text)
@@ -1073,6 +1123,10 @@ export function buildGameView(
         }
         if (msg.more) showMoreBtn(msg.more_text)
         else if (msg.more === false) hideMoreBtn()
+        // A memorise/forget this frame leaves us at a command prompt (the delay
+        // finished; no input_mode transition fires), so re-harvest now rather
+        // than waiting for the next menu round-trip.
+        reharvestIfDirty()
         break
       }
 
@@ -1130,6 +1184,8 @@ export function buildGameView(
       case 'go_lobby':
       case 'close':
         resetHarvest()
+        autoHarvestedThisGame = false  // re-harvest for the next game
+        spellsDirty = false  // no pending re-harvest carries into the next game
         onLobby()
         break
 
@@ -1154,6 +1210,7 @@ export function buildGameView(
     inXMode = true
     msgLog.style.display = 'none'
     hud.style.display = 'none'
+    renderSpellRail()  // hide the quick-cast rail so it doesn't cover the examine map
     touchControls.enterXMode()
     mapView.setFontScale(X_MODE_SCALE)
     // Zoom mode is left untouched: tiles already had zoom-on (forced at
@@ -1178,6 +1235,7 @@ export function buildGameView(
     touchControls.exitXMode()
     mapView.setFontScale(1.0)
     requestAnimationFrame(() => mapView.fitToContainer())
+    renderSpellRail()  // restore the quick-cast rail hidden by enterXMode
     if (activeMenu?.tag === 'stash') {
       // Returning to the stash results menu: keep HUD/msglog hidden (they were
       // hidden before the preview by renderOverlay, and the overlay layout
@@ -2247,37 +2305,58 @@ export function buildGameView(
     }
   }
 
-  // Keep the dev inspection hook pointing at the current cache array.
+  // Keep the dev inspection hook pointing at the current cache array, and
+  // refresh the persistent quick-cast rail so an auto/re-harvest fills it in as
+  // the base then extra columns land.
   function exposeSpellCache(): void {
     if (import.meta.env.DEV)
       (window as unknown as { __dcssSpellCache: SpellEntry[] }).__dcssSpellCache = spellCache
+    renderSpellRail()
+  }
+
+  // Cast a memorised spell from normal play: `z` opens the cast prompt and the
+  // spell's letter selects it (≡ typing `z<letter>`). Targeted spells drop the
+  // server into targeting, handled by the existing cursor/d-pad UI; self/instant
+  // spells just fire. Guarded to a clean command-mode state — the rail is always
+  // visible, so a stray tap during a menu/X-mode/overlay must be a no-op.
+  function castSpellLetter(letter: string): void {
+    // `currentInputMode === 1` additionally rejects active targeting (a prior
+    // targeted spell left the server in a target loop with a map cursor but no
+    // menu/overlay) — `z<letter>` there would land mid-targeting, not cast.
+    if (currentInputMode !== 1 || !commandChannelIdle()) return
+    conn.send({ msg: 'input', text: 'z' })
+    conn.send({ msg: 'input', text: letter })
+  }
+
+  // Render the persistent quick-cast rail from spellCache. Hidden when there are
+  // no spells. Each button casts on tap via castSpellLetter (its own guard keeps
+  // a tap during a menu/overlay/X-mode inert).
+  function renderSpellRail(): void {
+    // Hidden while examining (X-mode): the rail sits inside #map-wrap (z-index:3)
+    // and would otherwise float over the zoomed-out examine map, occluding the
+    // top-right cells the player entered X-mode to read.
+    if (spectating || inXMode || spellCache.length === 0) { spellRail.style.display = 'none'; return }
+    spellRail.innerHTML = ''
+    for (const s of spellCache) {
+      const btn = document.createElement('button')
+      btn.className = 'spell-rail-btn'
+      btn.title = `${s.title}${s.fail ? ` (${s.fail})` : ''}`
+      if (typeof s.colour === 'number') btn.style.color = uiColor(s.colour)
+      btn.appendChild(renderTiles(loader, [{ t: s.tile, tex: TEX.GUI }], 1))
+      const lbl = document.createElement('span')
+      lbl.className = 'spell-rail-letter'
+      lbl.textContent = s.letter
+      btn.appendChild(lbl)
+      btn.addEventListener('click', () => castSpellLetter(s.letter))
+      spellRail.appendChild(btn)
+    }
+    spellRail.style.display = ''
   }
 
   // Dev-only harvest trace. Prefixed + styled so it's easy to filter in the
   // console. No-op in production builds (tree-shaken via the env guard).
   function dbgSpell(...args: unknown[]): void {
     if (import.meta.env.DEV) console.log('%c[spell-harvest]', 'color:#5ec8ff;font-weight:bold', ...args)
-  }
-
-  // Dev-only: render the harvested spells as a console.table so the columns
-  // (letter/name/schools/level/fail and the toggled power/damage/range/noise)
-  // can be eyeballed against the in-game `I` screen. Also exposed as
-  // window.__dcssSpellTable() to reprint on demand.
-  function printSpellTable(): void {
-    if (!import.meta.env.DEV) return
-    if (!spellCache.length) { dbgSpell('(no spells memorised)'); return }
-    console.table(spellCache.map((s) => ({
-      key: s.letter,
-      name: s.title,
-      schools: s.schools,
-      lvl: s.level,
-      fail: s.fail,
-      power: s.power,
-      damage: s.damage,
-      range: s.range_string,
-      noise: s.noise,
-      tile: s.tile,
-    })))
   }
 
   // True while a silent harvest owns the input channel. During this brief
@@ -2290,6 +2369,22 @@ export function buildGameView(
   // based, so a suppressed keystroke just means the player re-presses it.)
   function isHarvesting(): boolean {
     return harvestPhase !== 'idle'
+  }
+
+  // The command channel is idle: the server is sitting at the command prompt
+  // with nothing transient in front of it — no menu/overlay/CRT/dialog, no
+  // examine cursor (X-mode), no `--more--` pager, no in-log y/n prompt, and no
+  // silent harvest already in flight. Only then is it safe to inject a
+  // command-level keystroke (a harvest's `I`/`!` or a rail `z<letter>`).
+  // The earlier guards listed only the menu/overlay subset, so a rail tap or an
+  // auto/re-harvest fired during a `--more--` or a channel-2 prompt leaked a
+  // stray keystroke into it (eating the pager/answering the prompt, or — for a
+  // harvest — getting the `I` swallowed so the probe times out and clears the
+  // rail). `moreBtn`/`activePromptEl` are exactly that missing state.
+  function commandChannelIdle(): boolean {
+    return !isHarvesting()
+      && uiStack.length === 0 && !crtActive && !dialogActive && !activeMenu
+      && !inXMode && activePromptEl === null && moreBtn.style.display === 'none'
   }
 
   // Abort any in-flight harvest and clear its latches. Called from the
@@ -2306,14 +2401,33 @@ export function buildGameView(
   // Fire a silent `I` to (re)populate spellCache. Only from a clean game
   // state — otherwise the keystroke is swallowed by whatever prompt/menu/
   // overlay is up (and could mean something else entirely).
-  function harvestSpells(): void {
-    if (harvestPhase !== 'idle') return
-    if (uiStack.length > 0 || crtActive || dialogActive || activeMenu) return
+  // Returns true if the harvest actually started (so the auto-trigger only
+  // marks itself done when it really fired, not when the guard bailed).
+  function harvestSpells(): boolean {
+    if (!commandChannelIdle()) return false
     harvestStartTs = Date.now()
     dbgSpell('fired (silent I)…')
     harvestPhase = 'base'
     conn.send({ msg: 'input', text: 'I' })
     armHarvestTimeout()
+    return true
+  }
+
+  // Auto-harvest once per game so the persistent rail is populated. Fired on
+  // the first clean COMMAND-mode transition.
+  function maybeAutoHarvest(): void {
+    if (spectating || autoHarvestedThisGame || isHarvesting()) return
+    if (harvestSpells()) autoHarvestedThisGame = true
+  }
+
+  // Resolve a pending letter-map change (spellsDirty): re-harvest so the rail
+  // reflects the new spells/letters. Clears the flag only when a harvest really
+  // fires — if the guard bails (mid-menu, etc.) the flag persists and the next
+  // clean command-mode retries. Spectators never harvest, so just drop the flag.
+  function reharvestIfDirty(): void {
+    if (!spellsDirty) return
+    if (spectating) { spellsDirty = false; return }
+    if (harvestSpells()) spellsDirty = false
   }
 
   // Fallback if an expected harvest message never arrives. In `base` the `I`
@@ -2333,7 +2447,6 @@ export function buildGameView(
       }
       harvestPhase = 'idle'
       exposeSpellCache()
-      printSpellTable()
     }, 1500)
   }
 
