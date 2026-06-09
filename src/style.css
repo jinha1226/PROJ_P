@@ -787,7 +787,6 @@ html, body {
 #game-messages {
   grid-area: msg;
   background: var(--bg);
-  border-top: 1px solid var(--border);
   font-size: 0.75rem;
   line-height: 1.3;
   /* Reserve the full 5 lines from the start so the map only sizes itself
@@ -822,7 +821,6 @@ html, body {
   bottom: 0;
   z-index: 3;
   background: color-mix(in srgb, var(--bg) 30%, transparent);
-  border-top: none;
 }
 /* --more-- is bottom-anchored in the map cell (z-index 4); lift it above the
    overlaid log so it never covers the newest message lines. */
@@ -1103,11 +1101,18 @@ html, body {
 #game-hud {
   grid-area: hud;
   background: var(--bg);
-  border-top: 1px solid var(--border);
   padding: 0.2rem 0.25rem;
   display: flex;
   flex-direction: column;
   gap: 0.1rem;
+}
+/* Non-casters have the log sitting directly on the HUD — text above text at
+   near-identical size, and a yellow log warning can scan as part of the
+   yellow name line. Keep the hairline for that boundary only; in spell-row
+   mode the rail's icon band already separates log from HUD, so casters get
+   the fully borderless stack. */
+#game-view:not(.spell-row) #game-hud {
+  border-top: 1px solid var(--border);
 }
 
 #hud-top {
@@ -1788,9 +1793,12 @@ html, body {
   gap: 0.25rem;
   padding: 0.25rem;
   background: var(--bg);
-  border-top: 1px solid var(--border);
-  /* 32px tile + 2×2px button padding + own padding + border */
-  height: calc(36px + 0.5rem + 1px);
+  /* No border-top: the translucent log overlay sits directly above, and a
+     hard line under it reads as stray chrome — the opaque icon band is its
+     own separator (and the HUD's hairline is non-caster-only, so the whole
+     caster stack below the map is borderless). */
+  /* 32px tile + 2×2px button padding + own padding */
+  height: calc(36px + 0.5rem);
   overflow: hidden;
 }
 .spell-rail-btn {
@@ -1813,7 +1821,6 @@ html, body {
   bottom: -2px;
   font-size: 0.62rem;
   line-height: 1;
-  font-weight: bold;
   color: var(--text);
   text-shadow: 0 0 2px #000, 0 0 3px #000;
   pointer-events: none;
@@ -2012,7 +2019,10 @@ html, body {
   gap: 0.35rem;
   padding: 0.2rem 0.35rem;
   background: var(--bg);
-  border-top: 1px solid var(--border);
+  /* Transparent (not removed): X-mode colors this border as its active-mode
+     indicator (.x-mode rule below), and keeping the 1px avoids a layout
+     shift when entering/leaving X-mode. */
+  border-top: 1px solid transparent;
   align-items: stretch;
   /* Cap the strip to the d-pad's height (3 cells + 2 gaps + own padding) so a
      tall z spell grid scrolls inside the panel instead of growing the whole
@@ -2455,7 +2465,6 @@ html, body {
   #game-messages {
     grid-area: msg;
     height: auto;
-    border-top: none;
     border-right: 1px solid var(--border);
     border-bottom: 1px solid var(--border);
   }
@@ -2471,6 +2480,10 @@ html, body {
 
   #map-wrap { grid-area: map; }
 
+  /* :not(.spell-row) matches the portrait non-caster border rule's
+     specificity — a bare #game-hud would lose to it and the sidebar HUD
+     would sprout a stray top border in non-caster landscape games. */
+  #game-view:not(.spell-row) #game-hud,
   #game-hud {
     grid-area: hud;
     border-top: none;
@@ -2550,7 +2563,6 @@ html, body {
     margin: 0.3rem;
     padding: 0;
     background: none;
-    border-top: none;
     height: 36px;
   }
 }
