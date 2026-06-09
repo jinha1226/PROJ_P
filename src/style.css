@@ -1761,7 +1761,10 @@ html, body {
   -webkit-tap-highlight-color: transparent;
 }
 .spell-rail-btn:active { background: var(--surface); border-color: var(--accent); }
-.spell-rail-letter {
+/* Shared by the rail and the ✦-tab grid so the corner letter looks/sits the
+   same in both placements. */
+.spell-rail-letter,
+.tc-spell-letter {
   position: absolute;
   right: 0;
   bottom: -2px;
@@ -1959,6 +1962,7 @@ html, body {
 
 /* ── Unified touch controls ─────────────────────────────────── */
 #touch-controls {
+  --tc-dpad: 3.6rem;  /* d-pad cell size (kept in sync with .tc-dpad below) */
   grid-area: touch;
   display: flex;
   flex-direction: row;
@@ -1967,6 +1971,11 @@ html, body {
   background: var(--bg);
   border-top: 1px solid var(--border);
   align-items: stretch;
+  /* Cap the strip to the d-pad's height (3 cells + 2 gaps + own padding) so a
+     tall ✦ spell grid scrolls inside the panel instead of growing the whole
+     strip and eating the map. The flex chain below needs min-height:0 to let
+     the grid shrink and scroll rather than forcing the panel taller. */
+  max-height: calc(var(--tc-dpad) * 3 + 4px + 0.4rem);
 }
 
 #touch-controls.x-mode { border-top-color: var(--accent); }
@@ -1989,8 +1998,8 @@ html, body {
 /* D-pad: 3×3 CSS grid of large buttons */
 .tc-dpad {
   display: grid;
-  grid-template-columns: repeat(3, 3.6rem);
-  grid-template-rows: repeat(3, 3.6rem);
+  grid-template-columns: repeat(3, var(--tc-dpad));
+  grid-template-rows: repeat(3, var(--tc-dpad));
   gap: 2px;
   flex-shrink: 0;
 }
@@ -2022,6 +2031,7 @@ html, body {
   flex: 1;
   gap: 2px;
   min-width: 0;
+  min-height: 0;
 }
 
 /* Header: Esc | tabs | Enter */
@@ -2094,6 +2104,7 @@ html, body {
   flex-direction: column;
   gap: 2px;
   flex: 1;
+  min-height: 0;
 }
 
 .tc-row {
@@ -2129,54 +2140,40 @@ html, body {
   line-height: 1;
 }
 
-/* ✦ tab: quick-cast spell grid hosted in the panel's content area. Same column
-   density as the action tabs (4-wide), but scrolls when spells overflow the
-   visible rows — so it scales to any spell count without covering the map. */
+/* ✦ tab: quick-cast spell grid hosted in the panel's content area. 4 columns,
+   scrolls when spells overflow — so it scales to any spell count without
+   covering the map. Buttons get the rail's treatment: just the tile with a
+   corner letter, no button box (justify-items:center keeps each content-sized
+   icon centered in its column). A border frames the whole area so the boxless
+   icons read as one grouped region. */
 .tc-spell-grid {
   flex: 1;
   display: grid;
   grid-template-columns: repeat(4, 1fr);
   grid-auto-rows: min-content;
-  gap: 2px;
+  justify-items: center;
+  gap: 4px 2px;
   align-content: start;
+  padding: 4px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 3px;
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
 }
 .tc-spell-btn {
   position: relative;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 1px;
+  display: block;
+  padding: 2px;
   line-height: 0;
-  background: var(--surface2);
-  border: 1px solid var(--border);
-  border-radius: 3px;
+  background: transparent;
+  border: 0;
   cursor: pointer;
   -webkit-tap-highlight-color: transparent;
   touch-action: manipulation;
 }
-.tc-spell-btn:active { background: var(--surface); border-color: var(--accent); }
-.tc-spell-letter {
-  position: absolute;
-  right: 1px;
-  bottom: 0;
-  font-size: 0.62rem;
-  line-height: 1;
-  font-weight: bold;
-  color: var(--text);
-  text-shadow: 0 0 2px #000, 0 0 3px #000;
-  pointer-events: none;
-}
-.tc-spell-empty {
-  flex: 1;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: var(--text);
-  opacity: 0.6;
-  font-size: 0.85rem;
-}
+/* --surface2 (not --surface) so the tap still contrasts against the tray fill. */
+.tc-spell-btn:active { background: var(--surface2); }
 
 /* Footer: Shift, Ctrl, Keyboard */
 .tc-footer {

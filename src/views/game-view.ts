@@ -621,6 +621,22 @@ export function buildGameView(
     // __dcssSpellCache with the parsed memorised spells; the harvest traces its
     // phases to the console (dbgSpell).
     ;(window as unknown as { __dcssHarvestSpells: () => void }).__dcssHarvestSpells = harvestSpells
+    // __dcssFakeSpells(n) — layout aid: pad the cache to n fake spells (cloning
+    // the real harvested tiles so the icons still render, with distinct letters)
+    // to eyeball rail/grid overflow + scrolling. Tapping a fake casts a bogus
+    // letter (harmless — the server just rejects it). Re-harvest to reset.
+    ;(window as unknown as { __dcssFakeSpells: (n?: number) => void }).__dcssFakeSpells = (n = 24) => {
+      if (spellCache.length === 0) { dbgSpell('no harvested spells to clone — enter the game first'); return }
+      const letters = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ'
+      const real = spellCache.slice()
+      spellCache = Array.from({ length: Math.min(n, letters.length) }, (_, i) => ({
+        ...real[i % real.length],
+        letter: letters[i],
+        title: `${real[i % real.length].title} ${i + 1}`,
+      }))
+      exposeSpellCache()
+      dbgSpell(`populated ${spellCache.length} fake spells`)
+    }
     exposeSpellCache()
   }
 
@@ -1098,20 +1114,34 @@ export function buildGameView(
         for (const m of msg.messages ?? []) {
           if (!m.text) continue
           const plain = stripDcss(m.text).trim()
-          // Swallow the "You have no spells." that a silent harvest's `I`
-          // prints for a non-caster — it's an artifact of our probe, not
-          // something the player did. Only while the harvest is in flight.
-          if (isHarvesting() && /^You have no spells\b/.test(plain)) continue
-          // The letter→spell map just changed under us: memorising adds a spell
-          // (+ its letter); a forced forget removes one. Flag the rail stale so
-          // reharvestIfDirty() (after this loop) refreshes it — otherwise a tap
-          // would cast the wrong spell. (`=` reassign has no distinctive
-          // message — it's caught at its menu instead.)
+          // A non-caster's silent-harvest `I` prints "You don't know any
+          // spells." (canned MSG_NO_SPELLS) and opens no menu, so the base
+          // phase has no menu to capture. Recognise this line as the harvest's
+          // no-spells terminator and end the harvest right now — otherwise
+          // isHarvesting() keeps suppressing all input until the 1.5s fallback
+          // fires, a lockout every spell-less character hits at game start.
+          // Clearing the cache + resetHarvest lifts the suppression this frame;
+          // `continue` swallows the line so the player never sees our probe.
+          if (isHarvesting() && /^You don't know any spells\b/.test(plain)) {
+            spellCache = []
+            resetHarvest()
+            exposeSpellCache()
+            continue
+          }
+          // The letter→spell map just changed under us — flag the rail stale so
+          // reharvestIfDirty() (after this loop) refreshes it; otherwise a tap
+          // would cast the wrong spell. Every spell GAIN funnels through the
+          // engine's add_spell_to_memory(), which emits "Spell assigned to
+          // '<letter>'." — so key off that one line rather than each flavour
+          // message it trails: "You finish memorising." on a book memorise,
+          // "The power to cast X wells up from within." on a Djinni / level-up
+          // gift, a revenant/Vehumet gift, etc. A LOSS instead prints "Your
+          // memory of X unravels." (`=` reassign rewrites letters silently —
+          // caught at its menu by the title check, not here).
           // Match as SUBSTRINGS, never whole-line: DCSS joins same-turn,
-          // same-channel mprs onto one line, so the memorise line arrives as
-          // "You finish memorising. Spell assigned to 'b'." (the assignment is
-          // a second mpr concatenated on). An anchored `$` would miss it.
-          if (/You finish memorising\b/.test(plain) || /Your memory of .+ unravels\b/.test(plain)) spellsDirty = true
+          // same-channel mprs onto one msgs line (e.g. "You finish memorising.
+          // Spell assigned to 'b'."), so an anchored `$` would miss it.
+          if (/Spell assigned to\b/.test(plain) || /Your memory of .+ unravels\b/.test(plain)) spellsDirty = true
           if (m.channel === 2 && PROMPT_TRIGGER_RE.test(m.text)) {
             disableActivePrompt()
             const row = makePromptRow(m.text)
@@ -2331,7 +2361,9 @@ export function buildGameView(
       btn.appendChild(renderTiles(loader, [{ t: s.tile, tex: TEX.GUI }], 1))
       const lbl = document.createElement('span')
       lbl.className = 'tc-spell-letter'
-      lbl.textContent = s.letter
+      // "za"/"zb" — the literal cast keystroke (z then the spell's letter), so
+      // the grid doubles as a reminder of what tapping sends.
+      lbl.textContent = `z${s.letter}`
       btn.appendChild(lbl)
       btn.addEventListener('click', () => castSpellLetter(s.letter))
       grid.appendChild(btn)
@@ -2456,7 +2488,9 @@ export function buildGameView(
   }
 
   // Fallback if an expected harvest message never arrives. In `base` the `I`
-  // opened no menu (no spells) — clear the cache. In `extra` the base columns
+  // opened no menu — normally a non-caster is caught faster by the
+  // MSG_NO_SPELLS line in the msgs handler, so this is the backstop for a
+  // dropped/late frame; clear the cache either way. In `extra` the base columns
   // are captured but the toggle re-send was lost; keep them, but the menu is
   // still open server-side, so Escape it (else the next keystroke is eaten).
   function armHarvestTimeout(): void {

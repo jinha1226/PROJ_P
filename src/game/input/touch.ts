@@ -511,17 +511,21 @@ export function buildTouchControls(send: SendFn, opts: { spellTab?: SpellTabConf
   const tabDefs: { key: TabKey; label: string }[] = [
     { key: 'micro', label: '@' },
     { key: 'macro', label: '>' },
-    { key: 'info',  label: '?' },
   ]
   // Quick-cast spells get their own tab (playing client only — spectators have
-  // no spells to cast). Swaps the content grid like any other tab.
+  // no spells to cast), grouped with the other action tabs and ahead of the
+  // info/help tab. Swaps the content grid like any other tab.
   if (opts.spellTab) tabDefs.push({ key: 'spells', label: '✦' })
+  tabDefs.push({ key: 'info', label: '?' })
   for (const td of tabDefs) {
     const btn = document.createElement('button')
     btn.className = 'tc-tab' + (td.key === 'micro' ? ' active' : '')
     btn.textContent = td.label
     btn.title = td.key
     btn.dataset.tab = td.key
+    // The ✦ tab starts hidden; refreshSpellTab() reveals it once a harvest
+    // finds spells (and hides it again if the player ends up with none).
+    if (td.key === 'spells') btn.style.display = 'none'
     btn.addEventListener('touchstart', e => { e.preventDefault(); renderTab(td.key) }, { passive: false })
     btn.addEventListener('click', () => renderTab(td.key))
     tabsEl.appendChild(btn)
@@ -605,27 +609,26 @@ export function buildTouchControls(send: SendFn, opts: { spellTab?: SpellTabConf
     tabsEl.querySelectorAll<HTMLElement>('.tc-tab').forEach(el => {
       el.classList.toggle('active', el.dataset.tab === tab)
     })
-    if (tab === 'spells') renderSpellContent()
+    // The ✦ tab hosts the spell grid game-view builds (it owns the spell data,
+    // tile loader, and cast logic); refreshSpellTab fills it. Sticky like any
+    // tab — stays until the player switches away, so repeat-casting is one tap
+    // each. Other tabs render their static button layout.
+    if (tab === 'spells') refreshSpellTab()
     else renderContent(TAB_BUTTONS[tab])
   }
 
-  // The ✦ tab hosts the spell grid game-view builds (it owns the spell data,
-  // tile loader, and cast logic). Sticky like any tab — it stays until the
-  // player switches away, so repeat-casting in a fight is one tap each.
-  function renderSpellContent(): void {
-    contentEl.innerHTML = ''
-    const grid = opts.spellTab?.render() ?? null
-    if (grid) { contentEl.appendChild(grid); return }
-    const empty = document.createElement('div')
-    empty.className = 'tc-spell-empty'
-    empty.textContent = 'No spells.'
-    contentEl.appendChild(empty)
-  }
-
-  // Called by game-view after a (re)harvest so an open ✦ tab reflects the new
-  // spell list (count / letters / fail). No-op unless the ✦ tab is showing.
+  // Reveal the ✦ tab only when a harvest found spells; hide it otherwise (a
+  // non-caster, or after forgetting the last spell). Called by game-view after
+  // every (re)harvest. Keeps an open ✦ tab's grid current, and if it just
+  // emptied while showing, falls back to the @ tab.
   function refreshSpellTab(): void {
-    if (activeTab === 'spells') renderSpellContent()
+    const tab = tabsEl.querySelector<HTMLElement>('.tc-tab[data-tab="spells"]')
+    if (!tab) return  // spectator — there is no ✦ tab
+    const grid = opts.spellTab?.render() ?? null
+    tab.style.display = grid ? '' : 'none'
+    if (activeTab !== 'spells') return
+    if (grid) { contentEl.innerHTML = ''; contentEl.appendChild(grid) }
+    else renderTab('micro')
   }
 
   function renderContent(rows: TabButtonDef[][]): void {

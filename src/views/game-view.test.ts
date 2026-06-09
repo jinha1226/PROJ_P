@@ -434,6 +434,51 @@ describe('spell harvest (silent I → ! → Esc) + preface parsing', () => {
     })
   }
 
+  // A spell-less character's `I` opens no menu — it prints the canned
+  // "You don't know any spells." instead. The base phase must end on that line
+  // (not sit suppressing input until the 1.5s fallback), and the artifact line
+  // must be swallowed so the player never sees a message they didn't trigger.
+  describe('no-spells terminator (non-caster)', () => {
+    const NO_SPELLS = "You don't know any spells."
+    const msgTextsIn = (h: Harness) =>
+      [...h.view.querySelectorAll<HTMLElement>('#game-messages .game-msg')].map(r => r.textContent?.trim())
+
+    it('ends the harvest immediately when the no-spells line arrives (no 1.5s lockout)', () => {
+      const h = setup()
+      startHarvest()  // I #1; phase 'base'
+      h.dispatch({ msg: 'msgs', messages: [{ text: NO_SPELLS }] })
+      // Phase must be idle now: a fresh harvest fires I #2 only if it was reset.
+      // With the old code the phase stays 'base' until the timer.
+      startHarvest()
+      expect(sentInputI(h)).toHaveLength(2)
+      h.dispatch({ msg: 'msgs', messages: [{ text: NO_SPELLS }] }) // settle harvest #2
+    })
+
+    it('swallows the no-spells artifact line so it never reaches the message log', () => {
+      const h = setup()
+      startHarvest()
+      h.dispatch({ msg: 'msgs', messages: [{ text: NO_SPELLS }] })
+      expect(msgTextsIn(h)).not.toContain(NO_SPELLS)
+    })
+
+    it('leaves the spell rail/✦ tab empty (no spells harvested)', () => {
+      const h = setup()
+      startHarvest()
+      h.dispatch({ msg: 'msgs', messages: [{ text: NO_SPELLS }] })
+      expect(cache()).toHaveLength(0)
+      expect(isHidden(h.view.querySelector<HTMLElement>('#spell-rail')!)).toBe(true)
+      expect(h.view.querySelector<HTMLElement>('.tc-tab[data-tab="spells"]')!.style.display).toBe('none')
+    })
+
+    it('does NOT swallow the no-spells line outside a harvest', () => {
+      const h = setup()
+      // Not harvesting → a literal "You don't know any spells." is a real game
+      // message (e.g. the player pressed `z` with none) and must show.
+      h.dispatch({ msg: 'msgs', messages: [{ text: NO_SPELLS }] })
+      expect(msgTextsIn(h)).toContain(NO_SPELLS)
+    })
+  })
+
   // A message can race into the brief harvest window that isn't part of our own
   // `I` round-trip. The harvest looks like normal play (activeMenu stays null),
   // so it must hand the channel back rather than mistake a foreign message for
@@ -484,8 +529,10 @@ describe('spell harvest (silent I → ! → Esc) + preface parsing', () => {
   })
 
   // Keep the rail in sync with the letter→spell map: it casts `z<letter>`
-  // blindly, so a stale letter would fire the WRONG spell. Exactly three events
-  // change that map, each re-harvests via the spellsDirty path. The triggers are
+  // blindly, so a stale letter would fire the WRONG spell. A re-harvest fires
+  // via the spellsDirty path whenever the map changes: any GAIN (engine emits
+  // "Spell assigned to '<letter>'." — book memorise, Djinni/level-up gift, etc.),
+  // any LOSS ("Your memory of X unravels."), or a `=` reassign. The triggers are
   // precise — routine play (casting, plain viewing, combat log) must NOT poll.
   describe('re-harvest on a letter-map change', () => {
     // Settle a re-harvest's own I → ! → Esc so its 1.5s fallback timer is cleared.
@@ -501,6 +548,19 @@ describe('spell harvest (silent I → ! → Esc) + preface parsing', () => {
       // Memorise completes inside command mode (no input_mode transition fires),
       // so the msgs handler itself must fire the refresh.
       h.dispatch({ msg: 'msgs', messages: [{ text: "You finish memorising. Spell assigned to 'b'." }] })
+      expect(sentInputI(h)).toHaveLength(2)
+      settle(h)
+    })
+
+    it('re-harvests on a level-up / Djinni spell gift (no "memorising" — only "Spell assigned to")', () => {
+      const h = setup()
+      fullHarvest(h)
+      expect(sentInputI(h)).toHaveLength(1)
+      // Djinni and other auto-gain paths skip the book-memorise flavour entirely;
+      // the only shared signal is add_spell_to_memory's "Spell assigned to '<l>'."
+      // (joined onto the gift's "…wells up from within." mpr). The old
+      // "You finish memorising" trigger missed this, stranding the rail stale.
+      h.dispatch({ msg: 'msgs', messages: [{ text: "The power to cast Call Canine Familiar wells up from within. Spell assigned to 'g'." }] })
       expect(sentInputI(h)).toHaveLength(2)
       settle(h)
     })
@@ -558,8 +618,9 @@ describe('spell harvest (silent I → ! → Esc) + preface parsing', () => {
   describe('✦ spell tab (touch-panel quick-cast grid)', () => {
     const spellTab = (h: Harness) => h.view.querySelector<HTMLElement>('.tc-tab[data-tab="spells"]')
     const gridBtns = (h: Harness) => [...h.view.querySelectorAll<HTMLElement>('.tc-spell-grid .tc-spell-btn')]
+    // Grid labels read "za"/"zb" (the literal cast keystroke), so match on that.
     const gridBtn = (h: Harness, letter: string) =>
-      gridBtns(h).find(b => b.querySelector('.tc-spell-letter')?.textContent === letter)!
+      gridBtns(h).find(b => b.querySelector('.tc-spell-letter')?.textContent === `z${letter}`)!
 
     it('renders one grid button (tile + letter) per harvested spell when the ✦ tab is tapped', () => {
       const h = setup()
@@ -595,6 +656,26 @@ describe('spell harvest (silent I → ! → Esc) + preface parsing', () => {
     it('omits the ✦ tab while spectating (no spells to cast)', () => {
       const h = setup({ username: 'bob' })
       expect(spellTab(h)).toBeNull()
+    })
+
+    it('keeps the ✦ tab hidden until a harvest finds spells, then reveals it', () => {
+      const h = setup()
+      expect(spellTab(h)!.style.display).toBe('none') // no spells yet → hidden
+      fullHarvest(h)
+      expect(spellTab(h)!.style.display).not.toBe('none') // harvest found spells → shown
+    })
+
+    it('hides the ✦ tab again (and falls back to @) when a re-harvest finds no spells', () => {
+      const h = setup()
+      fullHarvest(h)
+      spellTab(h)!.click()
+      expect(spellTab(h)!.classList.contains('active')).toBe(true)
+      // Re-harvest returns an empty spell menu (forgot the last spell).
+      startHarvest()
+      h.dispatch({ msg: 'menu', tag: 'spell', items: [] })
+      expect(spellTab(h)!.style.display).toBe('none')
+      expect(h.view.querySelector<HTMLElement>('.tc-tab[data-tab="micro"]')!.classList.contains('active')).toBe(true)
+      feedExtra(h) // settle the harvest's fallback timer
     })
   })
 })
