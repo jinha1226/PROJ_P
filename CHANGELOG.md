@@ -13,6 +13,10 @@ Notable changes to PocketZot, newest first.
 
 - Spellcasters now get a quick-cast row below the message log, with tappable
   icons that send `z` plus the spell's letter.
+- Landscape layout (unsupported) has been redesigned: the map fills
+  everything left of the sidebar, the message log and d-pad float over it,
+  and the monster list and quick-cast spells sit in the sidebar between the
+  HUD and the touch controls.
 
 ## 2026-06-08
 
