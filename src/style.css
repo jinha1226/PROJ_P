@@ -799,7 +799,15 @@ html, body {
      and the map re-fits (and may drop a row) on each step. */
   height: var(--msglog-h);
   overflow-y: auto;
-  padding: 0 0.25rem;
+  /* Vertical padding is the Safari fix, not cosmetic — don't zero it. With
+     box-sizing:border-box the padding-bottom lifts the bottom-pinned column up
+     off the bottom edge, which pushes the row scrolled just out of view a few
+     px clear of the top edge. That gap absorbs WebKit's fractional column-reverse
+     scroll offset (which Chrome rounds away but Safari/iOS doesn't), so the
+     hidden row's descenders no longer bleed in at the top. It also makes the
+     content box no longer an exact 5×line-box multiple, removing the
+     boundary-aligned cut that made the artifact possible. */
+  padding: 0.2rem 0.0rem;
   cursor: pointer;
   /* Bottom-pinned chat-log pattern: column-reverse lays children from the
      visual bottom upward, which lets the browser keep scroll naturally at
@@ -1112,7 +1120,7 @@ html, body {
 #game-hud {
   grid-area: hud;
   background: var(--bg);
-  padding: 0.2rem 0.25rem;
+  padding: 0.2rem 0.0rem;
   display: flex;
   flex-direction: column;
   gap: 0.1rem;
@@ -2027,7 +2035,7 @@ html, body {
   display: flex;
   flex-direction: row;
   gap: 0.35rem;
-  padding: 0.2rem 0.35rem;
+  padding: 0.1rem 0.35rem;
   background: var(--bg);
   /* Transparent (not removed): X-mode colors this border as its active-mode
      indicator (.x-mode rule below), and keeping the 1px avoids a layout
