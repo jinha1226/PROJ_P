@@ -2225,8 +2225,11 @@ html, body {
 
 .tc-btn-spacer { background: transparent; border-color: transparent; pointer-events: none; }
 
+/* Symbol macro buttons (⇥ auto-fight, ⎋, ⏎, …): a fixed size matched to the
+   d-pad arrows so the panel's large glyphs read consistently. Was a vw clamp,
+   which pinned to its ceiling in landscape and dwarfed the adjacent text. */
 .tc-btn.glyph {
-  font-size: clamp(1.3rem, 5vw, 1.9rem);
+  font-size: 1.4rem;
   line-height: 1;
 }
 
@@ -2322,6 +2325,11 @@ html, body {
   flex-direction: column;
   align-items: center;
   gap: 0.3rem;
+  /* Single base for all key text. Letters use 1em, glyph keys a fixed em
+     bump and corner marks a fixed em fraction — so every label scales from
+     this one value and stays in proportion across orientations (no vw). */
+  --kbd-font: 1.1rem;
+  font-size: var(--kbd-font);
   --kbd-key-w: calc((100% - 9 * var(--kbd-gap)) / 10);
   --kbd-key-h: clamp(2.6rem, 11vw, 4.2rem);
   --kbd-gap: 0.3rem;
@@ -2350,7 +2358,7 @@ html, body {
   border-radius: 3px;
   color: var(--text);
   font-family: var(--font-mono);
-  font-size: 1.1rem;
+  font-size: 1em;
   cursor: pointer;
   display: flex;
   align-items: center;
@@ -2372,7 +2380,6 @@ html, body {
   width: auto;
   min-width: var(--kbd-key-w);
   padding: 0 0.45rem;
-  font-size: 0.9rem;
 }
 
 .kbd-key.wide.flex {
@@ -2380,9 +2387,11 @@ html, body {
   min-width: 0;
 }
 
-/* Glyph keys (⎋ ⌃ ⇥ ⏎ ⌫ ⇧) — bump size so the Unicode symbols visually fill the key */
+/* Glyph keys (⎋ ⌃ ⇥ ⏎ ⌫ ⇧) — a fixed em bump over the key text so the thinner
+   Unicode symbols read at a comparable weight to the letters, without coupling
+   to viewport width (which blew them up to the clamp ceiling in landscape). */
 .kbd-key.glyph {
-  font-size: clamp(1.5rem, 5.5vw, 2.2rem);
+  font-size: 1.3em;
   line-height: 1;
 }
 
@@ -2407,7 +2416,7 @@ html, body {
   position: absolute;
   top: 2px;
   right: 4px;
-  font-size: 0.6rem;
+  font-size: 0.55em;
   line-height: 1;
   color: var(--text-dim);
   pointer-events: none;
