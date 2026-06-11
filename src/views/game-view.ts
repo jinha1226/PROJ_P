@@ -496,6 +496,16 @@ export function buildGameView(
 
   const touchControls: TouchControls = buildTouchControls((msg) => {
     if (isHarvesting()) return  // suppress d-pad/macro input during silent harvest
+    // The monster panel is a client-only overlay. In landscape it covers just
+    // the map, so the sidebar keyboard stays visible (the display:none hide
+    // that works in portrait is undone whenever a server message re-reveals
+    // the sidebar). Route its Esc to close the panel — mirroring the physical
+    // Esc handler in docKeyHandler — and swallow every other key so a stray
+    // tap can't drive the hidden game beneath the overlay.
+    if (monsterPanelOpen) {
+      if (msg.msg === 'key' && msg.keycode === 27) closeMonsterPanel()
+      return
+    }
     if (msg.msg === 'key' && menuNavActive()) {
       if (msg.keycode === CK_DOWN) { cycleMenuHover(false); return }
       if (msg.keycode === CK_UP) { cycleMenuHover(true); return }
@@ -2400,7 +2410,11 @@ export function buildGameView(
     // `currentInputMode === 1` additionally rejects active targeting (a prior
     // targeted spell left the server in a target loop with a map cursor but no
     // menu/overlay) — `z<letter>` there would land mid-targeting, not cast.
-    if (currentInputMode !== 1 || !commandChannelIdle()) return
+    // The monster panel is a client-only overlay that doesn't change input
+    // mode, so it needs its own gate: in landscape the rail stays visible in
+    // the sidebar beside the panel, and a tap here bypasses the touch-input
+    // swallow (the rail sends via conn.send, not that callback).
+    if (monsterPanelOpen || currentInputMode !== 1 || !commandChannelIdle()) return
     conn.send({ msg: 'input', text: 'z' })
     conn.send({ msg: 'input', text: letter })
   }
