@@ -127,8 +127,8 @@ describe('MonsterListView.renderTiles', () => {
   })
 
   it('collapses to one chevron-less row in compact (landscape) mode', () => {
-    // Landscape forces setCompact(true): the narrow sidebar can't host the
-    // multi-row expanded list, so it must render the single collapsed row
+    // Phone landscape forces setCompact(true): the short sidebar can't host
+    // the multi-row expanded list, so it must render the single collapsed row
     // (top group + "+N") and drop the expand/collapse chevron, regardless of
     // how many groups are present. Uses ASCII (no loader) since the collapse
     // is mode-independent.

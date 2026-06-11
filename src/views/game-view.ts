@@ -432,9 +432,12 @@ export function buildGameView(
 
   // Tap the compact monster list to open the full-screen GUI variant.
   // Refuse while a server-side prompt is up so we don't drop the user out
-  // of an in-progress targeting/menu/etc.
+  // of an in-progress targeting/menu/etc. Also refuse while the panel is
+  // already open: in landscape it covers only the map, leaving the sidebar
+  // chip clickable, and a re-open would rebuild the overlay and reset the
+  // panel's scroll position.
   monsterListView.element.addEventListener('click', (e) => {
-    if (uiStack.length > 0 || crtActive || dialogActive || activeMenu || isHarvesting()) return
+    if (uiStack.length > 0 || crtActive || dialogActive || activeMenu || isHarvesting() || monsterPanelOpen) return
     if (monsterListView.element.childElementCount === 0) return
     e.stopPropagation()
     openMonsterPanel()

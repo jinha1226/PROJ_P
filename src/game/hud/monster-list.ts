@@ -77,10 +77,10 @@ export class MonsterListView {
   // convention to match the virtual-keyboard button: ▴ when expanded
   // (tap collapses upward), ▾ when collapsed (tap expands downward).
   private collapsed = getPref('monsterListCollapsed')
-  // Landscape forces the single-line collapsed rendition (see setCompact):
-  // the narrow sidebar can't host the multi-row expanded list. Independent
-  // of `collapsed` so flipping orientation doesn't disturb the user's
-  // portrait expand/collapse pref.
+  // Short landscape (phone) forces the single-line collapsed rendition (see
+  // setCompact): there the sidebar has no vertical room for the multi-row
+  // expanded list. Independent of `collapsed` so flipping orientation
+  // doesn't disturb the user's expand/collapse pref.
   private compact = false
   private readonly toggleEl: HTMLElement
   // Per-version tile loader for the sprite path; null until game-view hands it
@@ -131,13 +131,16 @@ export class MonsterListView {
     if (this.mode === 'tiles' && this.lastMonsters) this.update(this.lastMonsters)
   }
 
-  // Called by game-view from an orientation matchMedia. Landscape (true)
-  // forces the single-line collapsed chip — top-threat glyph(s) + name +
-  // "+N", with the hostile outline — because the narrow sidebar can't host
-  // the multi-row expanded list without crowding the HUD and touch panel.
-  // The chip still taps through to the full monster panel. Reverting to
-  // false restores the user's portrait collapse pref. Replays the last
-  // snapshot so the chip appears immediately on rotation, not next turn.
+  // Called by game-view from its `(orientation: landscape) and
+  // (max-height: 600px)` matchMedia — i.e. landscape on a phone-height
+  // viewport. True forces the single-line collapsed chip — top-threat
+  // glyph(s) + name + "+N", with the hostile outline — because on a short
+  // sidebar the multi-row expanded list would crowd out the HUD and touch
+  // panel. Tablet-height landscape and portrait never match, keeping the
+  // full list (and the user's collapse pref) there. The chip still taps
+  // through to the full monster panel. Reverting to false restores the
+  // user's collapse pref. Replays the last snapshot so the chip appears
+  // immediately on rotation, not next turn.
   setCompact(compact: boolean): void {
     if (this.compact === compact) return
     this.compact = compact
