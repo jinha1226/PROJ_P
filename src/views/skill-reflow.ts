@@ -210,9 +210,16 @@ export function reflowSkillCrt(lines: string[]): string[] {
   // two-celled lines; the column-header line and the blank separator above the
   // help text both stop the walk.
   const HEADER_RE = /^\s*Skill\s+Level/
+  // The fixed-width grid always pads the left column so a run of spaces sits
+  // immediately before the right cell. Prose footers ("…each skill is in
+  // cyan.") flow continuously across that column, so a letter (or a lone
+  // inter-word space) lands just before repRight. Requiring the inter-column
+  // gap is what stops the walk from swallowing — and then splitting — a long
+  // explanatory line whose two halves both happen to be non-empty.
   const twoCells = (i: number): boolean =>
     bestN > 0 && i >= 0 && i < lines.length
     && !HEADER_RE.test(plains[i])
+    && plains[i][repRight - 1] === ' ' && plains[i][repRight - 2] === ' '
     && plains[i].slice(0, repRight).trim() !== ''
     && plains[i].slice(repRight).trim() !== ''
   while (twoCells(first - 1)) first--

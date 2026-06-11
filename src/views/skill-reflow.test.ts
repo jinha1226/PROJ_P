@@ -208,6 +208,22 @@ describe('reflowSkillCrt', () => {
     expect(out[0]).toBe('  Skill        Level') // header still deduped to one copy
   })
 
+  it('does not split a prose footer that touches the right column (no blank above it)', () => {
+    // Real bug: the two-column grid's last skill row is immediately followed by
+    // the explanatory prose (no blank separator on the wire). The prose is long
+    // enough to have text on both sides of the right column, so the grid-range
+    // walk must reject it by the missing inter-column gap, not swallow + split it.
+    const lines = [
+      `  ${'a - Fighting    +0'.padEnd(20)}${L('c - Spellcasting +11')}`,
+      `  ${'b - Dodging     +1'.padEnd(20)}${L('d - Conjurations +11')}`,
+      ' The relative cost of raising each skill is in cyan.',
+      ' Skills enhanced by cross-training are in green.',
+    ]
+    const out = reflowSkillCrt(lines).map(text)
+    expect(out).toContain(' The relative cost of raising each skill is in cyan.')
+    expect(out).toContain(' Skills enhanced by cross-training are in green.')
+  })
+
   it('splits a mastered right cell (no hotkey, no sign) at the grid column', () => {
     const lines = [
       `  ${'a - Fighting    +0'.padEnd(19)}${L('c - Spellcasting +11')}`,
