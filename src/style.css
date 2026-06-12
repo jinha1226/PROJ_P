@@ -1393,14 +1393,9 @@ html, body {
    margin-left keeps a minimum gap from the name. */
 .ml-collapsed-more {
   float: right;
-  font-size: 0.85em;
-  /* A float top-aligns its own line box instead of sitting on the row's
-     text baseline, so without this the smaller font rides high. 1.4/0.85
-     re-inflates the box to the row's full line height (.ml-row's 1.4 in
-     this font's em units), centering the text back onto the shared line.
-     (.ml-toggle deliberately skips this — top-aligned reads as a corner
-     button.) */
-  line-height: calc(1.4 / 0.85);
+  /* No font-size/line-height override: inheriting the row's keeps +N on the
+     name's baseline. A smaller font here would top-align off the baseline and
+     ride high — don't reintroduce one without baseline-aligning another way. */
   color: var(--text-dim);
   margin-left: 0.6em;
   font-style: italic;
