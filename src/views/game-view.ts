@@ -609,6 +609,9 @@ export function buildGameView(
     if (mode === renderMode) return
     renderMode = mode
     setPref('mapRenderMode', mode)
+    // CSS hook for mode-dependent chrome (e.g. the floating log's scrim
+    // lightens over tiles — see --msglog-bg in style.css).
+    view.classList.toggle('tiles-mode', mode === 'tiles')
     const center = { x: store.playerPos.x, y: store.playerPos.y }
     fontScaleObserver.unobserve(mapView.element)
     const oldEl = mapView.element
@@ -661,6 +664,11 @@ export function buildGameView(
       exposeSpellCache()
     }
     exposeSpellCache()
+    // __dcssMsgPill() — A/B the per-line message-log scrim variant (style.css
+    // `.msg-pill`): background hugs each line's text instead of filling the
+    // whole strip. Toggles; pass true/false to force.
+    ;(window as unknown as { __dcssMsgPill: (on?: boolean) => void }).__dcssMsgPill =
+      (on) => { view.classList.toggle('msg-pill', on) }
   }
 
   // Apply the persisted render-mode preference now that the map element,

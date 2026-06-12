@@ -699,6 +699,15 @@ html, body {
      line-height). A var so the spell-row rules below can offset #more-btn
      by exactly the log's height. */
   --msglog-h: calc(5 * var(--msglog-font) * var(--msglog-line));
+  /* Floating-log scrim. Text legibility comes from the text-shadow on
+     #game-messages, so the scrim's job is figure/ground separation — dimming
+     the map content behind the log. ASCII is the binding case: behind the log
+     are full-brightness bold glyphs (text over text), and only the scrim
+     keeps the layers apart, so it needs the stronger wash. Tiles are
+     continuous imagery the eye parses as "behind" on its own — the
+     .tiles-mode override lightens it (set by setRenderMode in game-view.ts,
+     which is also what swaps in TileMapView). */
+  --msglog-bg: color-mix(in srgb, var(--bg) 30%, transparent);
   /* Spell-rail button band: 32px tile + 2×2px button padding + own 0.25rem
      padding. Shared so the rail's height, the log float that sits just above it,
      and the --more-- offset that clears both stay locked together. */
@@ -833,7 +842,12 @@ html, body {
   left: 0;
   right: 0;
   z-index: 3;
-  background: color-mix(in srgb, var(--bg) 30%, transparent);
+  background: var(--msglog-bg);
+  /* Tight black halo + 1px drop: keeps every DCSS message color (incl. brown/
+     darkgrey) legible over bright floor tiles without raising the scrim —
+     the scrim level is tuned for layer separation, not contrast (see
+     --msglog-bg). Inherits to all log content. */
+  text-shadow: 0 1px 2px #000, 0 0 3px #000;
   font-size: var(--msglog-font);
   line-height: var(--msglog-line);
   /* A fixed 5-line floating box; newest message pinned to the anchored edge
@@ -859,6 +873,23 @@ html, body {
      `:first-child` is the most-recent message. */
   display: flex;
   flex-direction: column-reverse;
+}
+
+/* Tile rendering: lighter scrim — see --msglog-bg. */
+#game-view.tiles-mode { --msglog-bg: color-mix(in srgb, var(--bg) 15%, transparent); }
+
+/* Per-line scrim ("pill") variant — toggle live via the dev hook
+   __dcssMsgPill() in game-view.ts. The strip scrim goes fully transparent and
+   each message line carries its own backing instead, so the map shows through
+   wherever there's no text (short lines, quiet turns). Lines shrink to their
+   text (align-self overrides the column-reverse stretch). Horizontal padding
+   only: vertical would break the 5-lines-in---msglog-h rhythm. */
+#game-view.msg-pill #game-messages { background: transparent; }
+#game-view.msg-pill .game-msg {
+  align-self: flex-start;
+  max-width: 100%;
+  background: color-mix(in srgb, var(--bg) 50%, transparent);
+  padding: 0;
 }
 
 /* Portrait: the log (base rule) floats over the map's BOTTOM edge; these rules
