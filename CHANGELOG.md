@@ -9,12 +9,17 @@ formatting and HTML chrome differ. Drift is a bug.
 
 Notable changes to PocketZot, newest first.
 
-## 2026-06-10
+## 2026-06-12
 
 - Spellcasters now get a quick-cast row below the message log, with tappable
   icons that send `z` plus the spell's letter.
+- The message log now floats translucently over the map's bottom edge instead
+  of taking its own band of the screen, so the map shows several more rows.
+- Tile rendering now fills the map area edge to edge, including partial tiles.
 - Dimmed the touch controls so they don't outshine the dungeon in darker
   areas.
+- Fixed an issue with certain text input prompts.
+- Various other improvements.
 
 ## 2026-06-08
 
