@@ -342,7 +342,7 @@ export class MonsterListView {
       // fields, and avoids hand-rolled hashing bugs. The suffix is a
       // visual input too: the last row carries the "+N" overflow, so a
       // changed hidden-monster count must rebuild that row.
-      const memberSig = d.memberCells.map((c) => [c?.fg ?? 0, c?.t_bg ?? 0, c?.doll ?? null, c?.mcache ?? null, c?.icons ?? null])
+      const memberSig = d.memberCells.map((c) => [c?.fg ?? 0, c?.t_bg ?? 0, c?.doll ?? null, c?.mcache ?? null, c?.icons ?? null, c?.highlighted_summoner ?? false])
       const sig = JSON.stringify([d.hasBar, d.barColor, d.color, d.label, d.hpColor, rowSuffix ?? null, memberSig])
 
       const cached = this.rows[i]
@@ -376,15 +376,16 @@ export class MonsterListView {
       stack.className = 'ml-tile tile-stack'
 
       // Layer order matches MonsterPanelView.renderRow: monster sprite on
-      // top, threat wash below it, halo below that, floor at the bottom.
-      // prependDngn* slots in at index 0 of the DOM, so prepend calls run in
-      // reverse of bottom-up paint order.
+      // top, summoner ring below it, threat wash below that, halo below that,
+      // floor at the bottom. prependDngn* slots in at index 0 of the DOM, so
+      // prepend calls run in reverse of bottom-up paint order.
       const baseSpec = monsterTileSpec({
         fg_idx: fgTileIndex(cell?.fg),
         doll: cell?.doll,
         mcache: cell?.mcache,
       })
       if (baseSpec.length > 0) appendTiles(this.loader, stack, baseSpec, TILE_SCALE)
+      if (cell?.highlighted_summoner) prependDngnLayer(this.loader, stack, 'HALO_SUMMONER', TILE_SCALE)
       const threat = fgThreatDngnName(cell?.fg)
       if (threat) prependDngnLayer(this.loader, stack, threat, TILE_SCALE)
       const halo = fgHaloDngnName(cell?.fg)
