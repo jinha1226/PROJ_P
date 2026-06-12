@@ -7,7 +7,8 @@ import type { WsConnection } from '../ws/connection'
 import type { ServerMsg, ClientMsg, GameExit } from '../ws/types'
 import type { MapStore } from '../game/map/map-store'
 
-// game-view.ts exports only buildGameView, so it's exercised end-to-end the way
+// game-view.ts exports buildGameView (plus unwrapHangingIndents/HANG_MARK for
+// the data-file sweep test), so it's exercised end-to-end the way
 // the app drives it: the view assigns conn.onMessage, and we feed it server
 // frames via that handler (same approach as lobby.test.ts). These cover the
 // message-dispatch state machine — message log, HUD reveal gating, the overlay /
@@ -168,6 +169,149 @@ describe('ui-push / ui-pop overlay stack', () => {
     h.dispatch({ msg: 'ui-push', type: 'describe-item', title: 'A', body: 'a' })
     h.dispatch({ msg: 'close_all_menus' })
     expect(isHidden(overlay(h))).toBe(true)
+  })
+
+  it('unwraps server hanging-indent prop blocks into one hang-classed prose line', () => {
+    const h = setup()
+    // Wire layout from _format_prop_desc (describe.cc): 80-col hard wrap with
+    // continuation lines space-padded to the description column.
+    const body = [
+      "'Of mesmerism': When you are struck in melee, it briefly dazes all nearby",
+      '                enemies, then must recharge by standing still for a while. Its',
+      '                duration, radius, and recharge speed are improved by your',
+      '                Evocations skill.',
+      '',
+      'Rampage:   When you move towards an enemy, you cover twice the distance. It',
+      '           will not trigger if the destination is dangerous.',
+      'Will+:     It increases your willpower.',
+      '',
+      'Mesmerism radius: 2 (max 4)',
+    ].join('\n')
+    h.dispatch({ msg: 'ui-push', type: 'describe-item', title: 'c - an orb of mesmerism', body })
+    // Marked rows keep their original `label + padding` prefix; wrapped text
+    // hangs at the description column (style --hang-col) for padded labels,
+    // or at the 2ch default for run-in labels like `'Of mesmerism': `.
+    const hangEls = [...overlay(h).querySelectorAll<HTMLElement>('.overlay-line--hang')]
+    expect(hangEls.map(el => el.textContent)).toEqual([
+      "'Of mesmerism': When you are struck in melee, it briefly dazes all nearby "
+        + 'enemies, then must recharge by standing still for a while. Its '
+        + 'duration, radius, and recharge speed are improved by your Evocations skill.',
+      'Rampage:   When you move towards an enemy, you cover twice the distance. It '
+        + 'will not trigger if the destination is dangerous.',
+      // single-line padded-label rows hang too — identical when they fit,
+      // wrapping within the column when they don't
+      'Will+:     It increases your willpower.',
+    ])
+    expect(hangEls.map(el => el.style.getPropertyValue('--hang-col'))).toEqual(['', '11ch', '11ch'])
+    // Single-space-after-colon lines are ordinary prose — untouched — and no
+    // line carries the HANG_MARK sentinel into the DOM.
+    const lines = [...overlay(h).querySelectorAll('.overlay-line')]
+    const radiusLine = lines.find(el => el.textContent?.startsWith('Mesmerism radius:'))
+    expect(radiusLine?.classList.contains('overlay-line--hang')).toBe(false)
+    expect(radiusLine?.textContent).toBe('Mesmerism radius: 2 (max 4)')
+    expect(lines.some(el => el.textContent?.includes('\u0001'))).toBe(false)
+  })
+
+  it('routes the other server table shapes correctly (no hanging-indent marks)', () => {
+    const h = setup()
+    // Real layout shapes from the reference source that must NOT be marked
+    // by the unwrap (chips/indent-hang are render-side treatments):
+    const body = [
+      // god-powers header: cost right-aligned to col 80 (describe-god.cc:719)
+      'Granted powers:' + ' '.repeat(59) + '(Cost)',
+      // spell stat line: multi-stat chips (describe.cc:4218)
+      'Level: 5        Schools: Conjuration',
+      // right-aligned spell stat labels start with spaces → indent-hang
+      '  Damage: 3d12 (max 36)',
+      // monster attack table row: no colon label
+      'Bite                    2d8',
+      // resistance symbols: `label: value` pairs → chips
+      'rF: +       rC: + +       rPois: x',
+    ].join('\n')
+    h.dispatch({ msg: 'ui-push', type: 'describe-monster', title: 'shapes', body })
+    // chip rows for the multi-stat lines, pairs kept whole
+    const chipRows = [...overlay(h).querySelectorAll('.overlay-stat-row')]
+      .map(el => [...el.querySelectorAll('.overlay-stat')].map(s => s.textContent))
+    expect(chipRows).toContainEqual(['Level: 5', 'Schools: Conjuration'])
+    expect(chipRows).toContainEqual(['rF: +', 'rC: + +', 'rPois: x'])
+    // col-80 header and attack row keep the tabular nowrap treatment
+    const nowraps = [...overlay(h).querySelectorAll('.overlay-line--nowrap')].map(el => el.textContent)
+    expect(nowraps).toContain('Granted powers:' + ' '.repeat(59) + '(Cost)')
+    expect(nowraps).toContain('Bite                    2d8')
+    // indented stat keeps its text and hangs at its own depth
+    const dmg = [...overlay(h).querySelectorAll<HTMLElement>('.overlay-line--hang')]
+      .find(el => el.textContent?.includes('Damage:'))
+    expect(dmg?.textContent).toBe('  Damage: 3d12 (max 36)')
+    expect(dmg?.style.getPropertyValue('--hang-col')).toBe('2ch')
+  })
+
+  it('renders the weapon stat block: chips for the header, aligned wraps for the skill sub-items', () => {
+    const h = setup()
+    const body = [
+      'Base accuracy: -2  Base damage: 13  Base attack delay: 1.6',
+      "This weapon's minimum attack delay (0.7) is reached at skill level 18.",
+      '    Your skill: 3.6',
+      '    At 100% training you would reach 18.0 in about 9.3 XLs.',
+      '    At current training (25%) you reach 18.0 in about 15.2 XLs.',
+      '    Current attack delay: 1.4.',
+      'Damage rating: 34 (Base 13 x 127% (Str) x 113% (Skill) + 16 (Ench)).',
+    ].join('\n')
+    h.dispatch({ msg: 'ui-push', type: 'describe-item', title: 'a war axe', body })
+    const chipRows = [...overlay(h).querySelectorAll('.overlay-stat-row')]
+      .map(el => [...el.querySelectorAll('.overlay-stat')].map(s => s.textContent))
+    expect(chipRows).toContainEqual(['Base accuracy: -2', 'Base damage: 13', 'Base attack delay: 1.6'])
+    // each indented sub-item hangs at its 4-space depth
+    const hangs = [...overlay(h).querySelectorAll<HTMLElement>('.overlay-line--hang')]
+    const training = hangs.find(el => el.textContent?.includes('At 100% training'))
+    expect(training?.style.getPropertyValue('--hang-col')).toBe('4ch')
+    expect(training?.textContent).toBe('    At 100% training you would reach 18.0 in about 9.3 XLs.')
+    // prose lines stay plain
+    const rating = [...overlay(h).querySelectorAll('.overlay-line')]
+      .find(el => el.textContent?.startsWith('Damage rating:'))
+    expect(rating?.classList.contains('overlay-line--hang')).toBe(false)
+    expect(rating?.classList.contains('overlay-line--nowrap')).toBe(false)
+  })
+
+  it('never reflows quotes: darkgrey-embedded dialogue and plain msg.quote stay line-structured', () => {
+    const h = setup()
+    // Item-body quote: darkgrey switch on line 1 only; dialogue lines after
+    // it are raw text that would otherwise look like label rows.
+    const body = [
+      'A ring that protects its wearer from poison.',
+      '_________________',
+      '',
+      '<darkgrey>“Westley: To the death!',
+      'Buttercup:    “And to think, all that time it was your cup that was poisoned.”',
+      'Westley:      “They were both poisoned.”',
+    ].join('\n')
+    h.dispatch({ msg: 'ui-push', type: 'describe-item', title: 'a ring of poison resistance', body })
+    expect(overlay(h).querySelector('.overlay-line--hang')).toBeNull()
+    h.dispatch({ msg: 'close_all_menus' })
+    // Monster quote arrives as a plain-text field appended client-side —
+    // the unwrap runs before that append, so dialogue lines stay verbatim.
+    h.dispatch({
+      msg: 'ui-push', type: 'describe-monster', title: 'Lodul', body: 'A vodyanoi war-shaman.',
+      quote: 'Cat:  But who can say what a thing is worth.\nLister:  I can. Two quid.',
+    })
+    expect(overlay(h).querySelector('.overlay-line--hang')).toBeNull()
+    const texts = [...overlay(h).querySelectorAll('.overlay-line')].map(el => el.textContent)
+    expect(texts).toContain('Cat:  But who can say what a thing is worth.')
+  })
+
+  it('leaves darkgrey verse quotes line-structured (no hanging-indent unwrap)', () => {
+    const h = setup()
+    const body = [
+      'A fine cloak.',
+      '',
+      '<darkgrey>"A cloak, draped: o\'er shoulders bowed,',
+      'Conceals the heart."',
+      '   -Anonymous</darkgrey>',
+    ].join('\n')
+    h.dispatch({ msg: 'ui-push', type: 'describe-item', title: 'a cloak', body })
+    expect(overlay(h).querySelector('.overlay-line--hang')).toBeNull()
+    const texts = [...overlay(h).querySelectorAll('.overlay-line')].map(el => el.textContent)
+    expect(texts).toContain('"A cloak, draped: o\'er shoulders bowed,')
+    expect(texts).toContain('   -Anonymous')
   })
 
   it('ui-stack re-dispatches each nested item back through the handler (spectator join)', () => {

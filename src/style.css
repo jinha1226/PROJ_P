@@ -1846,6 +1846,16 @@ html, body {
 
 .overlay-line { min-height: 1lh; white-space: pre-wrap; }
 .overlay-line--nowrap { white-space: pre; }
+/* Unwrapped `Label: description` blocks (unwrapHangingIndents). Wrapped
+   text hangs at the row's own description column (--hang-col, derived from
+   the wire's label + padding; monospace so ch units line up exactly), giving
+   the server's two-column look with in-column wrapping. Run-in labels
+   (single-space, e.g. `'Of mesmerism': `) and over-wide columns fall back
+   to the compact 2ch default. */
+.overlay-line--hang {
+  padding-left: var(--hang-col, 2ch);
+  text-indent: calc(-1 * var(--hang-col, 2ch));
+}
 
 /* Server `show_dialog` modal (save-transfer prompt on trunk resume,
    end-of-game prompts). The server HTML carries class="button" and inline

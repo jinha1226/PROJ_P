@@ -1382,6 +1382,12 @@ export function buildGameView(
     if (msg.type === 'version') {
       rawBody = [msg.information, msg.features, msg.changes].filter(Boolean).join('\n\n')
     }
+    // Unwrap hanging-indent label rows in the server-built body only, BEFORE
+    // the client-assembled sections below: those append plain-text quotes
+    // (msg.quote, feats[].quote) and god power lists, which must not be
+    // reflowed (dialogue-format quote lines look like label rows). game-over
+    // is one fixed-width terminal block — leave it alone.
+    if (msg.type !== 'game-over') rawBody = unwrapHangingIndents(rawBody)
     if (msg.type === 'describe-god') {
       // describe-god has no `title`/`text` — name is the heading, and the
       // body is split across pane fields (description / favour+powers_list /
@@ -3489,21 +3495,133 @@ function propagateDarkgreyColor(body: string): string {
   return result
 }
 
+// Ego/artprop descriptions arrive pre-formatted by the server's
+// _format_prop_desc (describe.cc): a `Label: ` prefix, the description
+// hard-wrapped at 80 columns, and every continuation line padded with
+// spaces to align under the description column. That layout assumes an
+// 80-char terminal — at phone width each source line soft-wraps again and
+// the block turns into a jagged staircase. Detect the shape precisely
+// (first line has `label:` + padding + text; following lines indented with
+// exactly that many spaces), join each block into one logical line with the
+// padding collapsed, and tag it with HANG_MARK so renderBodyLines reflows
+// it as prose with a compact CSS hanging indent. Collapsing the padding
+// also keeps isTabularLine from classifying the joined line as nowrap.
+// Verse/quote lines never carry the exact-column indent, so they pass
+// through untouched. Lines with markup tags before the colon (stat rows,
+// key-help rows) are skipped by the [^<] guard.
+export const HANG_MARK = '\u0001'
+
+export function unwrapHangingIndents(body: string): string {
+  const lines = body.split('\n')
+  const out: string[] = []
+  // Active opens-only color carried across lines. Quote blocks arrive as
+  // `<darkgrey>` on their first line only (formatted_string color switch),
+  // so later quote lines are raw text — dialogue-format quotes
+  // ("Buttercup:    “And to think…”") would otherwise match the label-row
+  // shape. Never mark inside a darkgrey block.
+  let activeColor = ''
+  const trackTags = (l: string): void => {
+    for (const t of l.matchAll(/<(\/?)(\w+)>/g)) {
+      if (t[1]) activeColor = ''
+      else if (t[2] in DCSS_COLOR_MAP) activeColor = t[2]
+    }
+  }
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i]
+    const shielded = activeColor === 'darkgrey'
+    trackTags(line)
+    const m = shielded ? null : line.match(/^([^\s<][^<]*?:)( +)(?=\S)/)
+    if (m) {
+      const col = m[1].length + m[2].length
+      const contRe = new RegExp(`^ {${col}}(?=\\S)`)
+      let j = i + 1
+      while (j < lines.length && contRe.test(lines[j])) j++
+      if (j > i + 1) {
+        // Keep line 1 verbatim (label + original padding) — renderBodyLines
+        // re-derives the description column from it to set the hang width,
+        // so wrapped text aligns under the description column.
+        const joined = [line, ...lines.slice(i + 1, j).map(l => l.slice(col))].join(' ')
+        out.push(HANG_MARK + joined)
+        for (let k = i + 1; k < j; k++) trackTags(lines[k])
+        i = j - 1
+        continue
+      }
+      // Single-line padded-label row: same server formatter, but the
+      // description fit within one wire line so there's no continuation
+      // indent to validate against. At phone width these still misbehave:
+      // ≥3 padding spaces trips isTabularLine into nowrap (row pans
+      // offscreen), while a 2-space pad (9-char labels like "*Corrode:")
+      // soft-wraps flush-left. Mark them so they wrap within the
+      // description column like the joined blocks; rows that fit render
+      // pixel-identical to the nowrap form. Guards: padding ≥2 spaces (a
+      // single space is ordinary prose, e.g. "Mesmerism radius: 2"), short
+      // label, description column ≤18 (the widest real formatter column —
+      // excludes right-aligned-to-col-80 layouts like the god-powers
+      // "Granted powers:        (Cost)" header), and no multi-space runs in
+      // the remainder (multi-column rows keep their alignment).
+      if (m[2].length >= 2 && m[1].length <= 16 && col <= 18 && !/ {3,}/.test(line.slice(col))) {
+        out.push(HANG_MARK + line)
+        continue
+      }
+    }
+    out.push(line)
+  }
+  return out.join('\n')
+}
+
 // `terminal` renders the body as one fixed-width block: every line is nowrap
 // and the stat-row/per-line-tabular reformatting is skipped, so the caller can
 // scale the whole block to fit (see fitTerminalBody). Used for the game-over
 // screen; the describe-* panels keep the per-line heuristic (terminal=false).
 function renderBodyLines(rawBody: string, highlight: string, terminal = false): string {
   return balanceColorTagsAcrossLines(rawBody).split('\n').map(line => {
-    if (!terminal) {
+    // Lines marked by unwrapHangingIndents wrap with a hanging indent.
+    // propagateDarkgreyColor may have prepended tags, so the mark isn't
+    // necessarily at index 0. The marked line keeps its original
+    // `label + padding` prefix; re-derive the description column from it so
+    // wrapped text aligns under the column (the body is monospace, so Nch
+    // matches N wire characters exactly). Padded columns are honored up to
+    // 18ch (the widest real DBRAND label, "Manifold Assault:") — beyond
+    // that, and for single-space run-in labels like `'Of mesmerism': `,
+    // fall back to a compact 2ch hang.
+    const hang = line.includes(HANG_MARK)
+    let hangStyle = ''
+    if (hang) {
+      line = line.replace(HANG_MARK, '')
+      const pm = line.match(/^[^\s<][^<]*?:( +)(?=\S)/)
+      const col = pm ? pm[0].length : 0
+      if (pm && pm[1].length >= 2 && col <= 18) hangStyle = ` style="--hang-col:${col}ch"`
+    }
+    if (!terminal && !hang) {
       const stat = tryStatRow(line)
       if (stat) return stat
+      const plain = plainStatSegments(line)
+      if (plain) {
+        const chips = plain.map(s => `<span class="overlay-stat">${dcssToHtml(s)}</span>`).join('')
+        return `<div class="overlay-line overlay-stat-row">${chips}</div>`
+      }
     }
-    const cls = terminal || isTabularLine(line)
-      ? 'overlay-line overlay-line--nowrap'
-      : 'overlay-line'
+    let cls = hang
+      ? 'overlay-line overlay-line--hang'
+      : terminal || isTabularLine(line)
+        ? 'overlay-line overlay-line--nowrap'
+        : 'overlay-line'
+    // Indented prose sub-items ("    Your skill: 3.6", "    At 100%
+    // training you would reach 18.0 in about 9.3 XLs." — describe.cc
+    // emits these with a 4-space indent): wrap with a hanging indent at
+    // the line's own depth so continuations stay aligned under the
+    // sub-item instead of falling flush-left. The leading spaces render
+    // on line 1 as-is; the negative text-indent/padding pair only moves
+    // the wrapped lines. Deeply indented lines (>18) are left alone.
+    if (cls === 'overlay-line' && !hang) {
+      const ind = /^( {2,})\S/.exec(line)?.[1].length ?? 0
+      if (ind > 0 && ind <= 18) {
+        cls += ' overlay-line--hang'
+        hangStyle = ` style="--hang-col:${ind}ch"`
+      }
+    }
     const html = applyHighlight(dcssToHtml(line), highlight) || '&nbsp;'
-    return `<div class="${cls}">${html}</div>`
+    return `<div class="${cls}"${hangStyle}>${html}</div>`
   }).join('')
 }
 
@@ -3564,6 +3682,24 @@ function tryStatRow(line: string): string | null {
     .map(b => `<span class="overlay-stat">${dcssToHtml(`<${b.color}>${b.text}</${b.color}>`)}</span>`)
     .join('')
   return `<div class="overlay-line overlay-stat-row">${html}</div>`
+}
+
+// Untagged multi-stat lines: `label: value` pairs separated by 2+ spaces,
+// all on one line. Real shapes: the weapon header "Base accuracy: -2  Base
+// damage: 13  Base attack delay: 1.6" (describe.cc:1577), the armour header
+// "Base armour rating: 5     Encumbrance rating: 2" (describe.cc:2288), the
+// spell header "Level: 5        Schools: Conjuration" (describe.cc:4218).
+// At phone width these soft-wrap mid-pair ("Base / attack delay: 1.6");
+// rendering them as the same chip row used for tagged stat rows lets pairs
+// wrap as units. Indented lines are sub-items, not stat headers — skip.
+export function plainStatSegments(line: string): string[] | null {
+  if (line.includes('<') || /^\s/.test(line)) return null
+  const segs = line.trim().split(/ {2,}/)
+  if (segs.length < 2) return null
+  for (const s of segs) {
+    if (!/^[^\s:][^:]{0,23}: \S/.test(s)) return null
+  }
+  return segs
 }
 
 function isTabularLine(line: string): boolean {
