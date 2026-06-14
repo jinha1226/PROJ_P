@@ -50,3 +50,24 @@ DCSS keys, plus tile-touch movement, with a Korean/English toggle.
    implementation plan.
 
 **Spec:** `docs/superpowers/specs/2026-06-14-newbie-dcss-client-design.md`
+
+## 2026-06-14 — Upstream cloned for planning; scope refined
+
+- **Clone timing adjusted (supersedes decision #9 ordering):** to write a
+  no-placeholder implementation plan we need the real source, so PocketZot was
+  forked into PROJ_P now (merged `upstream/main` alongside our docs; `upstream`
+  remote retained for syncing) rather than after the plan.
+- **Discovery — much of the foundation already exists:**
+  - PocketZot already groups controls into **3 tabs** `@` micro / `>` macro /
+    `?` info (`ABOUT.md`), and already has **context-aware control sets**.
+  - `src/game/input/touch.ts` `TAB_BUTTONS` defines each button as
+    `{ label, title, text|key }` — the **English semantic description already
+    lives in `title`** ("Auto-explore", "Cast spell", …). So Pillar 2 (semantic
+    action bar) is mostly: surface `title` as the label + add Korean + a KO/EN
+    toggle. Smaller than feared.
+  - Movement is currently a **DPAD** in `touch.ts`; there is **no map
+    tap-to-travel handler** yet, so Pillar 1 (tile-touch travel) is genuine new
+    work (map cell tap → WebTiles travel command; map render is
+    `src/game/map/tile-map-view.ts`, send path is `src/ws/connection.ts`).
+- **Tab decision:** lean toward keeping PocketZot's 3-tab structure and
+  relabeling, rather than forcing the earlier 4-tab reorg — revisit in the plan.
