@@ -2829,3 +2829,19 @@ html, body {
   .login-account-tag { padding: 0.2rem 0.4rem; font-size: 0.72rem; }
   .login-footer { margin-top: 0.75rem; font-size: 0.75rem; }
 }
+
+/* Newbie semantic labels: word buttons need smaller text and wrapping,
+   unlike the single-glyph defaults. */
+.tc-btn.named {
+  font-size: 0.72rem;
+  line-height: 1.05;
+  white-space: normal;
+  word-break: keep-all;
+  padding: 2px 4px;
+}
+
+/* Language toggle in the footer, styled like the other footer buttons. */
+.tc-lang {
+  font-size: 0.8rem;
+  font-weight: 600;
+}
