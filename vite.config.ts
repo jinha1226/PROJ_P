@@ -1,6 +1,9 @@
 import { defineConfig } from 'vitest/config'
 
 export default defineConfig({
+  // Dev serves at '/'. The Pages deploy workflow sets VITE_BASE='/PROJ_P/' so
+  // assets resolve under the GitHub Pages project subpath.
+  base: process.env.VITE_BASE ?? '/',
   build: {
     sourcemap: false,
   },
