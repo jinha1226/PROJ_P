@@ -11,6 +11,7 @@ import {
 import { createShiftToggle } from './shift-state'
 import { getPref, setPref, type UiLang } from '../../prefs'
 import { actionLabel, TAB_LABELS } from './action-labels'
+import type { RcControls } from '../rc/rc-options'
 
 type SendFn = (msg: ClientMsg) => void
 type TabKey = 'micro' | 'macro' | 'info' | 'spells'
@@ -413,7 +414,13 @@ function buildKeyboardOverlay(send: SendFn): { element: HTMLElement; open: () =>
   return { element: overlay, open, close }
 }
 
-export function buildTouchControls(send: SendFn, opts: { spellTab?: SpellTabConfig; onRequestRebuild?: () => void } = {}): TouchControls {
+const RC_TOGGLES: { key: string; on: string; ko: string; en: string }[] = [
+  { key: 'language',       on: 'ko', ko: '한국어 (부분)',      en: 'Korean (partial)' },
+  { key: 'hp_warning',     on: '50', ko: 'HP 경고 50%',        en: 'HP warning 50%' },
+  { key: 'autofight_stop', on: '50', ko: '자동전투 50% 정지',  en: 'Autofight stop 50%' },
+]
+
+export function buildTouchControls(send: SendFn, opts: { spellTab?: SpellTabConfig; onRequestRebuild?: () => void; rc?: RcControls } = {}): TouchControls {
   let ctrlActive = false
   let activeTab: TabKey = 'micro'
   let lang: UiLang = getPref('uiLang')
@@ -679,6 +686,71 @@ export function buildTouchControls(send: SendFn, opts: { spellTab?: SpellTabConf
     dpadRow.appendChild(dpadLabel)
     dpadRow.appendChild(dpadToggleBtn)
     settingsOverlay.appendChild(dpadRow)
+
+    // RC options section
+    const rcSection = document.createElement('div')
+    rcSection.className = 'tc-settings-rc-section'
+
+    const rcTitle = document.createElement('div')
+    rcTitle.className = 'tc-settings-label tc-settings-rc-title'
+    rcTitle.textContent = lang === 'ko'
+      ? '게임 옵션 (RC) / Game options'
+      : 'Game options (RC) / 게임 옵션'
+    rcSection.appendChild(rcTitle)
+
+    if (!opts.rc || !opts.rc.available()) {
+      const note = document.createElement('div')
+      note.className = 'tc-settings-note'
+      note.textContent = lang === 'ko'
+        ? '게임에 접속하면 사용할 수 있어요'
+        : 'Available once you\'re in a game'
+      rcSection.appendChild(note)
+    } else {
+      const caveat = document.createElement('div')
+      caveat.className = 'tc-settings-note'
+      caveat.textContent = lang === 'ko'
+        ? '다음 캐릭터부터 적용 · 로그인 필요 · 한국어는 부분 번역'
+        : 'Applies to your next character · login required · Korean is partial'
+      rcSection.appendChild(caveat)
+
+      function refreshRcRows(): void {
+        for (const toggle of RC_TOGGLES) {
+          const btn = settingsOverlay.querySelector<HTMLButtonElement>(`.tc-set-rc[data-rc-key="${toggle.key}"]`)
+          if (!btn) continue
+          const current = opts.rc!.getOption(toggle.key)
+          const isOn = current === toggle.on
+          btn.textContent = isOn ? '켬/On' : '끔/Off'
+        }
+      }
+
+      opts.rc.onChange(refreshRcRows)
+
+      for (const toggle of RC_TOGGLES) {
+        const row = document.createElement('div')
+        row.className = 'tc-settings-row'
+        const label = document.createElement('span')
+        label.className = 'tc-settings-label'
+        label.textContent = lang === 'ko' ? toggle.ko : toggle.en
+        const btn = document.createElement('button')
+        btn.className = 'tc-settings-btn tc-set-rc'
+        btn.dataset.rcKey = toggle.key
+        const current = opts.rc.getOption(toggle.key)
+        btn.textContent = current === toggle.on ? '켬/On' : '끔/Off'
+        function makeToggle(t: { key: string; on: string }): () => void {
+          return () => {
+            const isOn = opts.rc!.getOption(t.key) === t.on
+            opts.rc!.setOption(t.key, isOn ? null : t.on)
+          }
+        }
+        const onToggle = makeToggle(toggle)
+        btn.addEventListener('touchstart', e => { e.preventDefault(); onToggle() }, { passive: false })
+        btn.addEventListener('click', onToggle)
+        row.appendChild(label)
+        row.appendChild(btn)
+        rcSection.appendChild(row)
+      }
+    }
+    settingsOverlay.appendChild(rcSection)
   }
 
   buildSettingsOverlay()
@@ -692,6 +764,7 @@ export function buildTouchControls(send: SendFn, opts: { spellTab?: SpellTabConf
     syncLangBtn()
     syncDpadBtn()
     settingsOverlay.style.display = 'flex'
+    if (opts.rc?.available()) opts.rc.request()
   }
   settingsBtn.addEventListener('touchstart', e => { e.preventDefault(); openSettings() }, { passive: false })
   settingsBtn.addEventListener('click', openSettings)

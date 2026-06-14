@@ -1,6 +1,14 @@
 // Minimal RC (init.txt) option editor. Treats the file as newline-separated
 // lines; manages a single `key = value` line, preserving everything else and
 // ignoring commented (#...) lines. Matches `key` as the first token before `=`.
+
+export interface RcControls {
+  available(): boolean
+  request(): void
+  getOption(key: string): string | null
+  setOption(key: string, value: string | null): void
+  onChange(cb: () => void): void
+}
 function isAssignmentTo(line: string, key: string): boolean {
   const m = /^\s*([A-Za-z0-9_]+)\s*=/.exec(line)
   return m !== null && m[1] === key

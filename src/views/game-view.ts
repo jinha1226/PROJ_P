@@ -1,5 +1,7 @@
 import type { WsConnection } from '../ws/connection'
 import type { ClientMsg, ServerMsg, GameExit } from '../ws/types'
+import { getCurrentGameId } from '../game/current-game'
+import { getRcOption, setRcOption, type RcControls } from '../game/rc/rc-options'
 import { fitToWidth } from './fit-terminal'
 import { MapStore } from '../game/map/map-store'
 import { MapView } from '../game/map/map-view'
@@ -547,6 +549,27 @@ export function buildGameView(
     }
   }
 
+  // --- RC file state ---
+  let rcText: string | null = null
+  const rcListeners: Array<() => void> = []
+
+  const rc: RcControls = {
+    available: () => getCurrentGameId() !== null,
+    request: () => {
+      const id = getCurrentGameId()
+      if (id) conn.send({ msg: 'get_rc', game_id: id })
+    },
+    getOption: (key: string) => (rcText === null ? null : getRcOption(rcText, key)),
+    setOption: (key: string, value: string | null) => {
+      const id = getCurrentGameId()
+      if (!id) return
+      rcText = setRcOption(rcText ?? '', key, value)
+      conn.send({ msg: 'set_rc', game_id: id, contents: rcText })
+      for (const cb of rcListeners) cb()
+    },
+    onChange: (cb: () => void) => { rcListeners.push(cb) },
+  }
+
   const spellTab = spectating ? undefined : { render: renderSpellGrid, hasSpells: () => spellCache.length > 0 }
   const touchSend = (msg: ClientMsg): void => {
     if (isHarvesting()) return  // suppress d-pad/macro input during silent harvest
@@ -572,10 +595,10 @@ export function buildGameView(
     conn.send(msg)
     afterUserSend(msg)
   }
-  let touchControls = buildTouchControls(touchSend, { spellTab, onRequestRebuild: rebuildTouchControls })
+  let touchControls = buildTouchControls(touchSend, { spellTab, onRequestRebuild: rebuildTouchControls, rc })
   function rebuildTouchControls(): void {
     const old = touchControls.element
-    touchControls = buildTouchControls(touchSend, { spellTab, onRequestRebuild: rebuildTouchControls })
+    touchControls = buildTouchControls(touchSend, { spellTab, onRequestRebuild: rebuildTouchControls, rc })
     old.replaceWith(touchControls.element)
   }
 
@@ -1338,6 +1361,11 @@ export function buildGameView(
           spectated: !!spectating,
           spectatedName: spectating?.username,
         })
+        break
+
+      case 'rcfile_contents':
+        rcText = msg.contents
+        for (const cb of rcListeners) cb()
         break
     }
   }

@@ -2937,3 +2937,21 @@ html, body {
   touch-action: manipulation;
 }
 .tc-settings-btn:active { background: var(--tc-press); color: var(--accent); }
+/* RC settings section */
+.tc-settings-rc-section {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  padding-top: 0.35rem;
+  border-top: 1px solid var(--tc-border);
+}
+.tc-settings-rc-title {
+  font-weight: 600;
+  margin-bottom: 0.1rem;
+}
+.tc-settings-note {
+  font-size: 0.65rem;
+  color: var(--text-dim);
+  opacity: 0.75;
+}
+/* .tc-set-rc shares .tc-settings-btn styles — no extra rules needed */
