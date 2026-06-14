@@ -2,16 +2,20 @@ import { SPECTATE_SERVERS } from './servers'
 
 const KEY = 'pocketzot:prefs'
 
+export type UiLang = 'ko' | 'en'
+
 export interface Prefs {
   lastGuestSpectateWsUrl: string | null
   monsterListCollapsed: boolean
   mapRenderMode: 'ascii' | 'tiles'
+  uiLang: UiLang
 }
 
 const DEFAULTS: Prefs = {
   lastGuestSpectateWsUrl: null,
   monsterListCollapsed: false,
   mapRenderMode: 'ascii',
+  uiLang: 'ko',
 }
 
 function load(): Prefs {
