@@ -109,3 +109,27 @@ misses → accuracy/weapon-skill gap. Caveats: server sends no "expected damage"
 screen, so skill-specific advice is secondary to real-time HUD/threat nudges;
 keep thresholds conservative and make it toggleable to avoid nagging. To be
 brainstormed as its own feature after tap-to-move.
+
+## 2026-06-14 — RC editing in Settings (verified protocol) + few QoL options
+
+WebTiles RC protocol VERIFIED against crawl server source
+(`webserver/webtiles/ws_handler.py`): client sends `{msg:'get_rc', game_id}` and
+`{msg:'set_rc', game_id, contents}`; server replies `{msg:'rcfile_contents',
+game_id, contents}`. Requires login (no spectators); own file only.
+
+Language option key VERIFIED in `initfile.cc`: it is **`language`** (NOT
+`translation_language`); `language = ko` for Korean. The game itself warns
+translations are PARTIAL ("Languages with at least partial translation: …"), and
+Korean coverage is uncertain — surface this honestly; the RC editor is valuable
+regardless.
+
+Design:
+- `game_id` is only known at `play` time (lobby `conn.send({msg:'play',
+  game_id})`); add a tiny shared `current-game` module set there, read by the RC
+  service in-game.
+- RC service: on opening RC settings, `get_rc` → hold raw rc text; a PURE helper
+  `setRcOption(text, key, value|null)` edits/removes one managed line preserving
+  the rest; `set_rc` saves.
+- Settings panel gains a "게임 옵션 (RC)" section (v1 toggles: `language=ko`,
+  `hp_warning=50`, `autofight_stop=50`). UI notes: applies to the NEXT character;
+  login required; Korean coverage partial. Framework makes adding toggles easy.
