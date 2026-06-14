@@ -11,7 +11,6 @@ import { MonsterPanelView } from '../game/hud/monster-panel'
 import { fgHaloDngnName } from '../game/hud/monster-style'
 import { InventoryStore } from '../game/inventory-store'
 import { buildTouchControls } from '../game/input/touch'
-import type { TouchControls } from '../game/input/touch'
 import { handleKeydown, CK_UP, CK_DOWN, CK_PGUP, CK_PGDN, CK_HOME, CK_END } from '../game/input/keyboard'
 import { createShiftToggle } from '../game/input/shift-state'
 import { uiColor, escHtml, dcssToHtml, DCSS_COLOR_MAP } from '../game/dcss-colors'
@@ -548,7 +547,8 @@ export function buildGameView(
     }
   }
 
-  const touchControls: TouchControls = buildTouchControls((msg) => {
+  const spellTab = spectating ? undefined : { render: renderSpellGrid, hasSpells: () => spellCache.length > 0 }
+  const touchSend = (msg: ClientMsg): void => {
     if (isHarvesting()) return  // suppress d-pad/macro input during silent harvest
     // The monster panel is a client-only overlay. In landscape it covers just
     // the map, so the sidebar keyboard stays visible (the display:none hide
@@ -571,7 +571,13 @@ export function buildGameView(
     if (msg.msg === 'key' && handleScrollerKeycode(msg.keycode)) return
     conn.send(msg)
     afterUserSend(msg)
-  }, spectating ? {} : { spellTab: { render: renderSpellGrid, hasSpells: () => spellCache.length > 0 } })
+  }
+  let touchControls = buildTouchControls(touchSend, { spellTab, onRequestRebuild: rebuildTouchControls })
+  function rebuildTouchControls(): void {
+    const old = touchControls.element
+    touchControls = buildTouchControls(touchSend, { spellTab, onRequestRebuild: rebuildTouchControls })
+    old.replaceWith(touchControls.element)
+  }
 
   const menuControls = document.createElement('div')
   menuControls.id = 'menu-controls'

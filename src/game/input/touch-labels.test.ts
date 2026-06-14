@@ -39,7 +39,8 @@ describe('semantic labels in the touch HUD', () => {
 describe('language toggle', () => {
   it('flips labels KO -> EN when the toggle is tapped', () => {
     const tc = buildTouchControls(() => {})
-    const toggle = tc.element.querySelector('.tc-lang') as HTMLButtonElement
+    ;(tc.element.querySelector('.tc-settings') as HTMLButtonElement).click()
+    const toggle = tc.element.querySelector('.tc-set-lang') as HTMLButtonElement
     expect(toggle).toBeTruthy()
     toggle.click()
     const texts = [...tc.element.querySelectorAll('.tc-content .tc-btn')].map(b => b.textContent)
@@ -49,7 +50,8 @@ describe('language toggle', () => {
 
   it('persists the chosen language to prefs', () => {
     const tc = buildTouchControls(() => {})
-    const toggle = tc.element.querySelector('.tc-lang') as HTMLButtonElement
+    ;(tc.element.querySelector('.tc-settings') as HTMLButtonElement).click()
+    const toggle = tc.element.querySelector('.tc-set-lang') as HTMLButtonElement
     toggle.click()
     expect(localStorage.getItem('pocketzot:prefs')).toContain('"uiLang":"en"')
   })

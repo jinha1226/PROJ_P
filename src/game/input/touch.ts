@@ -413,7 +413,7 @@ function buildKeyboardOverlay(send: SendFn): { element: HTMLElement; open: () =>
   return { element: overlay, open, close }
 }
 
-export function buildTouchControls(send: SendFn, opts: { spellTab?: SpellTabConfig } = {}): TouchControls {
+export function buildTouchControls(send: SendFn, opts: { spellTab?: SpellTabConfig; onRequestRebuild?: () => void } = {}): TouchControls {
   let ctrlActive = false
   let activeTab: TabKey = 'micro'
   let lang: UiLang = getPref('uiLang')
@@ -598,27 +598,104 @@ export function buildTouchControls(send: SendFn, opts: { spellTab?: SpellTabConf
   kbdBtn.addEventListener('click', () => openKbd())
   footerEl.appendChild(kbdBtn)
 
-  const langBtn = document.createElement('button')
-  langBtn.className = 'tc-lang'
-  langBtn.title = 'Language / 언어'
-  function syncLangBtn(): void { langBtn.textContent = lang === 'ko' ? '한' : 'EN' }
+  // Settings overlay
+  const settingsOverlay = document.createElement('div')
+  settingsOverlay.className = 'tc-settings-overlay'
+  settingsOverlay.style.display = 'none'
+  root.appendChild(settingsOverlay)
+
   function updateTabLabels(): void {
     tabsEl.querySelectorAll<HTMLElement>('.tc-tab').forEach(el => {
       const key = el.dataset.tab as TabKey | undefined
       if (key && key in TAB_LABELS) el.textContent = TAB_LABELS[key as keyof typeof TAB_LABELS][lang]
     })
   }
-  function toggleLang(): void {
-    lang = lang === 'ko' ? 'en' : 'ko'
-    setPref('uiLang', lang)
-    syncLangBtn()
-    updateTabLabels()
-    renderTab(activeTab)
+
+  function syncLangBtn(): void {
+    const btn = settingsOverlay.querySelector<HTMLButtonElement>('.tc-set-lang')
+    if (btn) btn.textContent = lang === 'ko' ? '한' : 'EN'
   }
-  syncLangBtn()
-  langBtn.addEventListener('touchstart', e => { e.preventDefault(); toggleLang() }, { passive: false })
-  langBtn.addEventListener('click', toggleLang)
-  footerEl.appendChild(langBtn)
+
+  function syncDpadBtn(): void {
+    const btn = settingsOverlay.querySelector<HTMLButtonElement>('.tc-set-dpad')
+    if (btn) btn.textContent = getPref('dpadEnabled') ? '켬/On' : '끔/Off'
+  }
+
+  function buildSettingsOverlay(): void {
+    settingsOverlay.innerHTML = ''
+
+    const title = document.createElement('div')
+    title.className = 'tc-settings-title'
+    title.textContent = '⚙ Settings / 설정'
+    settingsOverlay.appendChild(title)
+
+    const closeBtn = document.createElement('button')
+    closeBtn.className = 'tc-settings-close'
+    closeBtn.textContent = '✕'
+    closeBtn.title = 'Close'
+    function closeSettings(): void { settingsOverlay.style.display = 'none' }
+    closeBtn.addEventListener('touchstart', e => { e.preventDefault(); closeSettings() }, { passive: false })
+    closeBtn.addEventListener('click', closeSettings)
+    title.appendChild(closeBtn)
+
+    // Language row
+    const langRow = document.createElement('div')
+    langRow.className = 'tc-settings-row'
+    const langLabel = document.createElement('span')
+    langLabel.className = 'tc-settings-label'
+    langLabel.textContent = '언어 / Language'
+    const langToggleBtn = document.createElement('button')
+    langToggleBtn.className = 'tc-settings-btn tc-set-lang'
+    langToggleBtn.textContent = lang === 'ko' ? '한' : 'EN'
+    function toggleLang(): void {
+      lang = lang === 'ko' ? 'en' : 'ko'
+      setPref('uiLang', lang)
+      syncLangBtn()
+      updateTabLabels()
+      renderTab(activeTab)
+    }
+    langToggleBtn.addEventListener('touchstart', e => { e.preventDefault(); toggleLang() }, { passive: false })
+    langToggleBtn.addEventListener('click', toggleLang)
+    langRow.appendChild(langLabel)
+    langRow.appendChild(langToggleBtn)
+    settingsOverlay.appendChild(langRow)
+
+    // D-pad row
+    const dpadRow = document.createElement('div')
+    dpadRow.className = 'tc-settings-row'
+    const dpadLabel = document.createElement('span')
+    dpadLabel.className = 'tc-settings-label'
+    dpadLabel.textContent = '조이스틱 / D-pad'
+    const dpadToggleBtn = document.createElement('button')
+    dpadToggleBtn.className = 'tc-settings-btn tc-set-dpad'
+    dpadToggleBtn.textContent = getPref('dpadEnabled') ? '켬/On' : '끔/Off'
+    function toggleDpad(): void {
+      setPref('dpadEnabled', !getPref('dpadEnabled'))
+      syncDpadBtn()
+      opts.onRequestRebuild?.()
+    }
+    dpadToggleBtn.addEventListener('touchstart', e => { e.preventDefault(); toggleDpad() }, { passive: false })
+    dpadToggleBtn.addEventListener('click', toggleDpad)
+    dpadRow.appendChild(dpadLabel)
+    dpadRow.appendChild(dpadToggleBtn)
+    settingsOverlay.appendChild(dpadRow)
+  }
+
+  buildSettingsOverlay()
+
+  // Gear button replaces the standalone language button
+  const settingsBtn = document.createElement('button')
+  settingsBtn.className = 'tc-settings'
+  settingsBtn.textContent = '⚙'
+  settingsBtn.title = 'Settings / 설정'
+  function openSettings(): void {
+    syncLangBtn()
+    syncDpadBtn()
+    settingsOverlay.style.display = 'flex'
+  }
+  settingsBtn.addEventListener('touchstart', e => { e.preventDefault(); openSettings() }, { passive: false })
+  settingsBtn.addEventListener('click', openSettings)
+  footerEl.appendChild(settingsBtn)
 
   // --- Render helpers ---
 
