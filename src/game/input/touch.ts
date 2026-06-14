@@ -9,6 +9,9 @@ import {
   CK_CTRL_BKSP, CAPTURED_CTRL,
 } from './keyboard'
 import { createShiftToggle } from './shift-state'
+import { getPref } from '../../prefs'
+import { actionLabel } from './action-labels'
+import type { UiLang } from '../../prefs'
 
 type SendFn = (msg: ClientMsg) => void
 type TabKey = 'micro' | 'macro' | 'info' | 'spells'
@@ -414,6 +417,7 @@ function buildKeyboardOverlay(send: SendFn): { element: HTMLElement; open: () =>
 export function buildTouchControls(send: SendFn, opts: { spellTab?: SpellTabConfig } = {}): TouchControls {
   let ctrlActive = false
   let activeTab: TabKey = 'micro'
+  let lang: UiLang = getPref('uiLang')
 
   // Forward declarations — assigned during DOM construction below
   let shiftBtn!: HTMLButtonElement
@@ -655,8 +659,10 @@ export function buildTouchControls(send: SendFn, opts: { spellTab?: SpellTabConf
         }
         const btn = document.createElement('button')
         btn.className = 'tc-btn'
-        if (/[^\x20-\x7e]/.test(def.label)) btn.classList.add('glyph')
-        btn.textContent = def.label
+        const { text, named } = actionLabel(def, lang)
+        if (named) btn.classList.add('named')
+        else if (/[^\x20-\x7e]/.test(def.label)) btn.classList.add('glyph')
+        btn.textContent = text
         if (def.title) { btn.title = def.title; btn.setAttribute('aria-label', def.title) }
         btn.addEventListener('touchstart', e => { e.preventDefault(); sendTabKey(def) }, { passive: false })
         btn.addEventListener('click', () => sendTabKey(def))
