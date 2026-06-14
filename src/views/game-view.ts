@@ -394,10 +394,11 @@ export function buildGameView(
   // Bound to mapWrap (not mapView.element) so it survives the in-place swap
   // between MapView and TileMapView.
   //
-  // Single-tap-to-travel shares the same 300 ms double-tap window: a tap is
-  // not confirmed until that window expires with no second tap. `pendingTravel`
-  // holds the candidate's coords and a timer id; any event that satisfies the
-  // double-tap (a second pointerdown) or starts a two-finger gesture clears it.
+  // Single-tap-to-travel shares the double-tap window: a tap is not confirmed
+  // until the window expires with no second tap. Kept short so movement feels
+  // responsive (the whole window is the felt input delay per step) while still
+  // catching a fast double-tap (which cancels the pending travel and zooms).
+  const TAP_WINDOW_MS = 180
   let lastTap = { t: 0, x: 0, y: 0 }
   let pendingTravel: { timer: number; clientX: number; clientY: number } | null = null
   const cancelPendingTravel = (): void => {
@@ -414,7 +415,7 @@ export function buildGameView(
     const dt = now - lastTap.t
     const dx = e.clientX - lastTap.x
     const dy = e.clientY - lastTap.y
-    if (dt < 300 && dx * dx + dy * dy < 30 * 30) {
+    if (dt < TAP_WINDOW_MS && dx * dx + dy * dy < 30 * 30) {
       // Double-tap confirmed → zoom. Cancel any pending single-tap travel.
       cancelPendingTravel()
       mapView.setZoomMode(!mapView.isZoomMode())
@@ -432,7 +433,7 @@ export function buildGameView(
     const dt = e.timeStamp - lastTap.t
     const dx = e.clientX - lastTap.x
     const dy = e.clientY - lastTap.y
-    if (dt >= 300 || dx * dx + dy * dy >= 12 * 12) return
+    if (dt >= TAP_WINDOW_MS || dx * dx + dy * dy >= 12 * 12) return
     // Debounce: defer travel until the double-tap window passes. A second
     // pointerdown that satisfies the zoom check will cancel this timer first.
     cancelPendingTravel()
@@ -448,7 +449,7 @@ export function buildGameView(
         if (inXMode) return
         const cell = mapView.cellAtClient(clientX, clientY)
         if (cell) conn.send({ msg: 'click_cell', x: cell.x, y: cell.y, button: 1 })
-      }, 300),
+      }, TAP_WINDOW_MS),
     }
   })
 
@@ -620,8 +621,11 @@ export function buildGameView(
     getOption: (key: string) => (rcText === null ? null : getRcOption(rcText, key)),
     setOption: (key: string, value: string | null) => {
       const id = getCurrentGameId()
-      if (!id) return
-      rcText = setRcOption(rcText ?? '', key, value)
+      // Never edit before the real RC has loaded — otherwise we'd send a file
+      // containing ONLY this one line and wipe the player's other settings
+      // (e.g. language = ko). No-op until the real RC has loaded.
+      if (!id || rcText === null) return
+      rcText = setRcOption(rcText, key, value)
       conn.send({ msg: 'set_rc', game_id: id, contents: rcText })
       for (const cb of rcListeners) cb()
     },

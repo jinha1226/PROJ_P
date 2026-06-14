@@ -2396,20 +2396,26 @@ html, body {
   flex: 1;
 }
 
-/* Compact wrapping button strip (Layout v2 — no d-pad). All action buttons for
-   the active tab flow into one flex container; they wrap naturally so any tab
-   can have any number of buttons without JS row calculation. */
+/* Compact single-row button strip (Layout v2 — no d-pad). All action buttons
+   for the active tab sit in ONE horizontal row that scrolls sideways if they
+   overflow, instead of wrapping to multiple rows. This keeps the controls one
+   row tall so the map reclaims the vertical space. */
 .tc-strip {
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   gap: 2px;
-  flex: none;  /* don't stretch; height is determined by wrapping content */
+  flex: none;
+  overflow-x: auto;
+  overflow-y: hidden;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;  /* drag sideways to reveal overflow buttons */
 }
+.tc-strip::-webkit-scrollbar { display: none; }
 
 .tc-strip .tc-btn {
-  flex: 1 1 auto;
+  flex: 0 0 auto;      /* keep width; the row scrolls rather than squashing */
   min-width: 3.2rem;
-  min-height: 2rem;
+  min-height: 2.2rem;
 }
 
 .tc-btn {
