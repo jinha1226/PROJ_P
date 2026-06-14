@@ -71,3 +71,26 @@ DCSS keys, plus tile-touch movement, with a Korean/English toggle.
     `src/game/map/tile-map-view.ts`, send path is `src/ws/connection.ts`).
 - **Tab decision:** lean toward keeping PocketZot's 3-tab structure and
   relabeling, rather than forcing the earlier 4-tab reorg — revisit in the plan.
+
+## 2026-06-14 — Tap-to-move + bottom action strip (layout v2)
+
+Decided (design approved):
+- **Tap-to-move (Pillar 1):** WebTiles already exposes `{ msg: 'click_cell', x, y,
+  button }` (currently used only by the monster panel with button 3). Add a single
+  semantic method `cellAtPoint(clientX, clientY) → {x,y}|null` to BOTH map views
+  (`MapView` ascii, `TileMapView` canvas) using each view's own geometry
+  (offX/offY, cellPx), and a tap handler in `game-view.ts` that sends
+  `click_cell` with `button: 1` on a clean single tap during normal play. Server
+  pathfinds (adjacent = step, far = auto-travel, stops on monster sighting).
+  Must NOT break existing double-tap-zoom or two-finger tile-toggle; ignored when
+  a menu/UI overlay is open or in X-mode (out of scope this pass).
+- **Layout v2 (PocketCrawl-style):** remove the on-screen d-pad joystick; render
+  the active tab's action buttons as a single compact horizontal (wrapping) strip
+  at the bottom; keep the 행동/운영/정보 tabs (24 actions need grouping). Shrink
+  `#touch-controls` vertical footprint so the map area (`1fr`) grows.
+
+Deferred (next feature, needs its own brainstorm):
+- **Beginner progress guide:** read live species/background/skills/state (client
+  already receives them) and surface a skill-priority guide + contextual hints,
+  scoped to a few beginner-recommended species/background combos. Content/curation
+  is the hard part, not the data access.
