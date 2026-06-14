@@ -628,6 +628,11 @@ export function buildTouchControls(send: SendFn, opts: { spellTab?: SpellTabConf
     if (btn) btn.textContent = getPref('dpadEnabled') ? '켬/On' : '끔/Off'
   }
 
+  function syncCoachBtn(): void {
+    const btn = settingsOverlay.querySelector<HTMLButtonElement>('.tc-set-coach')
+    if (btn) btn.textContent = getPref('coachEnabled') ? '켬/On' : '끔/Off'
+  }
+
   function buildSettingsOverlay(): void {
     settingsOverlay.innerHTML = ''
 
@@ -686,6 +691,25 @@ export function buildTouchControls(send: SendFn, opts: { spellTab?: SpellTabConf
     dpadRow.appendChild(dpadLabel)
     dpadRow.appendChild(dpadToggleBtn)
     settingsOverlay.appendChild(dpadRow)
+
+    // Beginner Coach row
+    const coachRow = document.createElement('div')
+    coachRow.className = 'tc-settings-row'
+    const coachLabel = document.createElement('span')
+    coachLabel.className = 'tc-settings-label'
+    coachLabel.textContent = '초보 코치 / Beginner Coach'
+    const coachToggleBtn = document.createElement('button')
+    coachToggleBtn.className = 'tc-settings-btn tc-set-coach'
+    coachToggleBtn.textContent = getPref('coachEnabled') ? '켬/On' : '끔/Off'
+    function toggleCoach(): void {
+      setPref('coachEnabled', !getPref('coachEnabled'))
+      syncCoachBtn()
+    }
+    coachToggleBtn.addEventListener('touchstart', e => { e.preventDefault(); toggleCoach() }, { passive: false })
+    coachToggleBtn.addEventListener('click', toggleCoach)
+    coachRow.appendChild(coachLabel)
+    coachRow.appendChild(coachToggleBtn)
+    settingsOverlay.appendChild(coachRow)
 
     // RC options section
     const rcSection = document.createElement('div')

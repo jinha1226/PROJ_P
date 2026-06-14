@@ -22,6 +22,8 @@ import { reflowSkillCrt } from './skill-reflow'
 import { TEX, getTileLoader, type TileLoader } from '../game/tiles/tile-loader'
 import { renderTiles, appendIconOverlays, monsterTileSpec, prependDngnLayer, type TileRef } from '../game/tiles/tile-view'
 import { getPref, setPref } from '../prefs'
+import { createCoachHint, type CoachHint } from '../game/coach/coach-hint'
+import { evaluateCoach, type CoachHintId, type CoachInput } from '../game/coach/coach'
 
 // MOUSE_MODE_YESNO from DCSS defines.h. Set inside yesno() (prompt.cc:219)
 // for the duration of the y/N read, regardless of whether a menu is open.
@@ -207,6 +209,14 @@ export function buildGameView(
   // under-tile mini-bars. Kept here so a render-mode swap can seed the freshly
   // created view, which otherwise starts at zero until the next player message.
   const playerStats: { hp?: number; hp_max?: number; mp?: number; mp_max?: number } = {}
+  // Latest player fields needed for coach evaluation (accumulated across deltas).
+  const coachPlayerState: {
+    hp?: number; hp_max?: number; ac?: number; ev?: number; depth?: number
+    poison_survival?: number; status?: Array<{ text?: string }>
+  } = {}
+  const coachHint: CoachHint = createCoachHint()
+  let coachShown: CoachHintId | null = null
+  let coachDismissed: CoachHintId | null = null
   const inventoryStore = new InventoryStore()
   const statsView = new StatsView(inventoryStore)
   const statusView = new StatusView()
@@ -514,6 +524,54 @@ export function buildGameView(
   hud.appendChild(hudTop)
   hud.appendChild(statusView.element)
 
+  // Wire coach dismiss callback and define updateCoach.
+  coachHint.onDismiss((id: CoachHintId) => { coachDismissed = id })
+
+  function updateCoach(): void {
+    if (!getPref('coachEnabled')) {
+      coachHint.hide()
+      coachShown = null
+      return
+    }
+    // Collect hostile threats from the visible monster map, mirroring how
+    // MonsterListView iterates: filterAndSortMonsters hands us MonsterCells,
+    // each with mon.att (0 = hostile) and mon.threat (0-3).
+    const hostileThreats: number[] = []
+    for (const cell of store.getMonsters().values()) {
+      if ((cell.mon.att ?? 0) === 0) {
+        hostileThreats.push(cell.mon.threat ?? 0)
+      }
+    }
+    // poisonLethal: the player state includes poison_survival (HP the player
+    // will have after poison runs its course). If poison_survival is defined
+    // and <= 1 the player is effectively dying from poison.
+    const statuses = coachPlayerState.status ?? []
+    const isPoisoned = statuses.some(s => s.text != null && /poison/i.test(s.text))
+    const poisonLethal = isPoisoned
+      && coachPlayerState.poison_survival !== undefined
+      && coachPlayerState.poison_survival <= 1
+    const input: CoachInput = {
+      hp: coachPlayerState.hp ?? 1,
+      hpMax: coachPlayerState.hp_max ?? 1,
+      ac: coachPlayerState.ac ?? 0,
+      ev: coachPlayerState.ev ?? 0,
+      depth: coachPlayerState.depth ?? 1,
+      hostileThreats,
+      poisonLethal,
+    }
+    const id = evaluateCoach(input)
+    if (id === null) {
+      coachHint.hide()
+      coachShown = null
+      coachDismissed = null
+    } else if (id === coachDismissed) {
+      // User dismissed this hint — keep it hidden until the situation changes.
+    } else if (id !== coachShown) {
+      coachHint.show(id, getPref('uiLang'))
+      coachShown = id
+    }
+  }
+
   const moreBtn = document.createElement('button')
   moreBtn.id = 'more-btn'
   moreBtn.textContent = '— more —'
@@ -620,6 +678,7 @@ export function buildGameView(
   view.appendChild(msgLog)
   view.appendChild(spellRail)
   view.appendChild(moreBtn)
+  view.appendChild(coachHint.element)
   view.appendChild(hud)
   view.appendChild(numpadInput)
   if (spectating) {
@@ -878,6 +937,7 @@ export function buildGameView(
         else mapView.render(dirty)
         monsterListView.update(store.getMonsters())
         if (monsterPanelOpen) monsterPanel.update(store.getMonsters())
+        updateCoach()
         break
       }
 
@@ -900,6 +960,16 @@ export function buildGameView(
         inventoryStore.update(msg.inv)
         statsView.update(msg)
         if (msg.status !== undefined) statusView.update(msg.status)
+        // Accumulate coach-relevant player fields for next updateCoach call.
+        if (msg.hp !== undefined) coachPlayerState.hp = msg.hp
+        if (msg.hp_max !== undefined) coachPlayerState.hp_max = msg.hp_max
+        if (msg.ac !== undefined) coachPlayerState.ac = msg.ac
+        if (msg.ev !== undefined) coachPlayerState.ev = msg.ev
+        if (msg.depth !== undefined) coachPlayerState.depth = msg.depth
+        if (msg.poison_survival !== undefined) coachPlayerState.poison_survival = msg.poison_survival
+        else if (msg.status !== undefined) coachPlayerState.poison_survival = undefined
+        if (msg.status !== undefined) coachPlayerState.status = msg.status
+        updateCoach()
         if (msg.time !== undefined) markLastMsg('turn')
         if (!hudRevealed) {
           hudRevealed = true

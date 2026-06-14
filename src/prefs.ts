@@ -10,6 +10,7 @@ export interface Prefs {
   mapRenderMode: 'ascii' | 'tiles'
   uiLang: UiLang
   dpadEnabled: boolean
+  coachEnabled: boolean
 }
 
 const DEFAULTS: Prefs = {
@@ -18,6 +19,7 @@ const DEFAULTS: Prefs = {
   mapRenderMode: 'ascii',
   uiLang: 'ko',
   dpadEnabled: false,
+  coachEnabled: true,
 }
 
 function load(): Prefs {
