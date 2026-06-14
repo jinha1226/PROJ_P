@@ -1,5 +1,11 @@
 import type { ClientMsg } from '../../ws/types'
 import {
+  CK_UP, CK_DOWN, CK_LEFT, CK_RIGHT,
+  CK_HOME, CK_END, CK_PGUP, CK_PGDN,
+  CK_SHIFT_UP, CK_SHIFT_DOWN, CK_SHIFT_LEFT, CK_SHIFT_RIGHT,
+  CK_SHIFT_HOME, CK_SHIFT_END, CK_SHIFT_PGUP, CK_SHIFT_PGDN,
+  CK_CTRL_UP, CK_CTRL_DOWN, CK_CTRL_LEFT, CK_CTRL_RIGHT,
+  CK_CTRL_HOME, CK_CTRL_END, CK_CTRL_PGUP, CK_CTRL_PGDN,
   CK_CTRL_BKSP, CAPTURED_CTRL,
 } from './keyboard'
 import { createShiftToggle } from './shift-state'
@@ -22,6 +28,31 @@ interface TabButtonDef {
   text?: string
   key?: number
 }
+
+type DpadDef =
+  | { label: string; plain: number; shifted: number; ctrled: number }
+  | { label: string; text: string }
+
+// Arrow + numpad keycodes; shift = run-variant; ctrl = open-door / attack-stationary.
+// Center is the wait/confirm slot; sends '.' as text so it both waits one turn in
+// normal play and accepts the cursor target in X mode.
+const DPAD_LAYOUT: DpadDef[][] = [
+  [
+    { label: '↖', plain: CK_HOME,  shifted: CK_SHIFT_HOME,  ctrled: CK_CTRL_HOME  },
+    { label: '↑', plain: CK_UP,    shifted: CK_SHIFT_UP,    ctrled: CK_CTRL_UP    },
+    { label: '↗', plain: CK_PGUP,  shifted: CK_SHIFT_PGUP,  ctrled: CK_CTRL_PGUP  },
+  ],
+  [
+    { label: '←', plain: CK_LEFT,  shifted: CK_SHIFT_LEFT,  ctrled: CK_CTRL_LEFT  },
+    { label: '·', text: '.' },
+    { label: '→', plain: CK_RIGHT, shifted: CK_SHIFT_RIGHT, ctrled: CK_CTRL_RIGHT },
+  ],
+  [
+    { label: '↙', plain: CK_END,   shifted: CK_SHIFT_END,   ctrled: CK_CTRL_END   },
+    { label: '↓', plain: CK_DOWN,  shifted: CK_SHIFT_DOWN,  ctrled: CK_CTRL_DOWN  },
+    { label: '↘', plain: CK_PGDN,  shifted: CK_SHIFT_PGDN,  ctrled: CK_CTRL_PGDN  },
+  ],
+]
 
 // game-view owns the spell data (and the tile loader / cast logic), so it
 // supplies the grid DOM for the z tab; touch.ts just hosts it in the panel's
@@ -386,6 +417,7 @@ export function buildTouchControls(send: SendFn, opts: { spellTab?: SpellTabConf
   let ctrlActive = false
   let activeTab: TabKey = 'micro'
   let lang: UiLang = getPref('uiLang')
+  const dpadEnabled = getPref('dpadEnabled')
 
   // Forward declarations — assigned during DOM construction below
   let shiftBtn!: HTMLButtonElement
@@ -440,14 +472,34 @@ export function buildTouchControls(send: SendFn, opts: { spellTab?: SpellTabConf
     clearOneshot()
   }
 
+  function sendDpad(def: DpadDef): void {
+    if ('text' in def) {
+      send({ msg: 'input', text: def.text })
+    } else {
+      const code = ctrlActive ? def.ctrled : shift.isOn ? def.shifted : def.plain
+      send({ msg: 'key', keycode: code })
+    }
+    clearOneshot()
+  }
+
   // --- Root element ---
 
   const root = document.createElement('div')
   root.id = 'touch-controls'
+  root.classList.toggle('dpad-on', dpadEnabled)
 
   // Keyboard overlay (fixed position, renders above everything)
   const { element: kbdEl, open: openKbd, close: closeKbd } = buildKeyboardOverlay(send)
   root.appendChild(kbdEl)
+
+  // --- D-pad (optional, gated by dpadEnabled pref) ---
+
+  let dpadEl: HTMLDivElement | null = null
+  if (dpadEnabled) {
+    dpadEl = document.createElement('div')
+    dpadEl.className = 'tc-dpad'
+    root.appendChild(dpadEl)
+  }
 
   // --- Panel ---
 
@@ -570,6 +622,22 @@ export function buildTouchControls(send: SendFn, opts: { spellTab?: SpellTabConf
 
   // --- Render helpers ---
 
+  function buildDpad(): void {
+    if (!dpadEl) return
+    dpadEl.innerHTML = ''
+    for (let r = 0; r < DPAD_LAYOUT.length; r++) {
+      for (let c = 0; c < DPAD_LAYOUT[r].length; c++) {
+        const def = DPAD_LAYOUT[r][c]
+        const btn = document.createElement('button')
+        btn.className = 'tc-dpad-btn' + (r === 1 && c === 1 ? ' wait' : '')
+        btn.textContent = def.label
+        btn.addEventListener('touchstart', e => { e.preventDefault(); sendDpad(def) }, { passive: false })
+        btn.addEventListener('click', () => sendDpad(def))
+        dpadEl!.appendChild(btn)
+      }
+    }
+  }
+
   function renderTab(tab: TabKey): void {
     activeTab = tab
     tabsEl.querySelectorAll<HTMLElement>('.tc-tab').forEach(el => {
@@ -638,6 +706,7 @@ export function buildTouchControls(send: SendFn, opts: { spellTab?: SpellTabConf
   }
 
   // Initial render
+  if (dpadEnabled) buildDpad()
   renderContent(TAB_BUTTONS.micro)
 
   return { element: root, enterXMode, exitXMode, openKbd, closeKbd, refreshSpellTab }

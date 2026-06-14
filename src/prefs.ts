@@ -9,6 +9,7 @@ export interface Prefs {
   monsterListCollapsed: boolean
   mapRenderMode: 'ascii' | 'tiles'
   uiLang: UiLang
+  dpadEnabled: boolean
 }
 
 const DEFAULTS: Prefs = {
@@ -16,6 +17,7 @@ const DEFAULTS: Prefs = {
   monsterListCollapsed: false,
   mapRenderMode: 'ascii',
   uiLang: 'ko',
+  dpadEnabled: false,
 }
 
 function load(): Prefs {

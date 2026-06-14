@@ -2193,7 +2193,7 @@ html, body {
   --tc-fill: var(--surface);
   --tc-press: var(--surface2);
   --tc-label: var(--text-dim);
-  --tc-label-dim: #78716c;
+  --tc-label-dim: #78716c;  /* one stone step below --text-dim, for the wait btn */
   --tc-border: rgba(245, 158, 11, 0.07);
   grid-area: touch;
   display: flex;
@@ -2206,6 +2206,45 @@ html, body {
      shift when entering/leaving X-mode. */
   border-top: 1px solid transparent;
 }
+
+/* D-pad mode: switch to row layout and set the d-pad cell size token.
+   Cap height to 3 d-pad rows so a tall spell grid scrolls inside the panel
+   rather than growing the whole strip. */
+#touch-controls.dpad-on {
+  --tc-dpad: 3.6rem;
+  flex-direction: row;
+  align-items: stretch;
+  max-height: calc(var(--tc-dpad) * 3 + 4px + 0.4rem);
+}
+
+/* D-pad: 3×3 CSS grid of large buttons (only present when dpad-on) */
+#touch-controls.dpad-on .tc-dpad {
+  display: grid;
+  grid-template-columns: repeat(3, var(--tc-dpad));
+  grid-template-rows: repeat(3, var(--tc-dpad));
+  gap: 2px;
+  flex-shrink: 0;
+}
+
+.tc-dpad-btn {
+  background: var(--tc-fill);
+  border: 1px solid var(--tc-border);
+  border-radius: 4px;
+  color: var(--tc-label);
+  font-size: 1.4rem;
+  width: var(--tc-dpad, 3.6rem);
+  height: var(--tc-dpad, 3.6rem);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  user-select: none;
+  -webkit-user-select: none;
+  touch-action: manipulation;
+}
+
+.tc-dpad-btn:active { background: var(--tc-press); color: var(--accent); }
+.tc-dpad-btn.wait { color: var(--tc-label-dim); }
 
 #touch-controls.x-mode { border-top-color: var(--accent); }
 
@@ -2683,11 +2722,35 @@ html, body {
   .hg-bar-pair .hg-mp { flex: none; }
 
   /* In landscape the touch panel becomes a sidebar column cell (grid-area:panel).
-     No d-pad to float over the map, so #touch-controls stays as a normal flex
-     column. Keep display:contents only if needed for panel/menu-controls split —
-     with no d-pad the controls are a single unit, so we can let it be in-flow. */
+     Without the d-pad (#touch-controls lacking .dpad-on) controls are a single
+     unit — let it be in-flow as display:contents so .tc-panel hits grid-area:panel.
+     With the d-pad (.dpad-on) the d-pad floats over the map's bottom-left corner
+     (translucent overlay) while the panel occupies grid-area:panel. */
   #touch-controls {
     display: contents;
+  }
+
+  /* D-pad floats over the map's bottom-left corner when in landscape + dpad-on. */
+  #touch-controls.dpad-on .tc-dpad {
+    grid-area: map;
+    align-self: end;
+    justify-self: start;
+    position: relative;
+    z-index: 3;
+    /* Bottom margin matches the sidebar panel's home-indicator lift so
+       ↓/↘ taps don't ride the home swipe. */
+    margin: 0.3rem 0.3rem 1.25rem;
+  }
+  #touch-controls.dpad-on .tc-dpad-btn {
+    background: color-mix(in srgb, var(--surface2) 20%, transparent);
+    color: color-mix(in srgb, var(--text) 55%, transparent);
+    /* The 20%-opaque fill leaves the border as the button's visible edge
+       over the map, so use the app-wide border (not the dimmer --tc-border). */
+    border-color: var(--border);
+  }
+  /* The center "·" (.wait) has its own dimmer color; fade it to match. */
+  #touch-controls.dpad-on .tc-dpad-btn.wait {
+    color: color-mix(in srgb, var(--text-dim) 55%, transparent);
   }
 
   /* The 1.25rem bottom margins here (panel, menu controls, spectator bar)
