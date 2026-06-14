@@ -1,0 +1,27 @@
+.DS_Store
+dev-material/
+node_modules/
+coverage/
+.vitest/
+CLAUDE.md
+BUGS.md
+BUILD.md
+TODO.md
+SPECS.md
+dev-credentials.json
+.claude/
+.playwright-cli/
+dist/
+design/
+scripts/
+TODO
+.env*.local
+# Operator-only deployment assets. About / What's new ship in-app from
+# ABOUT.md / CHANGELOG.md; the static .html files are web mirrors.
+public/about.html
+public/support.html
+public/changelog.html
+public/hero.png
+public/shot-*.png
+public/robots.txt
+public/sitemap.xml

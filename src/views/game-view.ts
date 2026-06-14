@@ -1,0 +1,3752 @@
+import type { WsConnection } from '../ws/connection'
+import type { ClientMsg, ServerMsg, GameExit } from '../ws/types'
+import { fitToWidth } from './fit-terminal'
+import { MapStore } from '../game/map/map-store'
+import { MapView } from '../game/map/map-view'
+import { TileMapView } from '../game/map/tile-map-view'
+import { StatsView } from '../game/hud/stats-view'
+import { StatusView } from '../game/hud/status-view'
+import { MonsterListView } from '../game/hud/monster-list'
+import { MonsterPanelView } from '../game/hud/monster-panel'
+import { fgHaloDngnName } from '../game/hud/monster-style'
+import { InventoryStore } from '../game/inventory-store'
+import { buildTouchControls } from '../game/input/touch'
+import type { TouchControls } from '../game/input/touch'
+import { handleKeydown, CK_UP, CK_DOWN, CK_PGUP, CK_PGDN, CK_HOME, CK_END } from '../game/input/keyboard'
+import { createShiftToggle } from '../game/input/shift-state'
+import { uiColor, escHtml, dcssToHtml, DCSS_COLOR_MAP } from '../game/dcss-colors'
+import { parsePromptText, PROMPT_TRIGGER_RE } from './prompt-parse'
+import { extractSkillHotkeys } from './skill-hotkeys'
+import { reflowSkillCrt } from './skill-reflow'
+import { TEX, getTileLoader, type TileLoader } from '../game/tiles/tile-loader'
+import { renderTiles, appendIconOverlays, monsterTileSpec, prependDngnLayer, type TileRef } from '../game/tiles/tile-view'
+import { getPref, setPref } from '../prefs'
+
+// MOUSE_MODE_YESNO from DCSS defines.h. Set inside yesno() (prompt.cc:219)
+// for the duration of the y/N read, regardless of whether a menu is open.
+const MOUSE_MODE_YESNO = 8
+
+// --- local protocol interfaces ---
+
+interface NewgameButton {
+  hotkey?: string | number
+  label?: string
+  labels?: string[]
+  x?: number
+  y?: number
+  description?: string
+  highlight_colour?: number
+  tile?: Array<{t: number; tex: number}>
+}
+
+interface NewgameGridLabel {
+  x: number
+  y: number
+  label: string
+}
+
+interface NewgameItems {
+  buttons?: NewgameButton[]
+  labels?: NewgameGridLabel[]
+  width?: number
+  height?: number
+}
+
+interface SpellEntry {
+  title: string
+  letter: string
+  tile: number
+  colour?: number
+  // `effect` / `range_string` are the server's spellset wire fields, present
+  // only on describe-monster/item spell lists (the spell's damage effect and
+  // range). The player's own memorised-spell list has neither — its harvest
+  // parser fills `fail`/`schools`/`level` from the menu's default columns.
+  effect?: string
+  range_string?: string
+  fail?: string
+  schools?: string
+  level?: number
+}
+
+interface SpellBook {
+  label: string
+  spells: SpellEntry[]
+}
+
+interface UiPushMsg {
+  type: string
+  title?: string
+  prompt?: string
+  body?: string
+  text?: string
+  desc?: string
+  tile?: { t: number; tex: number } | Array<{ t: number; tex: number }>
+  tiles?: Array<{ t: number; tex: number }>
+  highlight?: string
+  information?: string
+  features?: string
+  changes?: string
+  actions?: string
+  feats?: Array<{ title?: string; body?: string; quote?: string; tile?: { t: number; tex: number } }>
+  fg_idx?: number  // describe-monster: monster's primary tile id (texture inferred)
+  doll?: Array<[number, number]>  // describe-monster: player-doll part [tile_id, ymax] entries
+  mcache?: Array<[number, number, number]> | null  // describe-monster: humanoid+equipment [tile_id, xofs, yofs]
+  flag?: number | number[]  // describe-monster: status overlay bitmask (attitude, behavior, …); [lo, hi] when MDAM/threat bits overflow 32 bits
+  icons?: number[]  // describe-monster: pre-decoded extra icon tile ids
+  // describe-monster / describe-item: spell list rendered where SPELLSET_PLACEHOLDER
+  // appears in the body. Each book has a header label and a list of spells.
+  spellset?: SpellBook[]
+  // describe-monster: optional pane fields (cycled via `!` in reference client).
+  quote?: string
+  status?: string
+  // describe-god fields
+  name?: string
+  colour?: number
+  is_altar?: boolean
+  description?: string
+  favour?: string
+  powers_list?: string
+  powers?: string
+  wrath?: string
+  extra?: string
+  service_fee?: string
+  'main-items'?: NewgameItems
+  'sub-items'?: NewgameItems
+  // seed-selection: explanatory paragraph rendered below the body, above
+  // the pregenerate checkbox; show_pregen_toggle hides the checkbox on
+  // dgamelaunch builds (server config), preserving Begin/Clear/Daily.
+  footer?: string
+  show_pregen_toggle?: boolean
+  // msgwin-get-line: stamped by the server; required so our ui_state_sync
+  // echoes back the same id (server drops mismatched syncs).
+  generation_id?: number
+  // formatted-scroller (message log, lookup help, morgue, …): server-side
+  // FS_START_AT_END flag (scroller.cc emits it alongside the push). The push
+  // is followed by ui-state scroll=INT32_MAX, but those may arrive in a
+  // separate WS frame — honoring this flag during the initial render
+  // guarantees the first paint is at the bottom even when they don't batch.
+  start_at_end?: boolean
+}
+
+interface MenuItem {
+  level: number
+  text?: string
+  colour?: number
+  hotkeys?: number[]
+  tiles?: Array<{ t: number; tex: number }>
+}
+
+interface MenuMsg {
+  type?: string
+  tag?: string
+  flags?: number
+  title?: { text: string }
+  items?: MenuItem[]
+  more?: string
+  // Authoritative item count. Inventory paging shrinks/grows this via
+  // update_menu; we truncate the items list to match (otherwise stale
+  // entries from the prior category linger when the new one is shorter).
+  total_items?: number
+  // When the server pushes a new menu replacing the topmost (without an
+  // intervening close_menu) it sets replace:true.
+  replace?: boolean
+}
+
+// Menu flag bits (subset; values from the reference client enums.js).
+const MF_MULTISELECT = 0x0004
+const MF_WRAP = 0x0080
+const MF_ARROWS_SELECT = 0x40000
+
+// Cell/glyph multiplier applied while X-mode (eXamine level map) is active.
+// Honored by both renderers via setFontScale (ASCII shrinks glyphs, tiles
+// shrink cellPx); each renderer's fill logic turns the freed HUD/log area
+// into extra cells. Upstream's tile_map_scale defaults to 0.6 — we ship
+// 0.7 for now; tune in one place.
+const X_MODE_SCALE = 0.7
+
+// Identifies a spectated game when transitioning lobby → game. Carries only the
+// spectated player's name; the per-version tile loader is passed separately (see
+// the `initialLoader` param of buildGameView) because it's orthogonal to whether
+// we're spectating — a played game can also arrive with a pre-resolved loader.
+export interface SpectateTarget {
+  username: string
+}
+
+export function buildGameView(
+  conn: WsConnection,
+  onLobby: (exit?: GameExit) => void,
+  spectating?: SpectateTarget,
+  initialLoader?: TileLoader,
+): HTMLElement {
+  const store = new MapStore()
+  if (import.meta.env.DEV) (window as unknown as { __dcssStore: MapStore }).__dcssStore = store
+  // Map render mode. Starts in ASCII regardless of the saved preference; tile
+  // mode (reachable in-session via a two-finger long-press on the map, see
+  // below) is applied just after setup via setRenderMode, which handles the
+  // view swap, atlas preload (~10 MB), and monster-list mode in one place.
+  // setRenderMode persists every change to prefs, so a tile-mode session
+  // resumes in tiles next launch.
+  let renderMode: 'ascii' | 'tiles' = 'ascii'
+  // This game's per-version tile loader, or null until we know the version.
+  // The lobby consumes `game_client` (which carries the version) whenever it
+  // arrives before the lobby→game transition, and hands us the resolved loader
+  // as `initialLoader`: always for a spectated game, and for a played game on
+  // servers that send game_client before game_started (e.g. CPO). When it
+  // arrives only after the transition (e.g. CDI) initialLoader is undefined and
+  // the game_client handler below resolves the loader once we hold it. Either
+  // way the server never resends the version after we mount, so this is the one
+  // chance to learn it. Because each loader is pinned to one immutable gamedata
+  // version, there's no shared mutable state to clear and no way to read a
+  // previous game's atlas under this game's tileinfo — the
+  // black-tile-after-version-switch class is gone by construction. Tile views
+  // only paint once they're handed this loader.
+  let loader: TileLoader | null = initialLoader ?? null
+  let mapView: MapView | TileMapView = new MapView(store)
+  // Running HP/MP snapshot (merged across player deltas) for the tile view's
+  // under-tile mini-bars. Kept here so a render-mode swap can seed the freshly
+  // created view, which otherwise starts at zero until the next player message.
+  const playerStats: { hp?: number; hp_max?: number; mp?: number; mp_max?: number } = {}
+  const inventoryStore = new InventoryStore()
+  const statsView = new StatsView(inventoryStore)
+  const statusView = new StatusView()
+  const monsterListView = new MonsterListView(store)
+  const monsterPanel = new MonsterPanelView(store)
+  let monsterPanelOpen = false
+  // When the loader is already known at mount (handed up from the lobby as
+  // initialLoader), wire it to the panels now so the persisted-pref tile swap
+  // below paints sprites immediately. Otherwise the game_client handler does it.
+  if (loader) {
+    monsterListView.setLoader(loader)
+    monsterPanel.setLoader(loader)
+  }
+
+  const uiStack: UiPushMsg[] = []
+  const crtLines = new Map<number, string>()
+  let crtActive = false
+  // True while a server `show_dialog` HTML overlay is up (e.g. trunk's
+  // save-transfer prompt on resume). Tracked like crtActive so it can't be
+  // orphaned if the server proceeds without an explicit hide_dialog.
+  let dialogActive = false
+  let crtTag: string | undefined
+  // Server tracks a menu stack (open_menu pushes, close_menu pops one,
+  // close_all_menus clears). Mirroring it is what lets close_menu restore
+  // the previous menu instead of dropping us into a hidden-server-menu state
+  // where the next keystroke gets eaten by the menu we forgot about.
+  const menuStack: MenuMsg[] = []
+  let activeMenu: MenuMsg | null = null
+  let hoveredMenuIdx = -1
+  // Raw server-side hover index for the active menu. We drive menu hover
+  // client-side via menu_hover (see cycleMenuHover) instead of forwarding raw
+  // arrow keys, because the server's C++ cycle_hover is hotkey-blind and
+  // would step onto coalesced continuation rows — costing a dead keypress per
+  // wrapped row. This tracks the server's cursor so the next client move is
+  // computed from the right place even when the server moves it.
+  let menuServerHover = -1
+  // Hover is a keyboard-nav indicator that doesn't earn its visual weight in a
+  // touch-first UI; the server, however, sends `last_hovered` defaults
+  // (MF_INIT_HOVER → 0) on menu open and re-echoes them on most updates. We
+  // suppress the visual until the user actually drives hover (arrows / Home /
+  // End / paging) — otherwise e.g. tapping uppercase `D` in a shop would light
+  // up row a, because ShopMenu::process_key's shopping-list branch in
+  // shopping.cc doesn't update `last_hovered` and echoes the stale init
+  // default. After the first user-driven move the flag stays on for the
+  // lifetime of the menu, and server echoes track normally.
+  let menuHoverFromUser = false
+
+  // --- Spellcaster spell harvest (step 1) ---------------------------------
+  // The player's memorised spells are never pushed proactively over WebTiles;
+  // they surface only when the `list_spells` menu opens (tag:"spell"). We
+  // harvest them silently: fire the `I` command (CMD_DISPLAY_SPELLS →
+  // inspect_spells → list_spells(viewing=true) — view-only, costs no turn and
+  // can't cast), capture the resulting menu items, Escape it closed, and never
+  // render it. The cache will feed a tap-to-cast spell panel (later steps).
+  //
+  // The spell menu is a ToggleableMenu with two column sets: the default
+  // (schools / failure% / level) arrives in the `menu` message; the alternate
+  // (power / damage / range / noise) is only the items' `alt_text` and is NOT
+  // transmitted until a `!` (CMD_MENU_CYCLE_MODE) toggle. We deliberately
+  // capture only the default set — nothing rendered uses the alternate
+  // columns, and skipping the toggle halves the harvest's round-trips (and
+  // with them the input-suppression window). If a UI ever surfaces
+  // power/damage/noise, re-add the second phase in the same change (it lives
+  // in git history: `mergeSpellExtra` + the 'extra' harvestPhase).
+  let spellCache: SpellEntry[] = []
+  // 'late-base' is the base phase after its input-suppression budget ran out:
+  // the `I` reply is slower than HARVEST_SUPPRESS_MS, so the user gets the
+  // input channel back, but we keep listening (up to HARVEST_LATE_MS) so the
+  // late menu is still captured silently instead of rendering as a surprise
+  // full-screen spell list with the rail abandoned empty for the whole game.
+  let harvestPhase: 'idle' | 'base' | 'late-base' = 'idle'
+  let harvestTimer = 0
+  // Input-suppression budget for the harvest's single `I` round-trip, and how
+  // much longer a slow reply is still accepted after suppression ends.
+  const HARVEST_SUPPRESS_MS = 1500
+  const HARVEST_LATE_MS = 8500
+  // Set when we send the harvest-closing Escape so the matching server
+  // close_menu — for a menu we deliberately never pushed onto menuStack — is
+  // swallowed instead of popping/clearing our real overlay state.
+  let pendingHarvestClose = false
+
+  // Spell rail: a persistent row of quick-cast buttons floated over the map's
+  // bottom edge in portrait (landscape slots it into the sidebar `spells`
+  // row). The message log floats over the map too — always, casters or not —
+  // so the rail is out of flow and its appearance never resizes the map; the
+  // `spell-row` class on #game-view only lifts the log (and --more--) by the
+  // rail's height. Always visible during play once spells are harvested.
+  const spellRail = document.createElement('div')
+  spellRail.id = 'spell-rail'
+  spellRail.style.display = 'none'
+  // Auto-harvest once per game (so the rail is populated without the player
+  // opening the tray). Reset on go_lobby for the next game.
+  let autoHarvestedThisGame = false
+  // Set when the letter→spell map changes (memorise / forget / `=` reassign) so
+  // the rail isn't left mapping a stale letter — which would cast the WRONG
+  // spell on tap. Resolved by reharvestIfDirty() at the next clean command-mode
+  // moment (it fires a fresh silent harvest). Event-driven, not timer-polled.
+  let spellsDirty = false
+
+  let activePromptEl: HTMLElement | null = null
+  let inXMode = false
+  let exitedXModeForInput = false
+  // Menu filter input (Ctrl-F → "Search for what? (regex)"). Server sends a
+  // title_prompt to start one — and an init_input/close_input pair right
+  // alongside, because the resumable_line_reader inherits line_reader's
+  // start/abort hooks. Those are artifacts; the actual UI lives in the title
+  // and the typed text only goes to the server when the user presses Enter
+  // (see menu.js:730 in the reference client). titlePromptInput non-null =
+  // both that suppression and the local-only typing state.
+  let titlePromptInput: HTMLInputElement | null = null
+  // Last cursor loc from the server. Tracked here so an ASCII↔tiles swap
+  // can re-apply it to the new view (each view keeps its own cursor state).
+  let cursorLoc: { x: number; y: number } | null = null
+  // Last `input_mode` from the server. MOUSE_MODE_YESNO (8) is sent while
+  // a (y/N) prompt is active inside an open menu (e.g. shop "Purchase
+  // items for X gold?"); buildMenuControls swaps the row when this is set.
+  let currentInputMode: number | undefined
+  // Sticky shift toggle for menu hotkeys. Used in shops ([A-J] adds to
+  // shopping list vs [a-j] marks for purchase) and the skill screen
+  // (capital letter solo-trains that skill). Same off/once/lock state
+  // machine as the virtual kbd (see shift-state.ts). Resets when the
+  // menu closes.
+  const menuShift = createShiftToggle({ onChange: () => refreshShiftUI() })
+  // Tracks whether the virtual keyboard was opened by us (paired with an
+  // input prompt). Auto-close sites only fire `closeKbd` when this flag is
+  // set, so a kbd the user manually toggled open via the kbd button stays
+  // open across overlay transitions.
+  let kbdAutoOpened = false
+
+  function autoOpenKbd(): void {
+    touchControls.openKbd()
+    kbdAutoOpened = true
+  }
+
+  function autoCloseKbdIfOurs(): void {
+    if (!kbdAutoOpened) return
+    kbdAutoOpened = false
+    touchControls.closeKbd()
+  }
+
+  const view = document.createElement('div')
+  view.id = 'game-view'
+
+  // Timestamp of the last touch contact anywhere in the view. The spell
+  // buttons' click handlers consult this to reject iOS's compatibility
+  // mouse events: WebKit fires them at the LIFT point of a touch that
+  // nothing scrolled, so a drag from the log onto the rail lands a `click`
+  // on a button the finger never started on. Tracked on the view (not
+  // document) so the listeners die with it on rebuild.
+  let lastViewTouchTs = -Infinity
+  const noteViewTouch = () => { lastViewTouchTs = performance.now() }
+  view.addEventListener('touchstart', noteViewTouch, { capture: true, passive: true })
+  view.addEventListener('touchend', noteViewTouch, { capture: true, passive: true })
+
+  const uiOverlay = document.createElement('div')
+  uiOverlay.id = 'ui-overlay'
+  uiOverlay.style.display = 'none'
+
+  const msgLog = document.createElement('div')
+  msgLog.id = 'game-messages'
+  msgLog.addEventListener('click', (e) => {
+    if (isHarvesting()) return
+    if (uiOverlay.style.display === 'none' && !(e.target as HTMLElement).closest('button, input, .game-text-input-row')) {
+      conn.send({ msg: 'key', keycode: 16 })
+      view.focus({ preventScroll: true })
+    }
+  })
+
+  const mapWrap = document.createElement('div')
+  mapWrap.id = 'map-wrap'
+  mapWrap.appendChild(mapView.element)
+
+  // Double-tap the map to toggle zoom. Bypassed while X-mode is active
+  // (font scale is overridden there) — single-tap behavior is undefined on
+  // the map today, so we don't need to suppress click propagation.
+  // Bound to mapWrap (not mapView.element) so it survives the in-place swap
+  // between MapView and TileMapView.
+  let lastTap = { t: 0, x: 0, y: 0 }
+  mapWrap.addEventListener('pointerdown', (e) => {
+    if (inXMode || e.button !== 0) return
+    // Ignore the secondary finger of a multi-touch gesture — otherwise two
+    // close-together touches can satisfy the double-tap-zoom check below.
+    if (!e.isPrimary) return
+    const target = e.target as HTMLElement | null
+    if (!target || !target.closest('#map-grid')) return
+    const now = e.timeStamp
+    const dt = now - lastTap.t
+    const dx = e.clientX - lastTap.x
+    const dy = e.clientY - lastTap.y
+    if (dt < 300 && dx * dx + dy * dy < 30 * 30) {
+      mapView.setZoomMode(!mapView.isZoomMode())
+      mapView.fitToContainer()
+      lastTap = { t: 0, x: 0, y: 0 }
+      return
+    }
+    lastTap = { t: now, x: e.clientX, y: e.clientY }
+  })
+
+  // Two-finger long-press on the map flips between ASCII and tile rendering.
+  // Hidden gesture (no on-screen affordance) because the toggle is rare and
+  // not first-launch discovery — atlases are ~10 MB and we never start a
+  // session in tile mode. Hold ~450 ms; cancel on finger movement >40 px,
+  // any lift before the timer, or a 3rd touch.
+  let tileGestureTimer: number | null = null
+  let tileGestureCenter: { x: number; y: number } | null = null
+  const cancelTileGesture = (): void => {
+    if (tileGestureTimer != null) { window.clearTimeout(tileGestureTimer); tileGestureTimer = null }
+    tileGestureCenter = null
+  }
+  mapWrap.addEventListener('touchstart', (e) => {
+    if (e.touches.length !== 2) { cancelTileGesture(); return }
+    const target = e.target as HTMLElement | null
+    if (!target || !target.closest('#map-grid')) { cancelTileGesture(); return }
+    // Suppress any pending single-tap-zoom state so the two-finger landings
+    // can't accidentally satisfy the double-tap-zoom check.
+    lastTap = { t: 0, x: 0, y: 0 }
+    const t1 = e.touches[0]; const t2 = e.touches[1]
+    tileGestureCenter = { x: (t1.clientX + t2.clientX) / 2, y: (t1.clientY + t2.clientY) / 2 }
+    if (tileGestureTimer != null) window.clearTimeout(tileGestureTimer)
+    tileGestureTimer = window.setTimeout(() => {
+      tileGestureTimer = null; tileGestureCenter = null
+      setRenderMode(renderMode === 'tiles' ? 'ascii' : 'tiles')
+    }, 450)
+  }, { passive: true })
+  mapWrap.addEventListener('touchmove', (e) => {
+    if (tileGestureTimer == null || !tileGestureCenter) return
+    if (e.touches.length !== 2) { cancelTileGesture(); return }
+    const t1 = e.touches[0]; const t2 = e.touches[1]
+    const cx = (t1.clientX + t2.clientX) / 2
+    const cy = (t1.clientY + t2.clientY) / 2
+    const dx = cx - tileGestureCenter.x; const dy = cy - tileGestureCenter.y
+    if (dx * dx + dy * dy > 40 * 40) cancelTileGesture()
+  }, { passive: true })
+  mapWrap.addEventListener('touchend', cancelTileGesture, { passive: true })
+  mapWrap.addEventListener('touchcancel', cancelTileGesture, { passive: true })
+
+  // Tap the compact monster list to open the full-screen GUI variant.
+  // Refuse while a server-side prompt is up so we don't drop the user out
+  // of an in-progress targeting/menu/etc. Also refuse while the panel is
+  // already open: in landscape it covers only the map, leaving the sidebar
+  // chip clickable, and a re-open would rebuild the overlay and reset the
+  // panel's scroll position.
+  monsterListView.element.addEventListener('click', (e) => {
+    if (uiStack.length > 0 || crtActive || dialogActive || activeMenu || isHarvesting() || monsterPanelOpen) return
+    if (monsterListView.element.childElementCount === 0) return
+    e.stopPropagation()
+    openMonsterPanel()
+  })
+
+  const hudTop = document.createElement('div')
+  hudTop.id = 'hud-top'
+  hudTop.appendChild(statsView.element)
+
+  const hud = document.createElement('div')
+  hud.id = 'game-hud'
+  // Hidden until the first `player` message — between layer:"game" and the
+  // first stats payload the HUD would otherwise show empty HP/MP bars and
+  // floating AC/EV/SH/… captions with no values. One display-based mechanism:
+  // showHud() is the sole un-hide and no-ops until hudRevealed flips on that
+  // first message, so the overlay/X-mode restore paths can call it
+  // unconditionally without revealing the HUD early. Hide paths set
+  // display:none directly.
+  hud.style.display = 'none'
+  let hudRevealed = false
+  const showHud = (): void => { if (hudRevealed) hud.style.display = '' }
+  hud.appendChild(hudTop)
+  hud.appendChild(statusView.element)
+
+  const moreBtn = document.createElement('button')
+  moreBtn.id = 'more-btn'
+  moreBtn.textContent = '— more —'
+  moreBtn.style.display = 'none'
+  moreBtn.addEventListener('click', () => {
+    if (isHarvesting()) return
+    conn.send({ msg: 'key', keycode: 32 })
+    view.focus({ preventScroll: true })
+  })
+
+  // The d-pad calls this send directly (it doesn't dispatch a keydown), so
+  // the menu-nav redirect has to happen here too — otherwise phone users get
+  // the raw-arrow / dead-keypress behaviour the keyboard path now avoids.
+  // Post-dispatch hook for outbound user keystrokes (from touch and physical
+  // keyboard). X-mode 'R' (CMD_MAP_EXCLUDE_RADIUS, viewmap.cc) blocks
+  // on getchm() for one digit char with no `init_input` / `text_cursor` to
+  // anchor a touch UI on; pop the numpad here so the user has a way to
+  // enter the radius. Outside X-mode, 'R' falls through normally (e.g. the
+  // macro tab's 'R' = "Remove jewellery").
+  //
+  // If the radius numpad is already up, any subsequent outbound keystroke
+  // (typically a digit / nav key from the physical keyboard) has just
+  // resolved the server's getchm() — close the now-stale numpad. Without
+  // this, kbd users see a phantom numpad after pressing R+digit on hardware.
+  let radiusNumpadActive = false
+  function afterUserSend(msg: ClientMsg): void {
+    if (radiusNumpadActive) {
+      removeNumpadInput()
+      return
+    }
+    if (inXMode && msg.msg === 'input' && msg.text === 'R') {
+      showNumpadInput('Exclusion radius (0–9):', { closeAfterDigit: true })
+    }
+  }
+
+  const touchControls: TouchControls = buildTouchControls((msg) => {
+    if (isHarvesting()) return  // suppress d-pad/macro input during silent harvest
+    // The monster panel is a client-only overlay. In landscape it covers just
+    // the map, so the sidebar keyboard stays visible (the display:none hide
+    // that works in portrait is undone whenever a server message re-reveals
+    // the sidebar). Route its Esc to close the panel — mirroring the physical
+    // Esc handler in docKeyHandler — and swallow every other key so a stray
+    // tap can't drive the hidden game beneath the overlay.
+    if (monsterPanelOpen) {
+      if (msg.msg === 'key' && msg.keycode === 27) closeMonsterPanel()
+      return
+    }
+    if (msg.msg === 'key' && menuNavActive()) {
+      if (msg.keycode === CK_DOWN) { cycleMenuHover(false); return }
+      if (msg.keycode === CK_UP) { cycleMenuHover(true); return }
+      if (msg.keycode === CK_PGDN) { pageMenu(false); return }
+      if (msg.keycode === CK_PGUP) { pageMenu(true); return }
+      if (msg.keycode === CK_END) { jumpMenu(true); return }
+      if (msg.keycode === CK_HOME) { jumpMenu(false); return }
+    }
+    if (msg.msg === 'key' && handleScrollerKeycode(msg.keycode)) return
+    conn.send(msg)
+    afterUserSend(msg)
+  }, spectating ? {} : { spellTab: { render: renderSpellGrid, hasSpells: () => spellCache.length > 0 } })
+
+  const menuControls = document.createElement('div')
+  menuControls.id = 'menu-controls'
+  menuControls.style.display = 'none'
+
+  const numpadInput = document.createElement('div')
+  numpadInput.id = 'numpad-input'
+  numpadInput.style.display = 'none'
+
+  view.appendChild(uiOverlay)
+  view.appendChild(mapWrap)
+  // Direct grid child (not inside #map-wrap) so each orientation can place
+  // it: portrait floats it over the map cell (grid-area:map + abspos, same
+  // containing-block trick as #more-btn), landscape slots it into the
+  // sidebar between HUD and spell rail.
+  view.appendChild(monsterListView.element)
+  view.appendChild(msgLog)
+  view.appendChild(spellRail)
+  view.appendChild(moreBtn)
+  view.appendChild(hud)
+  view.appendChild(numpadInput)
+  if (spectating) {
+    const bar = document.createElement('div')
+    bar.id = 'spectator-bar'
+    const exitBtn = document.createElement('button')
+    exitBtn.className = 'lobby-btn-ghost'
+    exitBtn.setAttribute('aria-label', 'Back to lobby')
+    exitBtn.textContent = '← Lobby'
+    exitBtn.addEventListener('click', () => {
+      conn.send({ msg: 'go_lobby' })
+      onLobby()
+    })
+    const chip = document.createElement('div')
+    chip.className = 'lobby-account-chip is-guest'
+    chip.innerHTML = `
+      <span class="lobby-chip-role">Spectating</span>
+      <span class="lobby-chip-sep">·</span>
+      <span class="lobby-chip-tag">${escHtml(spectating.username)}</span>
+    `
+    bar.appendChild(exitBtn)
+    bar.appendChild(chip)
+    view.appendChild(bar)
+  } else {
+    view.appendChild(touchControls.element)
+    view.appendChild(menuControls)
+  }
+
+  view.setAttribute('tabindex', '0')
+  requestAnimationFrame(() => view.focus({ preventScroll: true }))
+
+  // Observe the map-grid element so any container size change (initial
+  // layout settlement, message panel growth, HUD changes, window resize)
+  // triggers a refit. The hysteresis inside fitToContainer is what prevents
+  // tiny container shrinks from dropping a row — the observer fires either
+  // way, but the recompute keeps the current viewport size if overflow is
+  // small.
+  //
+  // Gated on hudRevealed: the HUD starts display:none and only takes its
+  // ~106px row on the first `player` message. The observer's initial fire
+  // therefore lands while the HUD is hidden, sizing the map to a viewport
+  // ~5 rows too tall; when the HUD then appears the container shrinks and a
+  // second fit drops those rows. Centering the grid (style.css) keeps that
+  // re-fit from sliding the map far, but the first `map` of the same WS
+  // batch can still paint cells at the too-tall size a frame before the
+  // async re-fit corrects it. So we ignore pre-reveal fires and do the first
+  // fit explicitly, synchronously, once the HUD is in place (see the
+  // `player` handler) — early enough to beat that same-batch first `map`
+  // render, so the first painted frame is already at the settled size.
+  //
+  // Some call sites (enterXMode/exitXMode, hideOverlay) also call
+  // mapView.fitToContainer() explicitly. That's redundant with the observer
+  // but resolves the layout one frame earlier — without it there'd be a
+  // brief flash at the old size before the observer's callback runs.
+  const fontScaleObserver = new ResizeObserver(() => {
+    if (!hudRevealed) return
+    requestAnimationFrame(() => mapView.fitToContainer())
+  })
+  fontScaleObserver.observe(mapView.element)
+
+  // Swaps the active map view in place. Forces zoom on when switching INTO
+  // tile mode (tiles at full 33×21 are ~10 px on a phone), and reuses the
+  // current view-center so the swap doesn't flicker through an unset position.
+  // Not persisted: choice resets to ASCII on next session.
+  function setRenderMode(mode: 'ascii' | 'tiles'): void {
+    if (mode === renderMode) return
+    renderMode = mode
+    setPref('mapRenderMode', mode)
+    // CSS hook for mode-dependent chrome (e.g. the floating log's scrim
+    // lightens over tiles — see --msglog-bg in style.css).
+    view.classList.toggle('tiles-mode', mode === 'tiles')
+    const center = { x: store.playerPos.x, y: store.playerPos.y }
+    fontScaleObserver.unobserve(mapView.element)
+    const oldEl = mapView.element
+    const next: MapView | TileMapView = mode === 'tiles' ? new TileMapView(store) : new MapView(store)
+    next.setViewCenter(center)
+    // Default tile mode to zoom-on. Apply unconditionally — tile X-mode 
+    // uses the zoom-on (17-floor) base shrunk by X_MODE_SCALE.
+    if (mode === 'tiles') next.setZoomMode(true)
+    // Carry the X-mode scale across the swap: the new view starts at 1.0
+    // by default, which would visibly un-zoom the map mid-X-mode. inXMode
+    // is the source of truth (global flag), so re-apply directly.
+    if (inXMode) next.setFontScale(X_MODE_SCALE)
+    if (cursorLoc) next.setCursor(cursorLoc)
+    next.setPlayerStats(playerStats)
+    oldEl.replaceWith(next.element)
+    mapView = next
+    fontScaleObserver.observe(mapView.element)
+    // Only preload once we hold this game's loader. If we're switching to tiles
+    // before that — e.g. the persisted-pref application at build, or a gesture
+    // toggle before game_client — the game_client handler preloads when the
+    // version lands.
+    if (mode === 'tiles' && loader) void (mapView as TileMapView).preloadAtlases(loader)
+    monsterListView.setRenderMode(mode)
+    requestAnimationFrame(() => { mapView.fitToContainer(); mapView.fullRender() })
+  }
+
+  // Dev-only console hook so the tile mode (otherwise only a hidden
+  // two-finger long-press) can be toggled from desktop Safari, which has
+  // no TouchEvent constructor to synthesize the gesture.
+  // __dcssTiles() toggles; __dcssTiles(true|false) forces tiles|ascii.
+  if (import.meta.env.DEV) {
+    (window as unknown as { __dcssTiles: (on?: boolean) => void }).__dcssTiles =
+      (on) => setRenderMode(on === undefined ? (renderMode === 'tiles' ? 'ascii' : 'tiles') : (on ? 'tiles' : 'ascii'))
+    // Spell harvest: __dcssHarvestSpells() fires a silent `I` and fills
+    // __dcssSpellCache with the parsed memorised spells.
+    ;(window as unknown as { __dcssHarvestSpells: () => void }).__dcssHarvestSpells = harvestSpells
+    // __dcssFakeSpells(n) — layout aid: pad the cache to n fake spells (cloning
+    // the real harvested tiles so the icons still render, with distinct letters)
+    // to eyeball rail/grid overflow + scrolling. Tapping a fake casts a bogus
+    // letter (harmless — the server just rejects it). Re-harvest to reset.
+    ;(window as unknown as { __dcssFakeSpells: (n?: number) => void }).__dcssFakeSpells = (n = 24) => {
+      if (spellCache.length === 0) return
+      const letters = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ'
+      const real = spellCache.slice()
+      spellCache = Array.from({ length: Math.min(n, letters.length) }, (_, i) => ({
+        ...real[i % real.length],
+        letter: letters[i],
+        title: `${real[i % real.length].title} ${i + 1}`,
+      }))
+      exposeSpellCache()
+    }
+    exposeSpellCache()
+    // __dcssMsgPill() — A/B the per-line message-log scrim variant (style.css
+    // `.msg-pill`): background hugs each line's text instead of filling the
+    // whole strip. Toggles; pass true/false to force.
+    ;(window as unknown as { __dcssMsgPill: (on?: boolean) => void }).__dcssMsgPill =
+      (on) => { view.classList.toggle('msg-pill', on) }
+  }
+
+  // Apply the persisted render-mode preference now that the map element,
+  // font-scale observer, and monster-list view are all wired up. Routed
+  // through setRenderMode, which swaps in the tile view immediately (before
+  // first paint, so no ASCII flash). The atlas preload waits until we hold the
+  // loader: on a played game that's the game_client handler; on a spectated
+  // game it's already set (from the lobby handoff) here.
+  if (getPref('mapRenderMode') === 'tiles') setRenderMode('tiles')
+
+  const docKeyHandler = (e: KeyboardEvent) => {
+    if (!view.isConnected) { document.removeEventListener('keydown', docKeyHandler); return }
+    if (isHarvesting()) { e.preventDefault(); return }  // suppress during silent harvest
+    if (spectating) {
+      if (e.key === 'Escape') {
+        e.preventDefault()
+        conn.send({ msg: 'go_lobby' })
+        onLobby()
+      }
+      return
+    }
+    if (document.activeElement instanceof HTMLInputElement) return
+    if (monsterPanelOpen) {
+      e.preventDefault()
+      if (e.key === 'Escape') closeMonsterPanel()
+      return
+    }
+    if (handleMenuNavKey(e)) return
+    if (handleScrollerKey(e)) return
+    handleKeydown(e, (msg) => { conn.send(msg); afterUserSend(msg) })
+  }
+  document.addEventListener('keydown', docKeyHandler)
+
+  // The monster list lives in the landscape sidebar, but only a tablet has the
+  // vertical room for the full multi-row list there: a phone in landscape
+  // (~390px tall) spends ~360px on HUD + spells + touch panel, leaving room
+  // for barely one monster row. So gate on HEIGHT — tall landscape (tablet)
+  // shows the full expanding list; short landscape (phone) collapses it to the
+  // single-line compact chip. 600px cleanly separates phones (≤~430px tall in
+  // landscape) from tablets (≥744px). Portrait floats the full list over the
+  // map and never matches this query. Re-sync on rotation/resize, self-removing
+  // once the view is gone (mirrors docKeyHandler); set the initial state before
+  // the first map message so the first render is already in the right mode.
+  const compactMql = window.matchMedia('(orientation: landscape) and (max-height: 600px)')
+  const syncMonsterCompact = (): void => {
+    if (!view.isConnected) { compactMql.removeEventListener('change', syncMonsterCompact); return }
+    monsterListView.setCompact(compactMql.matches)
+  }
+  compactMql.addEventListener('change', syncMonsterCompact)
+  monsterListView.setCompact(compactMql.matches)
+
+  conn.onMessage = handleMsg
+
+  function handleMsg(msg: ServerMsg): void {
+    switch (msg.msg) {
+      // Both 0.34 and trunk send bare `layer` (client.js: "layer":
+      // do_set_layer). `set_layer` is a defensive alias the server never
+      // actually sends.
+      case 'layer':
+      case 'set_layer':
+        if (msg.layer === 'game') { uiStack.length = 0; crtActive = false; dialogActive = false; crtTag = undefined; menuStack.length = 0; activeMenu = null; monsterPanelOpen = false; resetHarvest(); hideOverlay() }
+        break
+
+      // Raw-HTML modal pushed by the server (save-transfer prompt on trunk
+      // resume, end-of-game prompts, etc.). Mirrors reference handle_dialog:
+      // inject the HTML, wire [data-key] buttons to send that key. Without
+      // this the game blocks on an invisible prompt — a black screen.
+      case 'show_dialog': {
+        const html = msg.html ?? ''
+        dialogActive = true
+        renderOverlay('', () => {
+          const body = document.createElement('div')
+          body.className = 'dialog-body'
+          body.innerHTML = html
+          // Group the server's [data-key] buttons into one flex row. The
+          // server appends them in reverse visual order and floats them
+          // right (e.g. [No, Yes] → renders "Yes  No"); .dialog-buttons
+          // uses row-reverse to reproduce that intent for any button set.
+          const btnRow = document.createElement('div')
+          btnRow.className = 'dialog-buttons'
+          body.querySelectorAll<HTMLElement>('[data-key]').forEach((el) => {
+            el.addEventListener('click', () => {
+              const k = el.getAttribute('data-key') ?? ''
+              if (k) conn.send({ msg: 'input', text: k })
+            })
+            btnRow.appendChild(el)
+          })
+          if (btnRow.children.length) body.appendChild(btnRow)
+          uiOverlay.appendChild(body)
+        })
+        break
+      }
+
+      case 'hide_dialog':
+        if (dialogActive) { dialogActive = false; hideOverlay() }
+        break
+
+      case 'game_client': {
+        // Server tells us the gamedata version on game start. Use it to
+        // build URLs for tile atlases (gui.png, main.png, ...) served at
+        // /gamedata/<version>/.
+        if (msg.version) {
+          // Resolve this game's per-version loader. getTileLoader memoizes by
+          // version, so a same-version resume reuses the warm cache while a
+          // different version gets a fully isolated instance — no shared state
+          // to clear, no stale-atlas race. This is the moment a persisted
+          // tile-mode view (built before game_client) or a pre-game_client
+          // gesture toggle gets its loader and starts painting.
+          loader = getTileLoader(conn.httpBase, msg.version)
+          monsterListView.setLoader(loader)
+          monsterPanel.setLoader(loader)
+          if (renderMode === 'tiles') {
+            void (mapView as TileMapView).preloadAtlases(loader)
+            monsterListView.update(store.getMonsters())
+          }
+        }
+        break
+      }
+
+      case 'map': {
+        if (msg.clear) store.clear()
+        // vgrdc is resent on every map message even when it equals the
+        // current view center; setViewCenter returns true only on a real
+        // pan, so we can keep the dirty-render path live in steady state.
+        const panned = msg.vgrdc ? mapView.setViewCenter(msg.vgrdc) : false
+        const dirty = store.merge(msg.cells ?? [])
+        if (msg.clear || panned) mapView.fullRender()
+        else mapView.render(dirty)
+        monsterListView.update(store.getMonsters())
+        if (monsterPanelOpen) monsterPanel.update(store.getMonsters())
+        break
+      }
+
+      case 'player': {
+        if (msg.pos) {
+          store.playerPos = { x: msg.pos.x, y: msg.pos.y }
+          // setViewCenter reports whether the center actually moved; reuse that
+          // instead of recomputing the prev/current comparison here. (Same gate
+          // as the 'map' case — full redraw only on a real pan.)
+          if (mapView.setViewCenter(store.playerPos)) mapView.fullRender()
+        }
+        // Feed HP/MP to the renderer (tile mode draws under-tile mini-bars).
+        // After any fullRender above, so the player cell repaints with fresh
+        // values; merged into playerStats so a later tile-mode swap can seed.
+        if (msg.hp !== undefined) playerStats.hp = msg.hp
+        if (msg.hp_max !== undefined) playerStats.hp_max = msg.hp_max
+        if (msg.mp !== undefined) playerStats.mp = msg.mp
+        if (msg.mp_max !== undefined) playerStats.mp_max = msg.mp_max
+        mapView.setPlayerStats(playerStats)
+        inventoryStore.update(msg.inv)
+        statsView.update(msg)
+        if (msg.status !== undefined) statusView.update(msg.status)
+        if (msg.time !== undefined) markLastMsg('turn')
+        if (!hudRevealed) {
+          hudRevealed = true
+          // Don't reveal the HUD while an overlay covers the screen: the
+          // newgame-choice character-creation screens send `player` messages
+          // carrying placeholder stats ("the Conjurer — Yak", 0/0 HP, …)
+          // before any character exists. uiOverlay being shown is the signal
+          // a full overlay is up; when it closes, hideOverlay()/exitXMode()
+          // call showHud() (hudRevealed is now true) and reveal it then.
+          if (uiOverlay.style.display === 'none') {
+            showHud()
+            // First fit, now that the HUD occupies its row (showHud above) and
+            // statsView/statusView have populated it this same message — so the
+            // container is at its settled height. Synchronous (forces one
+            // layout) so a `map` message later in this same WS batch renders
+            // straight into the final viewport rather than the pre-fit size.
+            // The ResizeObserver stays gated until exactly here; see its comment.
+            mapView.fitToContainer()
+          }
+        }
+        break
+      }
+
+      case 'txt': {
+        const raw = msg as unknown as Record<string, unknown>
+        const lines = raw['lines']
+        if (raw['id'] && lines && typeof lines === 'object' && !Array.isArray(lines)) {
+          updateCrtLines(lines as Record<string, string>)
+        } else {
+          const text = String(raw['text'] ?? '')
+          if (text.includes('\n')) showTxtPage(text)
+          else appendMessage(text)
+        }
+        break
+      }
+
+      case 'ui-push': {
+        const pushMsg = msg as unknown as UiPushMsg
+        // A server overlay supersedes our client-side monster panel; clear the
+        // flag so subsequent map updates don't rewrite the overlay body.
+        monsterPanelOpen = false
+        // describe-* overlays hint "(press '!' for details)" inside the body,
+        // not in the actions footer — promote it to a tappable button so it's
+        // reachable on mobile. Mutating actions persists across ui-state body
+        // swaps, so the button stays put while the user toggles in/out.
+        if (/press '!' for details/.test(pushMsg.body ?? '') && !/\(!\)/.test(pushMsg.actions ?? '')) {
+          const trimmed = (pushMsg.actions ?? '').replace(/\.\s*$/, '')
+          pushMsg.actions = trimmed ? `${trimmed}, (!)details.` : '(!)details.'
+        }
+        uiStack.push(pushMsg)
+        showUiPush(pushMsg)
+        break
+      }
+
+      case 'ui-stack': {
+        // Sent on spectator join: a snapshot of the watched game's UI stack.
+        // Each item carries its own `msg` field (ui-push, ui-state, ...),
+        // so we re-dispatch through the same handler.
+        const items = (msg as unknown as { items?: ServerMsg[] }).items
+        if (Array.isArray(items)) for (const item of items) handleMsg(item)
+        break
+      }
+
+      case 'ui-pop':
+        uiStack.pop()
+        if (uiStack.length > 0) showUiPush(uiStack[uiStack.length - 1])
+        else if (crtActive) restoreCrt()
+        else if (activeMenu) showMenu(activeMenu)
+        else hideOverlay()
+        break
+
+      case 'ui-state': {
+        const raw = msg as unknown as Record<string, unknown>
+        const text = raw['text'] as string | undefined
+        const body = raw['body'] as string | undefined
+        const highlight = raw['highlight'] as string | undefined
+        const scroll = raw['scroll'] as number | undefined
+        const fromWebtiles = raw['from_webtiles'] === true
+        const actions = raw['actions'] as string | undefined
+        if (text) {
+          const entry: UiPushMsg = { type: 'formatted-scroller', text, ...(highlight ? { highlight } : {}), ...(actions ? { actions } : {}) }
+          if (uiStack.length > 0) {
+            Object.assign(uiStack[uiStack.length - 1], entry)
+            showUiPush(uiStack[uiStack.length - 1])
+          } else {
+            showTxtPage(text)
+          }
+        } else if (body !== undefined && uiStack.length > 0) {
+          // describe-item / describe-monster swap body in/out when the user
+          // toggles `!` (spell-failure details, monster panes, etc.). Server
+          // sends a ui-state with the replacement body and keeps the parent
+          // push's title, actions, and tile intact, so update body in place.
+          uiStack[uiStack.length - 1].body = body
+          showUiPush(uiStack[uiStack.length - 1])
+        }
+        // from_webtiles=true is the server echoing our own
+        // formatted_scroller_scroll back — our scroll position is already
+        // correct (we set it locally before sending).
+        if (scroll !== undefined && !fromWebtiles) scrollOverlayBody(scroll)
+        break
+      }
+
+      case 'ui-scroller-scroll': {
+        // The reference client skips this entirely when the top popup is a
+        // formatted-scroller (ui-layouts.js:1066-1073: "formatted scrollers
+        // send their own synchronization messages"). The server emits these
+        // with a hardcoded from_webtiles=false (ui.cc:1501-1503), so without
+        // the popup-type guard we'd ricochet our own scroll position back
+        // through this channel.
+        if (formattedScrollerActive()) break
+        const raw = msg as unknown as Record<string, unknown>
+        const scroll = raw['scroll'] as number | undefined
+        const fromWebtiles = raw['from_webtiles'] === true
+        if (scroll !== undefined && !fromWebtiles) scrollOverlayBody(scroll)
+        break
+      }
+
+      case 'ui-state-sync': {
+        // Server-driven updates to a focused input widget. from_webtiles=true
+        // means the server is echoing our own edit back, so skip to avoid
+        // clobbering the cursor mid-typing. Handled widgets:
+        //   "input"        — msgwin-get-line single text field
+        //   "seed"         — seed-selection seed entry
+        //   "pregenerate"  — seed-selection checkbox
+        //   "btn-*"        — buttons; presence-only, no state to apply
+        const m = msg as unknown as { widget_id?: string; text?: string; checked?: boolean; from_webtiles?: boolean; has_focus?: boolean }
+        if (m.from_webtiles) break
+        if (m.widget_id === 'input') {
+          const input = uiOverlay.querySelector<HTMLInputElement>('.input-dialog-field')
+          if (!input) break
+          if (m.has_focus) input.focus()
+          else if (typeof m.text === 'string' && input.value !== m.text) input.value = m.text
+        } else if (m.widget_id === 'seed') {
+          const input = uiOverlay.querySelector<HTMLInputElement>('.seed-input-field')
+          if (!input) break
+          if (m.has_focus) input.focus()
+          else if (typeof m.text === 'string' && input.value !== m.text) {
+            input.value = m.text
+            // Keep the revert-anchor aligned with the server so a non-digit
+            // edit doesn't snap the field back to empty.
+            input.dataset.lastValid = m.text
+          }
+        } else if (m.widget_id === 'pregenerate') {
+          const cb = uiOverlay.querySelector<HTMLInputElement>('.seed-pregen-checkbox')
+          if (cb && typeof m.checked === 'boolean') cb.checked = m.checked
+        }
+        break
+      }
+
+      case 'menu': {
+        const m = msg as unknown as MenuMsg
+        const titlePlain = stripDcss(m.title?.text ?? '')
+        // Silent spell harvest: capture the menu's default columns, then
+        // Escape it closed. See harvestSpells().
+        // In `late-base` (slow link; suppression already lifted) the user has
+        // had the channel back, so a tag:'spell' menu could also be one THEY
+        // opened (memorise, amnesia, `=` adjust all share the tag) — only
+        // capture when the title is the probe's own "Your spells (describe)"
+        // (`I` → list_spells(viewing=true) → real_action "describe").
+        if (m.tag === 'spell'
+            && (harvestPhase === 'base'
+                || (harvestPhase === 'late-base'
+                    && /^Your spells \(describe\)/.test(titlePlain)))) {
+          resetHarvest()  // timer + phase; the latch is re-set just below
+          spellCache = (m.items ?? [])
+            .filter(it => !!it.hotkeys?.length && !!it.tiles?.length)
+            .map(parseSpellItem)
+          exposeSpellCache()
+          pendingHarvestClose = true
+          conn.send({ msg: 'key', keycode: 27 })  // Escape closes the menu
+          break  // swallow: never render the menu
+        }
+        // A `menu` arrived mid-harvest that isn't our spell menu (some other
+        // menu raced in after the silent `I`). It can't be ours: our spell
+        // menu is captured + swallowed above. Abort the harvest so this
+        // renders now — otherwise harvestPhase stays non-idle, isHarvesting()
+        // stays true, and every input handler keeps early-returning until the
+        // suppression fallback, leaving a real menu the user can see but can't
+        // touch. (Covers `late-base` too: a foreign menu opening means the
+        // server isn't sitting in our probe's menu, so stop waiting for it.)
+        if (harvestPhase !== 'idle') resetHarvest()
+        // A real menu is opening, so any pending harvest-close expectation is
+        // stale (its close_menu already came or never will). Drop the latch —
+        // otherwise THIS menu's eventual close_menu would be wrongly swallowed.
+        pendingHarvestClose = false
+        // The `=` spell-letter reassign is the one spell-menu flow that
+        // silently rewrites the letter→spell map yet emits no distinctive
+        // message. All spell-list flows share tag:"spell" (list_spells hardcodes
+        // it), so the title is the only discriminator — "Your spells (adjust)"
+        // vs "(describe)" etc. Flag the rail stale; it re-harvests once the
+        // player finishes and we're back at a command prompt (input_mode→1).
+        if (m.tag === 'spell' && /\(adjust\)/i.test(titlePlain)) spellsDirty = true
+        if (m.type === 'crt') showCrt(m.tag)
+        else {
+          if (m.replace) menuStack.pop()
+          menuStack.push(m)
+          showMenu(m)
+        }
+        break
+      }
+
+      case 'update_menu': {
+        const m = msg as unknown as { more?: string; last_hovered?: number; total_items?: number; title?: { text: string } }
+        if (!activeMenu) break
+        if (m.more !== undefined) {
+          activeMenu.more = m.more
+          const footerEl = uiOverlay.querySelector('.overlay-footer')
+          if (footerEl) {
+            const listEl = uiOverlay.querySelector<HTMLElement>('.overlay-list')
+            const pos = listEl ? computeScrollPos(listEl) : 'top'
+            footerEl.innerHTML = formatMoreHtml(m.more, pos)
+            syncAcceptBtn(formatMore(m.more, pos))
+          }
+        }
+        if (m.total_items !== undefined) {
+          activeMenu.total_items = m.total_items
+          // Truncate stale entries when paging to a shorter category — the
+          // following update_menu_items only splices in the new chunk and
+          // would otherwise leave the tail intact. The official client does
+          // the same in update_menu (menu.js:822).
+          if (activeMenu.items && activeMenu.items.length > m.total_items) {
+            activeMenu.items.length = m.total_items
+            updateMenuItems(activeMenu)
+          }
+        }
+        if (m.title) {
+          activeMenu.title = m.title
+          // Don't blow away the active filter input — the title slot is
+          // currently the prompt label. We'll re-render the title when the
+          // filter closes.
+          if (!titlePromptInput) {
+            const titleSpan = uiOverlay.querySelector<HTMLElement>('.overlay-title span')
+            if (titleSpan) titleSpan.textContent = stripDcss(m.title.text)
+          }
+        }
+        if (m.last_hovered !== undefined) applyServerHover(m.last_hovered)
+        break
+      }
+
+      case 'menu_scroll': {
+        const m = msg as unknown as { first?: number; last_hovered?: number }
+        if (m.last_hovered !== undefined) applyServerHover(m.last_hovered)
+        break
+      }
+
+      case 'update_menu_items': {
+        // Per the protocol (cf. official menu.js update_item_range): patch the
+        // chunk in place; never truncate. Earlier code special-cased
+        // chunk_start === 0 by replacing the whole list, which dropped the
+        // unhighlighted entries when the server sent a single-item update to
+        // mark the current selection.
+        const m = msg as unknown as { chunk_start?: number; items?: MenuItem[] }
+        if (activeMenu && m.items) {
+          const start = m.chunk_start ?? 0
+          const items = activeMenu.items ?? []
+          items.splice(start, m.items.length, ...m.items)
+          activeMenu.items = items
+          updateMenuItems(activeMenu)
+        }
+        break
+      }
+
+      case 'input_mode': {
+        const prevInputMode = currentInputMode
+        currentInputMode = msg.mode
+        if (msg.mode === 1) {  // COMMAND: normal play resumed
+          hideMoreBtn()
+          disableActivePrompt()
+          removeTextInput()
+          // Reference only marks on the COMMAND transition, not on every
+          // COMMAND-while-COMMAND repeat (game.js set_input_mode early-returns).
+          if (prevInputMode !== 1) markLastMsg('cmd')
+          maybeAutoHarvest()  // populate the spell rail on first entry to play
+          reharvestIfDirty()  // refresh after a `=` reassign (or a deferred memorise/forget)
+          // After the harvest hooks: if one just claimed the channel, the
+          // flush's guard drops the queued tap instead of injecting `z` into
+          // the probe's menu.
+          flushPendingCast()
+        }
+        // YESNO prompts fire inside any menu that calls yesno() while open:
+        // shop purchase (shopping.cc), acquirement (acquire.cc), Nemelex
+        // StackFive (decks.cc:708). Menus with their own permanent bar
+        // (shop/stash/acquirement) rebuild on every mode change so the bar
+        // can swap to ⎋ Y N. Other menus get a bar only for the duration of
+        // the YESNO prompt — shown on the entering edge, hidden on the
+        // leaving edge.
+        if (activeMenu) {
+          const tag = activeMenu.tag
+          const tagHasBar = tag === 'shop' || tag === 'stash' || tag === 'acquirement'
+          const enteringYesno = msg.mode === MOUSE_MODE_YESNO
+          const leavingYesno = prevInputMode === MOUSE_MODE_YESNO && !enteringYesno
+          if (tagHasBar || enteringYesno || leavingYesno) {
+            buildMenuControls(tag, activeMenu.flags)
+            if (!tagHasBar) menuControls.style.display = enteringYesno ? '' : 'none'
+          }
+        }
+        break
+      }
+
+      case 'title_prompt': {
+        // `raw` is used for keycode capture in the macro editor — we don't
+        // implement that, so treat it like close (do nothing / dismiss any
+        // existing input).
+        if (msg.close || msg.raw) closeTitlePrompt()
+        else showTitlePrompt(msg.prompt ?? '')
+        break
+      }
+
+      case 'init_input': {
+        // Suppress the init/close pair that piggybacks on title_prompt — see
+        // titlePromptInput's declaration.
+        if (titlePromptInput) break
+        if (msg.type === 'messages') {
+          if (inXMode) { exitedXModeForInput = true; exitXMode() }
+          showTextInput(msg.prefill ?? '', msg.maxlen ?? 99, msg.tag)
+        } else if (msg.type === 'generic' && msg.tag === 'skill_target') {
+          // `type:"generic"` fires only for prompts inside a CRT menu, and
+          // the only such prompt in DCSS 0.34 is the skill target editor.
+          // The numpad sends each keystroke directly to the server, whose
+          // line_reader echoes it into the highlighted target cell.
+          showNumpadInput(msg.prompt ?? '')
+        }
+        // Other `type:"generic"` tags are dropped — none are known to fire
+        // in normal play. `type:"seed-selection"` uses ui-state-sync widgets,
+        // not init_input (see showSeedSelection).
+        break
+      }
+
+      case 'msgs': {
+        if (msg.rollback) {
+          // msgLog is column-reverse: most-recent message is firstChild, so
+          // rollback (remove the last N appended) walks the DOM head.
+          let n = msg.rollback
+          while (n-- > 0 && msgLog.firstChild) msgLog.firstChild.remove()
+        }
+        for (const m of msg.messages ?? []) {
+          if (!m.text) continue
+          // A non-caster's silent-harvest `I` prints "You don't know any
+          // spells." (canned MSG_NO_SPELLS) and opens no menu, so the base
+          // phase has no menu to capture. Recognise this line as the harvest's
+          // no-spells terminator and end the harvest right now — otherwise
+          // isHarvesting() keeps suppressing all input until the 1.5s fallback
+          // fires, a lockout every spell-less character hits at game start.
+          // Clearing the cache + resetHarvest lifts the suppression this frame;
+          // `continue` swallows the line so the player never sees our probe.
+          // Checks harvestPhase (not isHarvesting()) so a reply slow enough to
+          // land in `late-base` still terminates the harvest silently.
+          // The strip+trim is gated behind the phase check: this loop runs for
+          // every line of every msgs batch, and only a mid-harvest line can be
+          // the terminator.
+          if (harvestPhase !== 'idle' && /^You don't know any spells\b/.test(stripDcss(m.text).trim())) {
+            spellCache = []
+            resetHarvest()
+            exposeSpellCache()
+            continue
+          }
+          // The letter→spell map just changed under us — flag the rail stale so
+          // reharvestIfDirty() (after this loop) refreshes it; otherwise a tap
+          // would cast the wrong spell. Every spell GAIN funnels through the
+          // engine's add_spell_to_memory(), which emits "Spell assigned to
+          // '<letter>'." — so key off that one line rather than each flavour
+          // message it trails: "You finish memorising." on a book memorise,
+          // "The power to cast X wells up from within." on a Djinni / level-up
+          // gift, a revenant/Vehumet gift, etc. A LOSS instead prints "Your
+          // memory of X unravels." (`=` reassign rewrites letters silently —
+          // caught at its menu by the title check, not here).
+          // Match as SUBSTRINGS, never whole-line: DCSS joins same-turn,
+          // same-channel mprs onto one msgs line (e.g. "You finish memorising.
+          // Spell assigned to 'b'."), so an anchored `$` would miss it.
+          // Tested against the raw wire text (no stripDcss): colour tags wrap
+          // whole messages, they never split a phrase, and skipping the strip
+          // keeps this per-line check allocation-free.
+          if (/Spell assigned to\b/.test(m.text) || /Your memory of .+ unravels\b/.test(m.text)) spellsDirty = true
+          if (m.channel === 2 && PROMPT_TRIGGER_RE.test(m.text)) {
+            disableActivePrompt()
+            const row = makePromptRow(m.text)
+            activePromptEl = row
+            pushMsgRow(row)
+          } else {
+            appendMessage(m.text, true)
+          }
+        }
+        if (msg.more) showMoreBtn(msg.more_text)
+        else if (msg.more === false) hideMoreBtn()
+        // A memorise/forget this frame leaves us at a command prompt (the delay
+        // finished; no input_mode transition fires), so re-harvest now rather
+        // than waiting for the next menu round-trip.
+        reharvestIfDirty()
+        break
+      }
+
+      case 'cursor': {
+        const cursorId = (msg as unknown as { id: number }).id
+        cursorLoc = msg.loc ?? null
+        mapView.setCursor(msg.loc)
+        if (cursorId === 2) {
+          if (msg.loc && !inXMode) enterXMode()
+          else if (!msg.loc && inXMode) exitXMode()
+        } else if (!msg.loc && inXMode) {
+          exitXMode()
+        }
+        if (!msg.loc) exitedXModeForInput = false
+        break
+      }
+
+      case 'close_input':
+        if (titlePromptInput) break
+        removeTextInput()
+        removeNumpadInput()
+        if (exitedXModeForInput) { exitedXModeForInput = false; enterXMode() }
+        break
+
+      case 'close_menu': {
+        // Swallow the close for a spell menu we harvested but never pushed,
+        // so it can't pop/clear a real overlay underneath.
+        if (pendingHarvestClose) { pendingHarvestClose = false; break }
+        menuStack.pop()
+        const prev = menuStack[menuStack.length - 1] ?? null
+        activeMenu = prev
+        menuShift.reset()
+        titlePromptInput = null
+        if (prev) showMenu(prev)
+        else if (uiStack.length > 0) showUiPush(uiStack[uiStack.length - 1])
+        else if (crtActive) restoreCrt()
+        else hideOverlay()
+        break
+      }
+
+      case 'close_all_menus':
+        uiStack.length = 0
+        crtActive = false
+        dialogActive = false
+        crtTag = undefined
+        menuStack.length = 0
+        activeMenu = null
+        menuShift.reset()
+        monsterPanelOpen = false
+        titlePromptInput = null
+        resetHarvest()
+        hideOverlay()
+        break
+
+      case 'go_lobby':
+      case 'close':
+        resetHarvest()
+        autoHarvestedThisGame = false  // re-harvest for the next game
+        spellsDirty = false  // no pending re-harvest carries into the next game
+        onLobby()
+        break
+
+      case 'game_ended':
+        // Forward exit details so the lobby renders the exit dialog after the
+        // layer switch. The trailing go_lobby + lobby list (often batched with
+        // this) land on the lobby's message handler, not ours.
+        onLobby({
+          reason: msg.reason,
+          message: msg.message,
+          dump: msg.dump,
+          spectated: !!spectating,
+          spectatedName: spectating?.username,
+        })
+        break
+    }
+  }
+
+  // --- X mode (eXamine level map) ---
+
+  function enterXMode(): void {
+    inXMode = true
+    view.classList.add('x-mode')  // drops the map's log-strip padding (style.css)
+    msgLog.style.display = 'none'
+    hud.style.display = 'none'
+    renderSpellRail()  // drop the rail row (and the log's map overlay) for the examine map
+    touchControls.enterXMode()
+    mapView.setFontScale(X_MODE_SCALE)
+    // Zoom mode is left untouched: tiles already had zoom-on (forced at
+    // construction by setRenderMode), and the scale shrinks each cell by
+    // X_MODE_SCALE so the freed HUD/log area fills with more cells.
+    requestAnimationFrame(() => mapView.fitToContainer())
+    // Stash-search activation opens an X-mode preview with the destination
+    // cursor: swap the results menu out for the full map + d-pad so the
+    // player can see where they'd travel and confirm with Enter. Restored
+    // by exitXMode when they Esc back to the menu; close_menu / hideOverlay
+    // takes care of cleanup if they Enter to travel and the menu closes.
+    if (activeMenu?.tag === 'stash') {
+      uiOverlay.style.display = 'none'
+      menuControls.style.display = 'none'
+      mapView.element.style.display = ''
+      touchControls.element.style.display = ''
+    }
+  }
+
+  function exitXMode(): void {
+    inXMode = false
+    view.classList.remove('x-mode')
+    touchControls.exitXMode()
+    mapView.setFontScale(1.0)
+    requestAnimationFrame(() => mapView.fitToContainer())
+    renderSpellRail()  // restore the quick-cast rail hidden by enterXMode
+    if (activeMenu?.tag === 'stash') {
+      // Returning to the stash results menu: keep HUD/msglog hidden (they were
+      // hidden before the preview by renderOverlay, and the overlay layout
+      // expects them gone), swap map back for overlay + custom controls,
+      // re-hide the d-pad.
+      uiOverlay.style.display = ''
+      menuControls.style.display = ''
+      mapView.element.style.display = 'none'
+      touchControls.element.style.display = 'none'
+    } else {
+      showHud()
+      msgLog.style.display = ''
+    }
+  }
+
+  // --- ui-push handler ---
+
+  // Decode status icons from msg.flag (low word of t.fg) and merge with
+  // any pre-decoded numeric ids in msg.icons. Bitmask tables live in
+  // monster-style.ts so the panel and this popup stay in lockstep.
+  function appendMonsterStatusOverlays(wrap: HTMLElement, msg: UiPushMsg, scale: number): void {
+    // The popup has no HP bar, so damage shows as the MDAM overlay (includeMdam),
+    // matching the reference's draw_foreground(prepare_fg_flags(desc.flag), desc.icons).
+    appendIconOverlays(loader, wrap, msg.flag ?? 0, msg.icons ?? [], scale, { includeMdam: true })
+  }
+
+  // Map each ui-push variant's tile-bearing fields onto a uniform tile list
+  // for the title icon. Returns undefined when the popup carries no tile.
+  function deriveTileSpec(msg: UiPushMsg): TileRef[] | undefined {
+    if (msg.tiles) return msg.tiles
+    if (msg.tile) return Array.isArray(msg.tile) ? msg.tile : [msg.tile]
+    if (msg.feats?.[0]?.tile) return [msg.feats[0].tile]
+    // describe-monster: doll = body parts (humanoid form), mcache = body + worn
+    // equipment with per-piece pixel offsets. Shared with the monster panel
+    // via monsterTileSpec so both render the same humanoid composition.
+    const monSpec = monsterTileSpec({ fg_idx: msg.fg_idx, doll: msg.doll, mcache: msg.mcache })
+    if (monSpec.length > 0) return monSpec
+    return undefined
+  }
+
+  function showUiPush(msg: UiPushMsg): void {
+    if (msg.type === 'newgame-choice') { showNewgameChoice(msg); return }
+    if (msg.type === 'newgame-random-combo') { showRandomCombo(msg); return }
+    if (msg.type === 'msgwin-get-line') { showInputDialog(msg); return }
+    if (msg.type === 'seed-selection') { showSeedSelection(msg); return }
+
+    let titleSrc = msg.title ?? msg.prompt ?? ''
+    let rawBody = msg.text ?? msg.body ?? msg.desc ?? ''
+    if (msg.type === 'version') {
+      rawBody = [msg.information, msg.features, msg.changes].filter(Boolean).join('\n\n')
+    }
+    // Unwrap hanging-indent label rows in the server-built body only, BEFORE
+    // the client-assembled sections below: those append plain-text quotes
+    // (msg.quote, feats[].quote) and god power lists, which must not be
+    // reflowed (dialogue-format quote lines look like label rows). game-over
+    // is one fixed-width terminal block — leave it alone.
+    if (msg.type !== 'game-over') rawBody = unwrapHangingIndents(rawBody)
+    if (msg.type === 'describe-god') {
+      // describe-god has no `title`/`text` — name is the heading, and the
+      // body is split across pane fields (description / favour+powers_list /
+      // powers / wrath / extra). Flatten them into one scrollable body.
+      titleSrc = msg.name ? `<lightblue>${msg.name}</lightblue>` : ''
+      const sections: string[] = []
+      if (msg.description) sections.push(msg.description)
+      if (msg.favour) sections.push(`<lightblue>Favour:</lightblue> ${msg.favour}`)
+      if (msg.powers_list) {
+        const lines = msg.powers_list.split('\n').slice(3, -1).filter(s => s.trim())
+        if (lines.length) sections.push(`<lightblue>Powers:</lightblue>\n${lines.join('\n')}`)
+      }
+      if (msg.powers) sections.push(msg.powers)
+      if (msg.wrath) sections.push(`<lightblue>Wrath:</lightblue>\n${msg.wrath}`)
+      if (msg.extra) sections.push(msg.extra)
+      // Altar-only join prompt (ui-layouts.js:350-353). service_fee is non-empty
+      // only for Gozag — already pre-formatted with leading space and parens.
+      if (msg.is_altar) sections.push(`<cyan>J</cyan>/<cyan>Enter</cyan>: join religion${msg.service_fee ?? ''}`)
+      rawBody = sections.join('\n\n')
+    }
+    if (msg.type === 'describe-monster') {
+      // Reference client splits these into separate panes the user cycles
+      // with `!` (ui-layouts.js:443). On mobile we append them so the
+      // content is visible without an extra interaction. msg.quote arrives
+      // as plain text (unlike the body-embedded darkgrey quotes from
+      // describe.cc:4001) — render it as-is, preserving the source's
+      // original line structure (dialogue, stage directions, attribution).
+      const extra: string[] = []
+      if (msg.status) extra.push(`<lightblue>Status:</lightblue>\n${msg.status}`)
+      if (msg.quote) extra.push(`<lightblue>Quote:</lightblue>\n${msg.quote}`)
+      if (extra.length) rawBody = (rawBody ? rawBody + '\n\n' : '') + extra.join('\n\n')
+    }
+    if (msg.type === 'describe-feature-wide' && msg.feats?.length) {
+      const feats = msg.feats
+      titleSrc = feats[0].title ?? ''
+      rawBody = feats.map((f, i) => {
+        const parts: string[] = []
+        if (i > 0 && f.title) parts.push(f.title)
+        if (f.body && f.body !== f.title) parts.push(f.body)
+        if (f.quote) parts.push(f.quote)
+        return parts.join('\n\n')
+      }).filter(Boolean).join('\n\n')
+    }
+    const title = stripDcss(titleSrc)
+    const spellset = msg.spellset
+    // Strip the placeholder when there's no spellset to render in its place;
+    // otherwise keep it so we can split the body around it below.
+    if (!spellset?.length) rawBody = rawBody.replace(/SPELLSET_PLACEHOLDER/g, '')
+    rawBody = propagateDarkgreyColor(rawBody)
+    rawBody = rawBody
+      .replace(/\n{3,}/g, '\n\n')
+      .replace(/^((?:<[^>]+>)*)\s+/, '$1')
+      .replace(/\s+((?:<[^>]+>)*)$/, '$1')
+      .trim()
+
+    renderOverlay(title, () => {
+      const tileSpec = deriveTileSpec(msg)
+      if (tileSpec && tileSpec.length > 0) {
+        const headerEl = uiOverlay.querySelector('.overlay-title')
+        if (headerEl) {
+          const tileEl = renderTiles(loader, tileSpec, 2, { expand: true })
+          tileEl.classList.add('overlay-title-tile')
+          headerEl.insertBefore(tileEl, headerEl.firstChild)
+          if (msg.type === 'describe-monster') {
+            const halo = fgHaloDngnName(msg.flag ?? 0)
+            if (halo) prependDngnLayer(loader, tileEl, halo, 2)
+            appendMonsterStatusOverlays(tileEl, msg, 2)
+          }
+        }
+      }
+      if (rawBody) {
+        const bodyEl = document.createElement('div')
+        bodyEl.className = 'overlay-body fg7'
+        // The end-of-game screen (the "Goodbye, …" character summary + the
+        // server's high-score table) is a single fixed-width terminal block,
+        // not a prose panel: every line shares one 80-column coordinate
+        // system. renderBodyLines' per-line isTabularLine heuristic shreds it
+        // — score rows with short names get multi-space padding (nowrap) while
+        // long-name rows wrap — so render it as one nowrap block and scale the
+        // font so the widest line fits the viewport (mirrors the morgue / the
+        // official client). describe-monster/item/god panels stay per-line.
+        const terminal = msg.type === 'game-over'
+        if (spellset?.length && rawBody.includes('SPELLSET_PLACEHOLDER')) {
+          // Reference client splits the body on SPELLSET_PLACEHOLDER and
+          // renders the spellset between the halves (ui-layouts.js:24-31).
+          // monsters get colour=false so the spell name keeps the default
+          // text colour; items pass colour=true to highlight schools.
+          const colourSpells = msg.type !== 'describe-monster'
+          const onSpell = (letter: string) => conn.send({ msg: 'input', text: letter })
+          const parts = rawBody.split('SPELLSET_PLACEHOLDER')
+          parts.forEach((part, i) => {
+            if (i > 0) {
+              for (const book of spellset) {
+                bodyEl.appendChild(renderSpellbook(loader, book, colourSpells, onSpell))
+              }
+            }
+            if (part) bodyEl.insertAdjacentHTML('beforeend', renderBodyLines(part, msg.highlight ?? '', terminal))
+          })
+        } else {
+          bodyEl.innerHTML = renderBodyLines(rawBody, msg.highlight ?? '', terminal)
+        }
+        uiOverlay.appendChild(bodyEl)
+        // rAF re-fits once fonts settle (the sync call lands before paint).
+        if (terminal) {
+          fitToWidth(bodyEl)
+          requestAnimationFrame(() => fitToWidth(bodyEl))
+        }
+        // formatted-scroller is a client-owned scroll widget (see the block
+        // comment at scrollOverlayBody). Hook the scroll listener so touch
+        // swipes and our own page-key handler sync back to the server; honor
+        // FS_START_AT_END synchronously (reading scrollHeight forces a
+        // layout flush, so the position lands before the first paint).
+        if (msg.type === 'formatted-scroller') {
+          if (msg.start_at_end) {
+            suppressScrollerSync()
+            bodyEl.scrollTop = bodyEl.scrollHeight
+          }
+          attachScrollerListener(bodyEl)
+        }
+      }
+      if (msg.actions) {
+        uiOverlay.appendChild(buildActionsBar(msg.actions))
+      }
+    })
+    // A ui-push layered over a shop/stash/acquirement menu (e.g. describe-item
+    // after `!`) should keep the menu's bottom row.
+    if (activeMenu?.tag === 'shop' || activeMenu?.tag === 'stash' || activeMenu?.tag === 'acquirement') {
+      buildMenuControls(activeMenu.tag, activeMenu.flags)
+      menuControls.style.display = ''
+      touchControls.element.style.display = 'none'
+    }
+  }
+
+  function showTxtPage(text: string): void {
+    const synthetic: UiPushMsg = { type: 'txt-page', text }
+    uiStack.push(synthetic)
+    showUiPush(synthetic)
+  }
+
+  // Menu filter (Ctrl-F → "Search for what? (regex)"). Reference webtiles
+  // client (menu.js:668-740) inlines an input field into the menu title and
+  // — unlike msgwin-get-line — does NOT echo characters to the server while
+  // typing; the whole string is sent as a single text_input on Enter.
+  // Matching that here means we don't have to ferry per-key updates back to
+  // the server's resumable_line_reader (whose init_input/close_input pair we
+  // also suppress in the dispatcher above).
+  function showTitlePrompt(prompt: string): void {
+    const titleEl = uiOverlay.querySelector<HTMLElement>('.overlay-title')
+    if (!titleEl) return
+    titleEl.innerHTML = ''
+    const promptEl = document.createElement('span')
+    promptEl.className = 'menu-filter-prompt'
+    promptEl.innerHTML = dcssToHtml(prompt)
+    titleEl.appendChild(promptEl)
+    const input = document.createElement('input')
+    input.type = 'text'
+    input.className = 'input-dialog-field menu-filter-input'
+    input.autocomplete = 'off'
+    input.autocapitalize = 'off'
+    input.spellcheck = false
+    input.inputMode = 'none'
+    input.addEventListener('keydown', (e) => {
+      e.stopPropagation()
+      if (e.key === 'Enter') {
+        e.preventDefault()
+        conn.send({ msg: 'text_input', text: input.value + '\r' })
+        closeTitlePrompt()
+      } else if (e.key === 'Escape') {
+        e.preventDefault()
+        conn.send({ msg: 'key', keycode: 27 })
+        closeTitlePrompt()
+      }
+    })
+    titleEl.appendChild(input)
+    titlePromptInput = input
+    autoOpenKbd()
+    requestAnimationFrame(() => input.focus())
+  }
+
+  function closeTitlePrompt(): void {
+    if (!titlePromptInput) return
+    titlePromptInput = null
+    const titleEl = uiOverlay.querySelector<HTMLElement>('.overlay-title')
+    if (titleEl && activeMenu) {
+      titleEl.innerHTML = ''
+      const span = document.createElement('span')
+      span.textContent = stripDcss(activeMenu.title?.text ?? '')
+      titleEl.appendChild(span)
+    }
+  }
+
+  // ?-/ search prompts ("Describe what?", "Find what?", level travel, ...)
+  // arrive as ui-push msgwin-get-line. The server drives the field via
+  // ui-state-sync (widget_id "input") and we echo each edit back, so
+  // generation_id must match.
+  function showInputDialog(msg: UiPushMsg): void {
+    const genId = msg.generation_id
+    uiOverlay.innerHTML = ''
+    uiOverlay.style.display = ''
+    mapView.element.style.display = 'none'
+    msgLog.style.display = 'none'
+    hud.style.display = 'none'
+    // Leave touchControls visible — the kbd-overlay is a fixed-position
+    // child of it, and `display:none` on the parent would hide the keyboard
+    // too. The keyboard covers the d-pad anyway when open.
+    touchControls.element.style.display = ''
+    menuControls.style.display = 'none'
+    menuControls.innerHTML = ''
+
+    const wrap = document.createElement('div')
+    wrap.className = 'input-dialog'
+
+    if (msg.prompt) {
+      const promptEl = document.createElement('div')
+      promptEl.className = 'input-dialog-prompt'
+      promptEl.innerHTML = dcssToHtml(msg.prompt)
+      wrap.appendChild(promptEl)
+    }
+
+    const input = document.createElement('input')
+    input.type = 'text'
+    input.className = 'input-dialog-field'
+    input.autocomplete = 'off'
+    input.autocapitalize = 'off'
+    input.spellcheck = false
+    input.inputMode = 'none'
+
+    input.addEventListener('input', () => {
+      if (genId === undefined) return
+      conn.send({
+        msg: 'ui_state_sync',
+        widget_id: 'input',
+        text: input.value,
+        cursor: input.selectionStart ?? input.value.length,
+        generation_id: genId,
+      })
+    })
+
+    input.addEventListener('keydown', (e) => {
+      e.stopPropagation()
+      if (e.key === 'Enter') {
+        e.preventDefault()
+        conn.send({ msg: 'key', keycode: 13 })
+      } else if (e.key === 'Escape') {
+        e.preventDefault()
+        conn.send({ msg: 'key', keycode: 27 })
+      }
+    })
+
+    wrap.appendChild(input)
+    uiOverlay.appendChild(wrap)
+    autoOpenKbd()
+    requestAnimationFrame(() => input.focus())
+  }
+
+  // Custom-seed entry on newgame. The server pushes title/body/footer text
+  // and a show_pregen_toggle flag, then drives the seed input and pregen
+  // checkbox via ui-state-sync (widget_id "seed" / "pregenerate"). Buttons
+  // use hotkeys: Enter=Begin, '-'=Clear, 'd'=Daily — the server's button
+  // handlers update the seed input server-side and echo back via sync.
+  function showSeedSelection(msg: UiPushMsg): void {
+    const genId = msg.generation_id
+    uiOverlay.innerHTML = ''
+    uiOverlay.style.display = ''
+    mapView.element.style.display = 'none'
+    msgLog.style.display = 'none'
+    hud.style.display = 'none'
+    // Keep touchControls visible so the kbd-overlay child stays mounted (see
+    // showInputDialog for the same reason).
+    touchControls.element.style.display = ''
+    menuControls.style.display = 'none'
+    menuControls.innerHTML = ''
+
+    const wrap = document.createElement('div')
+    wrap.className = 'seed-selection'
+
+    if (msg.title) {
+      const header = document.createElement('div')
+      header.className = 'seed-header'
+      header.innerHTML = dcssToHtml(msg.title)
+      wrap.appendChild(header)
+    }
+
+    if (msg.body) {
+      const bodyText = document.createElement('div')
+      bodyText.className = 'seed-body-text fg7'
+      bodyText.innerHTML = dcssToHtml(msg.body)
+      wrap.appendChild(bodyText)
+    }
+
+    const row = document.createElement('div')
+    row.className = 'seed-input-row'
+    const label = document.createElement('span')
+    label.className = 'seed-input-label'
+    label.textContent = 'Seed:'
+    row.appendChild(label)
+
+    const input = document.createElement('input')
+    input.type = 'text'
+    input.className = 'seed-input-field'
+    input.autocomplete = 'off'
+    input.autocapitalize = 'off'
+    input.spellcheck = false
+    input.inputMode = 'numeric'
+    input.pattern = '\\d*'
+    // Revert non-digit input to the last valid value, matching the reference
+    // client's _keyfun_seed_input behaviour. Stored on dataset so the
+    // ui-state-sync handler can keep it in sync when the server pre-fills.
+    input.dataset.lastValid = ''
+    input.addEventListener('input', () => {
+      if (!/^\d*$/.test(input.value)) {
+        input.value = input.dataset.lastValid ?? ''
+        return
+      }
+      input.dataset.lastValid = input.value
+      if (genId === undefined) return
+      conn.send({
+        msg: 'ui_state_sync',
+        widget_id: 'seed',
+        text: input.value,
+        cursor: input.selectionStart ?? input.value.length,
+        generation_id: genId,
+      })
+    })
+    input.addEventListener('keydown', (e) => {
+      e.stopPropagation()
+      if (e.key === 'Enter') {
+        e.preventDefault()
+        conn.send({ msg: 'key', keycode: 13 })
+      } else if (e.key === 'Escape') {
+        e.preventDefault()
+        conn.send({ msg: 'key', keycode: 27 })
+      }
+    })
+    row.appendChild(input)
+
+    function makeHotkeyBtn(textHtml: string, keycode: number): HTMLButtonElement {
+      const btn = document.createElement('button')
+      btn.className = 'seed-btn'
+      btn.innerHTML = dcssToHtml(textHtml)
+      btn.addEventListener('click', () => {
+        conn.send({ msg: 'key', keycode })
+        requestAnimationFrame(() => input.focus())
+      })
+      return btn
+    }
+    row.appendChild(makeHotkeyBtn('<brown>[-] Clear</brown>', 45))
+    row.appendChild(makeHotkeyBtn('<brown>[d] Daily</brown>', 100))
+    wrap.appendChild(row)
+
+    if (msg.footer) {
+      const footer = document.createElement('div')
+      footer.className = 'seed-footer fg7'
+      footer.innerHTML = dcssToHtml(msg.footer)
+      wrap.appendChild(footer)
+    }
+
+    if (msg.show_pregen_toggle) {
+      const pregenLabel = document.createElement('label')
+      pregenLabel.className = 'seed-pregen'
+      const pregen = document.createElement('input')
+      pregen.type = 'checkbox'
+      pregen.className = 'seed-pregen-checkbox'
+      pregen.addEventListener('change', () => {
+        if (genId === undefined) return
+        conn.send({
+          msg: 'ui_state_sync',
+          widget_id: 'pregenerate',
+          checked: pregen.checked,
+          generation_id: genId,
+        })
+      })
+      const txt = document.createElement('span')
+      txt.textContent = 'Fully pregenerate the dungeon'
+      pregenLabel.append(pregen, txt)
+      wrap.appendChild(pregenLabel)
+    }
+
+    const bar = document.createElement('div')
+    bar.className = 'seed-button-bar'
+    const beginBtn = document.createElement('button')
+    beginBtn.className = 'seed-btn seed-btn-primary'
+    beginBtn.textContent = '[Enter] Begin!'
+    beginBtn.addEventListener('click', () => {
+      conn.send({ msg: 'key', keycode: 13 })
+    })
+    bar.appendChild(beginBtn)
+    wrap.appendChild(bar)
+
+    uiOverlay.appendChild(wrap)
+    autoOpenKbd()
+    requestAnimationFrame(() => input.focus())
+  }
+
+  function showRandomCombo(msg: UiPushMsg): void {
+    const title = stripDcss(msg.prompt ?? msg.title ?? '')
+    renderOverlay(title, () => {
+      const bodyEl = document.createElement('div')
+      bodyEl.className = 'overlay-body fg7'
+      bodyEl.textContent = 'Do you want to play this combination?'
+      uiOverlay.appendChild(bodyEl)
+
+      const bar = document.createElement('div')
+      bar.className = 'overlay-footer overlay-actions'
+      const choices: Array<{ key: string; label: string }> = [
+        { key: 'Y', label: 'Yes (Y)' },
+        { key: 'n', label: 'Reroll (n)' },
+        { key: 'q', label: 'Quit (q)' },
+      ]
+      for (const c of choices) {
+        const btn = document.createElement('button')
+        btn.className = 'action-btn'
+        btn.textContent = c.label
+        btn.addEventListener('click', () => {
+          conn.send({ msg: 'input', text: c.key })
+          view.focus({ preventScroll: true })
+        })
+        bar.appendChild(btn)
+      }
+      uiOverlay.appendChild(bar)
+    })
+  }
+
+  function showNewgameChoice(msg: UiPushMsg): void {
+    uiOverlay.innerHTML = ''
+    uiOverlay.style.display = ''
+    mapView.element.style.display = 'none'
+    msgLog.style.display = 'none'
+    hud.style.display = 'none'
+    touchControls.element.style.display = 'none'
+    if (spectating) {
+      menuControls.style.display = 'none'
+    } else {
+      buildMenuControls()
+      menuControls.style.display = ''
+    }
+
+    const wrap = document.createElement('div')
+    wrap.className = 'ngc-wrap'
+    uiOverlay.appendChild(wrap)
+
+    const titleHtml = msg.title ?? msg.prompt ?? ''
+    if (titleHtml) {
+      const titleEl = document.createElement('div')
+      titleEl.className = 'overlay-title'
+      titleEl.innerHTML = dcssToHtml(titleHtml)
+      wrap.appendChild(titleEl)
+    }
+
+    // Description panel updated on first tap; second tap on same item confirms
+    const descEl = document.createElement('div')
+    descEl.className = 'ngc-desc'
+    descEl.innerHTML = '<em>Tap to preview, tap again to confirm.</em>'
+    let pendingKey: string | null = null
+    let pendingBtn: HTMLButtonElement | null = null
+
+    function sendHotkey(hotkey: string | number | undefined): void {
+      if (typeof hotkey === 'number') {
+        // Non-printable (Bksp=8, Tab=9, Esc=27) must go via {key, keycode};
+        // {input, text} is for printable chars only.
+        if (hotkey < 32 || hotkey === 127) conn.send({ msg: 'key', keycode: hotkey })
+        else conn.send({ msg: 'input', text: String.fromCharCode(hotkey) })
+      } else if (hotkey) {
+        conn.send({ msg: 'input', text: String(hotkey) })
+      }
+    }
+
+    function makeBtnHandler(btn: NewgameButton, btnEl: HTMLButtonElement): () => void {
+      const keyChar = typeof btn.hotkey === 'number' ? String.fromCharCode(btn.hotkey) : String(btn.hotkey ?? '')
+      return () => {
+        if (pendingKey === keyChar && pendingBtn === btnEl) {
+          sendHotkey(btn.hotkey)
+          view.focus({ preventScroll: true })
+        } else {
+          pendingBtn?.classList.remove('ngc-selected')
+          pendingKey = keyChar
+          pendingBtn = btnEl
+          btnEl.classList.add('ngc-selected')
+          const plain = stripDcss(String(btn.labels?.[0] ?? btn.label ?? '')).trim()
+          const dashIdx = plain.indexOf(' - ')
+          const name = dashIdx >= 0 ? plain.slice(dashIdx + 3) : plain
+          const desc = btn.description ?? ''
+          descEl.innerHTML =
+            `<strong>${escHtml(name)}</strong>${desc ? `<br><span class="ngc-desc-text">${escHtml(desc)}</span>` : ''}<br><em class="ngc-confirm-hint">Tap again to confirm.</em>`
+        }
+        view.focus({ preventScroll: true })
+      }
+    }
+
+    function buildGrid(items: NewgameItems, extraClass?: string): HTMLElement {
+      const cols = items.width ?? 1
+      const buttons = items.buttons ?? []
+      const colLabels = items.labels ?? []
+
+      const gridEl = document.createElement('div')
+      gridEl.className = extraClass ? `ngc-grid ${extraClass}` : 'ngc-grid'
+      gridEl.style.setProperty('--ngc-cols', String(cols))
+
+      // Column header row (y:0 labels)
+      if (colLabels.length > 0) {
+        for (let c = 0; c < cols; c++) {
+          const lbl = colLabels.find(l => l.x === c && l.y === 0)
+          const hdr = document.createElement('div')
+          hdr.className = 'ngc-col-header'
+          if (lbl) hdr.innerHTML = dcssToHtml(lbl.label)
+          gridEl.appendChild(hdr)
+        }
+      }
+
+      // Sort buttons by row then column; fill gaps with empty divs
+      const sorted = [...buttons].sort((a, b) => ((a.y ?? 0) - (b.y ?? 0)) || ((a.x ?? 0) - (b.x ?? 0)))
+      let curRow = -1
+      let curCol = 0
+
+      for (const btn of sorted) {
+        const bx = btn.x ?? 0
+        const by = btn.y ?? 0
+        if (by !== curRow) {
+          // Pad rest of previous row
+          while (curRow >= 0 && curCol < cols) { gridEl.appendChild(document.createElement('div')); curCol++ }
+          curRow = by; curCol = 0
+        }
+        // Pad columns before this button
+        while (curCol < bx) { gridEl.appendChild(document.createElement('div')); curCol++ }
+
+        const labels = btn.labels ?? (btn.label !== undefined ? [btn.label] : [])
+        const main = String(labels[0] ?? '').trim()
+        const suffix = labels.length >= 2 ? String(labels[1]).trim() : ''
+        const btnEl = document.createElement('button')
+        btnEl.className = 'ngc-btn'
+        if (suffix) {
+          // Weapon menu: main label + apt suffix as right-aligned column
+          const mainSpan = document.createElement('span')
+          mainSpan.className = 'ngc-btn-main'
+          mainSpan.innerHTML = dcssToHtml(main)
+          const suffixSpan = document.createElement('span')
+          suffixSpan.className = 'ngc-btn-suffix'
+          suffixSpan.innerHTML = dcssToHtml(suffix)
+          btnEl.append(mainSpan, suffixSpan)
+        } else {
+          btnEl.innerHTML = dcssToHtml(main)
+        }
+        btnEl.addEventListener('click', makeBtnHandler(btn, btnEl))
+        gridEl.appendChild(btnEl)
+        curCol++
+      }
+      return gridEl
+    }
+
+    const mainItems = msg['main-items']
+    if (mainItems?.buttons?.length) {
+      wrap.appendChild(buildGrid(mainItems))
+    }
+
+    wrap.appendChild(descEl)
+
+    const subItems = msg['sub-items']
+    if (subItems?.buttons?.length) {
+      wrap.appendChild(buildGrid(subItems, 'ngc-sub-grid'))
+    }
+
+    view.focus({ preventScroll: true })
+  }
+
+  // --- CRT handler ---
+
+  function showCrt(tag?: string): void {
+    crtActive = true
+    crtTag = tag
+    crtLines.clear()
+    menuShift.reset()
+    mountCrtEl()
+    if (tag === 'skills') {
+      buildMenuControls(tag)
+      menuControls.style.display = ''
+    }
+  }
+
+  function restoreCrt(): void {
+    mountCrtEl()
+    if (crtTag === 'skills') {
+      buildMenuControls(crtTag)
+      menuControls.style.display = ''
+    }
+    renderCrtEl()
+  }
+
+  function mountCrtEl(): void {
+    autoCloseKbdIfOurs()
+    uiOverlay.innerHTML = ''
+    uiOverlay.style.display = ''
+    mapView.element.style.display = 'none'
+    msgLog.style.display = 'none'
+    hud.style.display = 'none'
+    touchControls.element.style.display = 'none'
+    menuControls.style.display = 'none'
+    const el = document.createElement('div')
+    el.id = 'crt-display'
+    // Skills CRT is reflowed to one column, so it no longer needs to pan; let
+    // it wrap instead (the help text below the grid is full-width).
+    if (crtTag === 'skills') el.classList.add('crt-skills')
+    uiOverlay.appendChild(el)
+    view.focus({ preventScroll: true })
+  }
+
+  function renderCrtEl(): void {
+    const el = uiOverlay.querySelector('#crt-display')
+    if (!el) return
+    el.innerHTML = ''
+    const maxKey = crtLines.size > 0 ? Math.max(...crtLines.keys()) : 0
+    let rows: string[] = []
+    for (let i = 0; i <= maxKey; i++) rows.push(crtLines.get(i) ?? '')
+    // The skills menu (`m`) ships a fixed two-column terminal grid; reflow it
+    // into a single column so it fits a phone without horizontal panning.
+    if (crtTag === 'skills') rows = reflowSkillCrt(rows)
+    for (const html of rows) {
+      const line = document.createElement('div')
+      line.className = 'crt-line'
+      line.innerHTML = html
+      el.appendChild(line)
+    }
+    if (crtTag === 'skills') updateSkillLetterButtons()
+  }
+
+  function updateSkillLetterButtons(): void {
+    const lines: string[] = []
+    uiOverlay.querySelectorAll<HTMLElement>('.crt-line').forEach(line => {
+      lines.push(line.textContent ?? '')
+    })
+    const letters = extractSkillHotkeys(lines)
+    let row = menuControls.querySelector<HTMLElement>('.skill-letter-row')
+    if (!row) {
+      row = document.createElement('div')
+      row.className = 'skill-letter-row'
+      menuControls.insertBefore(row, menuControls.firstChild)
+    }
+    row.innerHTML = ''
+    const shiftOn = menuShift.isOn
+    for (const letter of letters) {
+      const btn = document.createElement('button')
+      btn.className = 'menu-ctrl-btn skill-letter-btn'
+      btn.textContent = shiftOn && /[a-z]/.test(letter) ? letter.toUpperCase() : letter
+      const fire = () => {
+        const shiftedNow = menuShift.isOn
+        const out = shiftedNow && /[a-z]/.test(letter) ? letter.toUpperCase() : letter
+        conn.send({ msg: 'input', text: out })
+        menuShift.consume()
+      }
+      btn.addEventListener('click', () => {
+        fire()
+        view.focus({ preventScroll: true })
+      })
+      btn.addEventListener('touchstart', (e) => {
+        e.preventDefault()
+        fire()
+      }, { passive: false })
+      row.appendChild(btn)
+    }
+  }
+
+  function updateCrtLines(lines: Record<string, string>): void {
+    for (const [k, v] of Object.entries(lines)) {
+      crtLines.set(Number(k), v)
+    }
+    renderCrtEl()
+  }
+
+  // --- menu handler ---
+
+  function glyphHtml(label: string): string {
+    if (label === '⎋' || label === '⏎') return `<span class="menu-ctrl-glyph">${label}</span>`
+    if (label.startsWith('⏎ ')) return `<span class="menu-ctrl-glyph">⏎</span> ${escHtml(label.slice(2))}`
+    if (label.startsWith('⎋ ')) return `<span class="menu-ctrl-glyph">⎋</span> ${escHtml(label.slice(2))}`
+    return escHtml(label)
+  }
+
+  function syncAcceptBtn(footerText: string): void {
+    const btn = menuControls.querySelector<HTMLButtonElement>('[data-dynamic="accept"]')
+    if (!btn) return
+    const acceptMatch = footerText.match(/accept\s*(\(\d+ chosen\))/i)
+    const buyMatch = /\[Enter\]\s+buy\s+marked\s+items/i.test(footerText)
+    if (acceptMatch) btn.innerHTML = glyphHtml(`⏎ Accept ${acceptMatch[1]}`)
+    else if (buyMatch) btn.innerHTML = glyphHtml('⏎ Buy marked items')
+    else btn.innerHTML = glyphHtml('⏎')
+  }
+
+  function buildMenuControls(tag?: string, flags?: number): void {
+    menuControls.innerHTML = ''
+    type BtnDef = { label: string; key?: string; keycode?: number; dynamic?: true; shift?: true }
+    // Server keeps the menu open for a (y/N) confirmation (e.g. shop purchase)
+    // and signals it via input_mode=YESNO. Swap the row to Y/N so the user
+    // has a way to answer without a keyboard.
+    const yesnoActive = currentInputMode === MOUSE_MODE_YESNO
+    let btns: BtnDef[]
+    if (yesnoActive) {
+      btns = [
+        { label: '⎋', keycode: 27 },
+        { label: 'Y', key: 'y' },
+        { label: 'N', key: 'n' },
+      ]
+    } else if (tag === 'shop') {
+      btns = [
+        { label: '⎋', keycode: 27 },
+        { label: '!', key: '!' },
+        { label: '/', key: '/' },
+        { label: '⇧', shift: true },
+        { label: '⏎', keycode: 13, dynamic: true },
+      ]
+    } else if (tag === 'acquirement') {
+      // AcquireMenu (acquire.cc): single-select, item hotkeys a-i via row taps.
+      // ! cycles acquire/examine mode; selecting an item flips input_mode to
+      // YESNO, which the yesnoActive branch above swaps in for confirmation.
+      btns = [
+        { label: '⎋', keycode: 27 },
+        { label: '!', key: '!' },
+      ]
+    } else if (tag === 'stash') {
+      // Stash-search results (Ctrl-F). Tap a row to open the X-mode preview;
+      // enterXMode/exitXMode hide/restore this menu around the preview.
+      // The three letter-keys mirror the cues the server prints in the menu
+      // title:
+      //   !  toggle travel/examine target mode
+      //   /  cycle sort (alpha / by distance)
+      //   =  hide useless & duplicates
+      // No accept (⏎) button: with no visible default hover (see
+      // menuHoverFromUser) there's no obvious target, and tapping a row
+      // already activates it.
+      btns = [
+        { label: '⎋', keycode: 27 },
+        { label: '!', key: '!' },
+        { label: '/', key: '/' },
+        { label: '=', key: '=' },
+      ]
+    } else if (tag === 'skills') {
+      btns = [
+        { label: '⎋', keycode: 27 },
+        { label: '⇧', shift: true },
+        { label: '?',   key: '?' },
+        { label: '=',   key: '=' },
+        { label: '-',   key: '-' },
+        { label: '/',   key: '/' },
+        { label: '*',   key: '*' },
+        { label: '_',   key: '_' },
+        { label: '!',   key: '!' },
+      ]
+    } else if (flags !== undefined && (flags & MF_MULTISELECT)) {
+      btns = [
+        { label: '⎋', keycode: 27 },
+        { label: '⏎', keycode: 13, dynamic: true },
+      ]
+    } else {
+      btns = [{ label: '⎋', keycode: 27 }]
+    }
+    for (const def of btns) {
+      const btn = document.createElement('button')
+      btn.className = 'menu-ctrl-btn'
+      btn.innerHTML = glyphHtml(def.label)
+      if (def.dynamic) btn.dataset.dynamic = 'accept'
+      if (def.shift) {
+        btn.dataset.shift = 'true'
+        applyShiftBtnState(btn)
+        btn.addEventListener('click', () => {
+          menuShift.tap()
+          view.focus({ preventScroll: true })
+        })
+        btn.addEventListener('touchstart', (e) => {
+          e.preventDefault()
+          menuShift.tap()
+        }, { passive: false })
+      } else {
+        btn.addEventListener('click', () => {
+          if (def.key) conn.send({ msg: 'input', text: def.key })
+          else if (def.keycode) conn.send({ msg: 'key', keycode: def.keycode })
+          view.focus({ preventScroll: true })
+        })
+        btn.addEventListener('touchstart', (e) => {
+          e.preventDefault()
+          if (def.key) conn.send({ msg: 'input', text: def.key })
+          else if (def.keycode) conn.send({ msg: 'key', keycode: def.keycode })
+        }, { passive: false })
+      }
+      menuControls.appendChild(btn)
+    }
+  }
+
+  function applyShiftBtnState(btn: HTMLElement): void {
+    btn.classList.toggle('active', menuShift.state === 'once')
+    btn.classList.toggle('locked', menuShift.state === 'lock')
+  }
+
+  function refreshShiftUI(): void {
+    const btn = menuControls.querySelector<HTMLElement>('[data-shift="true"]')
+    if (btn) applyShiftBtnState(btn)
+    syncMenuShiftLabels()
+  }
+
+  function syncMenuShiftLabels(): void {
+    // Skill-letter buttons in the menu-controls bar echo the shift state so
+    // what the user sees matches what tapping will send. (Shop rows used to
+    // toggle an inline hotkey chip here too, but rows now render their text
+    // verbatim — the hotkey lives inside item.text — so the ⇧ control's own
+    // active/locked styling is the shift indicator there.)
+    const shiftOn = menuShift.isOn
+    menuControls.querySelectorAll<HTMLElement>('.skill-letter-btn').forEach(el => {
+      const t = el.textContent ?? ''
+      if (t.length === 1 && /[a-zA-Z]/.test(t)) {
+        el.textContent = shiftOn ? t.toUpperCase() : t.toLowerCase()
+      }
+    })
+  }
+
+  // scroll=false when the caller already positioned the list (paging) and
+  // scrollIntoView would fight the manual scroll.
+  function highlightHoveredRow(scroll = true): void {
+    uiOverlay.querySelectorAll<HTMLElement>('.item-hovered').forEach(el => el.classList.remove('item-hovered'))
+    const el = uiOverlay.querySelector<HTMLElement>(`[data-menu-idx="${hoveredMenuIdx}"]`)
+    if (el) {
+      el.classList.add('item-hovered')
+      if (scroll) el.scrollIntoView({ block: 'nearest' })
+    }
+  }
+
+  // Reflect a server-reported hover (echo of our own menu_hover/menu_scroll,
+  // or any server-initiated move). Keeps menuServerHover in sync so the next
+  // client-side move computes from the right place.
+  //
+  // Suppress scrollIntoView when `raw === menuServerHover` — that's the echo
+  // of a hover change we just sent, so the caller (pageMenu/jumpMenu) already
+  // positioned the list. `block:'nearest'` is *usually* a no-op when the row
+  // is in view, but a coalesced lead can be taller than the viewport, in
+  // which case 'nearest' would align its bottom and undo the page scroll.
+  // Genuine server-initiated moves see `raw !== menuServerHover` and still
+  // scroll the row into view.
+  function applyServerHover(raw: number): void {
+    if (!menuHoverFromUser) return  // see menuHoverFromUser declaration
+    const isEcho = raw === menuServerHover
+    menuServerHover = raw
+    hoveredMenuIdx = raw
+    highlightHoveredRow(!isEcho)
+  }
+
+  function menuItemSelectable(it: MenuItem | undefined): boolean {
+    return !!it && it.level === 2
+      && (activeMenu?.tag === 'use_item' || !!(it.hotkeys && it.hotkeys.length))
+  }
+
+  // Based on next_hoverable_item, we scan the authoritative server
+  // item array (the index space menu_hover expects) for the next
+  // selectable entry, honouring MF_WRAP and the "up with no hover does
+  // nothing" bound.
+  function nextHoverableMenuItem(reverse: boolean, start: number): number {
+    const items = activeMenu?.items ?? []
+    const n = items.length
+    if (n === 0) return -1
+    const wrap = ((activeMenu?.flags ?? 0) & MF_WRAP) !== 0
+    const maxItems = wrap ? n : reverse ? start : n - Math.max(start, 0)
+    if (maxItems <= 0) return -1
+    let h = start
+    if (reverse && h < 0) h = 0
+    h += reverse ? -1 : 1
+    for (let tried = 0; tried < maxItems; tried++) {
+      if (wrap) h = ((h % n) + n) % n
+      h = Math.max(0, Math.min(h, n - 1))
+      if (menuItemSelectable(items[h])) return h
+      h += reverse ? -1 : 1
+    }
+    return -1
+  }
+
+  function setMenuHover(idx: number, scroll = true): void {
+    if (idx < 0) return
+    menuHoverFromUser = true
+    if (idx === menuServerHover) {
+      highlightHoveredRow(scroll)
+      return
+    }
+    menuServerHover = idx
+    hoveredMenuIdx = idx
+    highlightHoveredRow(scroll)
+    // Drive the server's cursor directly instead of letting it cycle_hover
+    // off a forwarded arrow key (which is hotkey-blind). Do not also forward
+    // the raw key — that would double-move.
+    conn.send({ msg: 'menu_hover', hover: idx, mouse: false })
+  }
+
+  function cycleMenuHover(reverse: boolean): void {
+    const next = nextHoverableMenuItem(reverse, menuServerHover)
+    if (next !== -1) setMenuHover(next)
+  }
+
+  function menuListEl(): HTMLElement | null {
+    return uiOverlay.querySelector<HTMLElement>('.overlay-list')
+  }
+
+  const firstSelectableIdx = (): number => nextHoverableMenuItem(false, -1)
+  const lastSelectableIdx = (): number =>
+    nextHoverableMenuItem(true, activeMenu?.items?.length ?? 0)
+
+  // The rendered rows whose box intersects the list viewport, in DOM order
+  // (= server-index order; continuations/headers carry no data-menu-idx).
+  function visibleMenuRows(el: HTMLElement): HTMLElement[] {
+    const lr = el.getBoundingClientRect()
+    return [...el.querySelectorAll<HTMLElement>('[data-menu-idx]')].filter(r => {
+      const rr = r.getBoundingClientRect()
+      return rr.bottom > lr.top + 1 && rr.top < lr.bottom - 1
+    })
+  }
+
+  function firstSelectableVisibleIdx(el: HTMLElement): number {
+    for (const r of visibleMenuRows(el)) {
+      const i = Number(r.dataset.menuIdx)
+      if (menuItemSelectable(activeMenu?.items?.[i])) return i
+    }
+    return -1
+  }
+
+  // Webtiles menu paging is client-side; the server only needs the resulting
+  // visible range + hover so it can stream item chunks for large/lazy menus
+  // (reference update_server_scroll). Harmless no-op for fully-loaded menus.
+  function sendMenuScroll(el: HTMLElement): void {
+    const vis = visibleMenuRows(el)
+    if (vis.length === 0) return
+    conn.send({
+      msg: 'menu_scroll',
+      first: Number(vis[0].dataset.menuIdx),
+      last: Number(vis[vis.length - 1].dataset.menuIdx),
+      hover: menuServerHover,
+    })
+  }
+
+  function pageMenu(up: boolean): void {
+    const el = menuListEl()
+    if (!el) return
+    const max = Math.max(0, el.scrollHeight - el.clientHeight)
+    const delta = Math.max(40, el.clientHeight - 24)  // slight overlap
+    el.scrollTop = Math.min(max, Math.max(0, el.scrollTop + (up ? -delta : delta)))
+    const target = up && el.scrollTop <= 0 ? firstSelectableIdx()
+      : !up && el.scrollTop >= max - 1 ? lastSelectableIdx()
+      : firstSelectableVisibleIdx(el)
+    if (target >= 0) setMenuHover(target, false)
+    sendMenuScroll(el)
+  }
+
+  function jumpMenu(toEnd: boolean): void {
+    const el = menuListEl()
+    if (!el) return
+    el.scrollTop = toEnd ? el.scrollHeight : 0
+    setMenuHover(toEnd ? lastSelectableIdx() : firstSelectableIdx(), false)
+    sendMenuScroll(el)
+  }
+
+  // A rendered, arrow-selectable menu overlay is up: arrow input should drive
+  // hover client-side (send menu_hover) rather than be forwarded as a raw
+  // key. Skipped during the stash X-mode preview — the menu is hidden behind
+  // the map and arrows must reach the server to move the cursor.
+  function menuNavActive(): boolean {
+    return !!activeMenu && !crtActive && !inXMode
+      && (((activeMenu.flags ?? 0) & MF_ARROWS_SELECT) !== 0)
+      && !!uiOverlay.querySelector('.overlay-list')
+  }
+
+  // Returns true if the key was a menu-nav key we handled client-side.
+  function handleMenuNavKey(e: KeyboardEvent): boolean {
+    if (!menuNavActive()) return false
+    if (e.ctrlKey || e.altKey || e.metaKey || e.shiftKey) return false
+    if (e.key === 'ArrowDown') { e.preventDefault(); cycleMenuHover(false); return true }
+    if (e.key === 'ArrowUp') { e.preventDefault(); cycleMenuHover(true); return true }
+    if (e.key === 'PageDown') { e.preventDefault(); pageMenu(false); return true }
+    if (e.key === 'PageUp') { e.preventDefault(); pageMenu(true); return true }
+    if (e.key === 'Home') { e.preventDefault(); jumpMenu(false); return true }
+    if (e.key === 'End') { e.preventDefault(); jumpMenu(true); return true }
+    return false
+  }
+
+  // Strip the menu hotkey preface from a spell row, leaving the column text at
+  // offset 0. It's " a - <text>" for a normal row, but " a + <text>" for the
+  // preselected (you.last_cast_spell) row — SpellMenuEntry::_get_text_preface
+  // (spl-cast.cc) uses '+' there. Match either sign: miss it and that row's
+  // title (and every fixed-width column below) shifts. Anyone who has cast a
+  // spell this game hits this, so it's the common case, not an edge.
+  function stripSpellPreface(rawText: string | undefined): string {
+    return stripDcss(rawText ?? '').replace(/^\s*\S+\s*[-+]\s*/, '')
+  }
+
+  // Parse one row of the list_spells menu into a SpellEntry. Letter and icon
+  // come straight off the wire (hotkeys[0], tiles[0]); only the name/columns
+  // need teasing out of the text. After the preface the row is fixed-position
+  // (_spell_base_description in the 0.34 source): name chopped to 32, schools
+  // padded out to column 58, then failure in a 9-wide field (13 for revenants'
+  // enkindle column) and the level digit. Slice by position, NOT by whitespace
+  // runs: a 25-char schools string ("Conjuration/Translocation" — Momentum
+  // Strike, Iskenderun's Mystic Blast) leaves only ONE pad space before the
+  // failure column, so a \s{2,} split merges schools+fail and shifts every
+  // later column. The fail/level tail isn't position-stable across the two
+  // field widths, so split that small piece on whitespace instead: level is
+  // the last token, fail is everything before it.
+  function parseSpellItem(it: MenuItem): SpellEntry {
+    const letter = String.fromCharCode(it.hotkeys![0])
+    const plain = stripSpellPreface(it.text)
+    const tail = plain.slice(58).trim().split(/\s+/).filter(Boolean)
+    const level = Number(tail[tail.length - 1])
+    return {
+      letter,
+      tile: it.tiles![0].t,
+      colour: it.colour,
+      title: plain.slice(0, 32).trim() || plain.trim(),
+      schools: plain.slice(32, 58).trim() || undefined,
+      fail: tail.slice(0, -1).join(' ') || undefined,
+      level: Number.isFinite(level) ? level : undefined,
+    }
+  }
+
+  // Keep the dev inspection hook pointing at the current cache array, and
+  // refresh both spell surfaces (the quick-cast rail and the z tab grid) so an
+  // auto/re-harvest fills them in when its menu capture lands.
+  function exposeSpellCache(): void {
+    if (import.meta.env.DEV)
+      (window as unknown as { __dcssSpellCache: SpellEntry[] }).__dcssSpellCache = spellCache
+    renderSpellRail()
+    touchControls.refreshSpellTab()
+  }
+
+  // Build the spell grid for the touch-panel z tab from spellCache, or null when
+  // there's nothing to show (no spells / spectating) → the tab shows its empty
+  // state. Mirrors the rail's per-spell button (tile + letter badge) but in the
+  // panel's content area: costs no map space and scrolls past the visible rows.
+  // One quick-cast button (tile + "za"-style corner letter, tap to cast),
+  // shared by the rail and the z-tab grid so the two surfaces can't drift —
+  // only the container-specific button class differs.
+  function makeSpellButton(s: SpellEntry, btnClass: string): HTMLElement {
+    const btn = document.createElement('button')
+    btn.className = btnClass
+    btn.title = `${s.title}${s.fail ? ` (${s.fail})` : ''}`
+    if (typeof s.colour === 'number') btn.style.color = uiColor(s.colour)
+    btn.appendChild(renderTiles(loader, [{ t: s.tile, tex: TEX.GUI }], 1))
+    const lbl = document.createElement('span')
+    lbl.className = 'spell-letter'
+    // "za"/"zb" — the literal cast keystroke (z then the spell's letter), so
+    // the button doubles as a reminder of what tapping sends.
+    lbl.textContent = `z${s.letter}`
+    btn.appendChild(lbl)
+    // Touch taps are detected manually (touchstart records the contact,
+    // touchend casts if the finger didn't drift) rather than firing on raw
+    // touchstart like touch.ts buttons or trusting iOS click synthesis:
+    //  - raw touchstart casts the instant a drag CONTACTS the button — and a
+    //    drag aimed at the log above lands fat-finger contacts on the rail;
+    //  - iOS click synthesis both drops fast second taps (the original
+    //    dropped-cast bug) and conjures clicks at the LIFT point of a drag
+    //    that nothing scrolled (see the click gate below).
+    // Firing on our own touchend keeps double-taps reliable (no browser
+    // heuristics) at the cost of finger-up rather than finger-down timing.
+    // preventDefault on touchstart suppresses the tap's own synthetic click.
+    let tapX = 0, tapY = 0, tapMoved = false
+    btn.addEventListener('touchstart', e => {
+      e.preventDefault()
+      const t = e.touches?.[0]
+      tapX = t?.clientX ?? 0
+      tapY = t?.clientY ?? 0
+      tapMoved = false
+    }, { passive: false })
+    btn.addEventListener('touchmove', e => {
+      const t = e.touches?.[0]
+      if (t && Math.hypot(t.clientX - tapX, t.clientY - tapY) > TAP_SLOP_PX) tapMoved = true
+    })
+    btn.addEventListener('touchend', () => { if (!tapMoved) castSpellLetter(s.letter) })
+    // Mouse/desktop path. Gated on recent touch activity in the view: iOS
+    // dispatches its compatibility mouse events (incl. click) at the lift
+    // point of an unconsumed drag, so a finger that lands on the floating
+    // log and lifts over the rail "clicks" a button it never touched. Real
+    // touch taps cast via their own touchend above, so any click inside a
+    // touch session is synthetic or stray; mouse clicks have no preceding
+    // touch and pass.
+    btn.addEventListener('click', e => {
+      // Modern engines deliver click as a PointerEvent: a click that
+      // self-identifies as a genuine mouse (hybrid devices — iPad +
+      // trackpad, touchscreen laptops) bypasses the touch-recency gate,
+      // which would otherwise eat a real mouse click landing within 700ms
+      // of unrelated touch activity. Only 'mouse' bypasses: a pen tap also
+      // fires touch events (and casts via touchend above), and where
+      // pointerType is absent the timestamp heuristic decides.
+      if ((e as PointerEvent).pointerType !== 'mouse'
+        && performance.now() - lastViewTouchTs < SYNTH_CLICK_SUPPRESS_MS) return
+      castSpellLetter(s.letter)
+    })
+    return btn
+  }
+
+  function renderSpellGrid(): HTMLElement | null {
+    if (spectating || spellCache.length === 0) return null
+    const grid = document.createElement('div')
+    grid.className = 'tc-spell-grid'
+    for (const s of spellCache) grid.appendChild(makeSpellButton(s, 'tc-spell-btn'))
+    return grid
+  }
+
+  // Cast a memorised spell from normal play: `z` opens the cast prompt and the
+  // spell's letter selects it (≡ typing `z<letter>`). Targeted spells drop the
+  // server into targeting, handled by the existing cursor/d-pad UI; self/instant
+  // spells just fire. Guarded to a clean command-mode state — the rail is always
+  // visible, so a stray tap during a menu/X-mode/overlay must be a no-op.
+  //
+  // A guarded-out tap is queued (1-deep) when the blocker is our own
+  // just-sent cast: the engine answers the `z` by flushing
+  // input_mode:PROMPT plus the channel-2 "Cast which spell?" line (which the
+  // log renders as a prompt row → activePromptEl) BEFORE the letter resolves
+  // the cast, so the second tap of a quick double-tap lands inside that
+  // round-trip and used to vanish silently — while typing `zaza` on a
+  // keyboard queues server-side and casts twice. The pending tap fires on
+  // the input_mode→1 that ends the round-trip; PENDING_CAST_TTL_MS bounds
+  // both queueing and firing so a tap can't resurface as a surprise cast
+  // long after (e.g. the first cast was targeted and the player sat in the
+  // targeter).
+  const PENDING_CAST_TTL_MS = 1000
+  // Finger drift beyond this is a drag, not a tap — the touchend won't cast.
+  const TAP_SLOP_PX = 12
+  // A click this soon after touch activity is iOS's synthesized
+  // compatibility click (or a stray), never a real mouse press.
+  const SYNTH_CLICK_SUPPRESS_MS = 700
+  let lastCastSentAt = -Infinity
+  let pendingCastLetter: string | null = null
+  let pendingCastUntil = 0
+
+  function castSpellLetter(letter: string): void {
+    // `currentInputMode === 1` additionally rejects active targeting (a prior
+    // targeted spell left the server in a target loop with a map cursor but no
+    // menu/overlay) — `z<letter>` there would land mid-targeting, not cast.
+    // The monster panel is a client-only overlay that doesn't change input
+    // mode, so it needs its own gate: in landscape the rail stays visible in
+    // the sidebar beside the panel, and a tap here bypasses the touch-input
+    // swallow (the rail sends via conn.send, not that callback).
+    if (monsterPanelOpen || currentInputMode !== 1 || !commandChannelIdle()) {
+      // Queue only when our own cast is plausibly still in flight and the
+      // player isn't in a real context (menu/overlay/X-mode/panel) — there a
+      // deferred cast would be the exact stray the guard exists to stop.
+      const ownCastInFlight = performance.now() - lastCastSentAt < PENDING_CAST_TTL_MS
+      const inForeignContext = monsterPanelOpen || inXMode || crtActive || dialogActive
+        || uiStack.length > 0 || activeMenu !== null
+      if (ownCastInFlight && !inForeignContext) {
+        pendingCastLetter = letter  // latest tap wins
+        pendingCastUntil = performance.now() + PENDING_CAST_TTL_MS
+      }
+      return
+    }
+    sendCast(letter)
+  }
+
+  function sendCast(letter: string): void {
+    // One message, not two: the Python server writes each input message's
+    // text to the game pty in a single write (process_handler.handle_input),
+    // so "z"+letter arrive in the engine's buffer together and it never
+    // blocks (flushing the cast prompt and waiting on the socket) between
+    // them — the way it can when two messages land as two pty writes. This
+    // shrinks the prompt round-trip the pending-cast queue exists to cover.
+    conn.send({ msg: 'input', text: `z${letter}` })
+    lastCastSentAt = performance.now()
+  }
+
+  // Fire the queued double-tap cast now that input_mode→1 says the command
+  // channel is open again. Clears the queue before re-running the full tap
+  // guard: by this point the mode-1 handler has already hidden the more
+  // button and disabled the prompt row, but anything else still blocking
+  // (a menu that raced in, a reharvestIfDirty probe that just claimed the
+  // channel) means the tap is stale — dropped, not re-queued.
+  function flushPendingCast(): void {
+    if (pendingCastLetter === null) return
+    const letter = pendingCastLetter
+    pendingCastLetter = null
+    if (performance.now() > pendingCastUntil) return
+    if (monsterPanelOpen || currentInputMode !== 1 || !commandChannelIdle()) return
+    sendCast(letter)
+  }
+
+  // Render the persistent quick-cast rail from spellCache. Hidden when there are
+  // no spells. Each button casts on tap via castSpellLetter (its own guard keeps
+  // a tap during a menu/overlay/X-mode inert). The `spell-row` class on the view
+  // tracks rail visibility: while set, CSS lifts the floating message log (and
+  // --more--) by the rail's height so the rail fits beneath them — the rail
+  // itself floats over the map, so showing it never resizes the map.
+  // The cache array the rail's buttons were last built from. Every harvest
+  // (and the dev fake-spells hook) assigns a NEW array to spellCache, so
+  // reference identity distinguishes "content changed, rebuild" from
+  // "visibility toggled, just un/hide" — the X-mode enter/exit calls land on
+  // the cheap path instead of rebuilding every button + tile per examine.
+  let railBuiltFrom: SpellEntry[] | null = null
+  function renderSpellRail(): void {
+    // Hidden while examining (X-mode): the zoomed-out examine map claims the
+    // log/HUD rows, and the rail's row (plus the log overlay) would shrink and
+    // occlude the very cells the player entered X-mode to read.
+    const visible = !spectating && !inXMode && spellCache.length > 0
+    view.classList.toggle('spell-row', visible)
+    if (!visible) { spellRail.style.display = 'none'; return }
+    if (railBuiltFrom !== spellCache) {
+      spellRail.innerHTML = ''
+      for (const s of spellCache) spellRail.appendChild(makeSpellButton(s, 'spell-rail-btn'))
+      railBuiltFrom = spellCache
+    }
+    spellRail.style.display = ''
+  }
+
+  // True while a silent harvest owns the input channel. During this brief
+  // window (one round-trip) the server is sitting in the spell menu
+  // while the client still looks like normal play (activeMenu stays null), so
+  // user input must be suppressed — otherwise a stray keystroke lands in that
+  // menu (describing a spell, scrolling, or Escaping it) and desyncs the
+  // harvest. Suppression can't get stuck: harvestPhase always leaves the
+  // suppressing states within HARVEST_SUPPRESS_MS via armHarvestTimeout, even
+  // if a message is dropped. (Crawl is turn-based, so a suppressed keystroke
+  // just means the player re-presses it.) 'late-base' is deliberately NOT a
+  // suppressing state: the reply is overdue and the player gets the channel
+  // back — a keystroke they fire may be eaten by the still-open server menu,
+  // which is the price of not locking input on a slow link.
+  function isHarvesting(): boolean {
+    return harvestPhase === 'base'
+  }
+
+  // The command channel is idle: the server is sitting at the command prompt
+  // with nothing transient in front of it — no menu/overlay/CRT/dialog, no
+  // examine cursor (X-mode), no `--more--` pager, no in-log y/n prompt, and no
+  // silent harvest already in flight. Only then is it safe to inject a
+  // command-level keystroke (a harvest's `I` or a rail `z<letter>`).
+  // The earlier guards listed only the menu/overlay subset, so a rail tap or an
+  // auto/re-harvest fired during a `--more--` or a channel-2 prompt leaked a
+  // stray keystroke into it (eating the pager/answering the prompt, or — for a
+  // harvest — getting the `I` swallowed so the probe times out and clears the
+  // rail). `moreBtn`/`activePromptEl` are exactly that missing state.
+  // Checks harvestPhase directly (not isHarvesting()) because 'late-base'
+  // must also block injection: the probe's menu may still be open server-side
+  // even though user input suppression has been lifted.
+  function commandChannelIdle(): boolean {
+    return harvestPhase === 'idle'
+      && uiStack.length === 0 && !crtActive && !dialogActive && !activeMenu
+      && !inXMode && activePromptEl === null && moreBtn.style.display === 'none'
+  }
+
+  // End any in-flight harvest and clear its latches — every harvest-exit
+  // path routes through here so the timer/phase/latch lifecycle lives in one
+  // place: the successful menu capture (which re-latches pendingHarvestClose
+  // right after), the foreign-menu abort, the no-spells terminator, and the
+  // full-state teardowns (layer:"game", close_all_menus, go_lobby). The
+  // teardown calls are what keep a bulk menu close or game transition
+  // mid-harvest from leaving input suppressed (harvestPhase stuck) or
+  // pendingHarvestClose latched — the latter would otherwise swallow the
+  // NEXT genuine close_menu and strand a real overlay.
+  function resetHarvest(): void {
+    clearTimeout(harvestTimer)
+    harvestPhase = 'idle'
+    pendingHarvestClose = false
+  }
+
+  // Fire a silent `I` to (re)populate spellCache. Only from a clean game
+  // state — otherwise the keystroke is swallowed by whatever prompt/menu/
+  // overlay is up (and could mean something else entirely).
+  // Returns true if the harvest actually started (so the auto-trigger only
+  // marks itself done when it really fired, not when the guard bailed).
+  function harvestSpells(): boolean {
+    if (!commandChannelIdle()) return false
+    harvestPhase = 'base'
+    conn.send({ msg: 'input', text: 'I' })
+    armHarvestTimeout()
+    return true
+  }
+
+  // Auto-harvest once per game so the persistent rail is populated. Fired on
+  // the first clean COMMAND-mode transition.
+  function maybeAutoHarvest(): void {
+    if (spectating || autoHarvestedThisGame || isHarvesting()) return
+    if (harvestSpells()) autoHarvestedThisGame = true
+  }
+
+  // Resolve a pending letter-map change (spellsDirty): re-harvest so the rail
+  // reflects the new spells/letters. Clears the flag only when a harvest really
+  // fires — if the guard bails (mid-menu, etc.) the flag persists and the next
+  // clean command-mode retries. Spectators never harvest, so just drop the flag.
+  function reharvestIfDirty(): void {
+    if (!spellsDirty) return
+    if (spectating) { spellsDirty = false; return }
+    if (harvestSpells()) spellsDirty = false
+  }
+
+  // Fallback if the harvest's `I` reply never arrives within the
+  // input-suppression budget — either the character has no spells and the
+  // MSG_NO_SPELLS fast path was lost, or the link is just slower than the
+  // budget (RTT > 1.5s is real on mobile). Don't give up: drop to
+  // `late-base`, which lifts input suppression but keeps listening for the
+  // menu so a slow reply is still captured silently — the old reset-to-idle
+  // here let that late menu render as an unrequested full-screen spell list
+  // AND left the rail empty for the rest of the game (autoHarvestedThisGame
+  // stays true; nothing retries). Only after the extended `late-base` window
+  // also passes do we conclude the frame was truly dropped and clear the
+  // cache.
+  function armHarvestTimeout(): void {
+    clearTimeout(harvestTimer)
+    harvestTimer = window.setTimeout(() => {
+      if (harvestPhase !== 'base') return
+      harvestPhase = 'late-base'
+      harvestTimer = window.setTimeout(() => {
+        if (harvestPhase !== 'late-base') return
+        resetHarvest()
+        spellCache = []
+        exposeSpellCache()
+      }, HARVEST_LATE_MS)
+    }, HARVEST_SUPPRESS_MS)
+  }
+
+  function showMenu(msg: MenuMsg): void {
+    if (activeMenu !== msg) {
+      hoveredMenuIdx = -1
+      menuServerHover = -1
+      menuHoverFromUser = false
+      menuShift.reset()
+    }
+    activeMenu = msg
+    const title = stripDcss(msg.title?.text ?? '')
+    renderOverlay(title, () => {
+      renderMenuItems(msg.items ?? [])
+      const footerEl = document.createElement('div')
+      footerEl.className = 'overlay-footer'
+      footerEl.innerHTML = formatMoreHtml(msg.more ?? '', 'top')
+      uiOverlay.appendChild(footerEl)
+    })
+    if (msg.tag === 'shop' || msg.tag === 'stash' || msg.tag === 'acquirement') {
+      buildMenuControls(msg.tag, msg.flags)
+      menuControls.style.display = ''
+      touchControls.element.style.display = 'none'
+    }
+    syncAcceptBtn(formatMore(msg.more ?? '', 'top'))
+    if (msg.more?.includes('XXX')) {
+      const listEl = uiOverlay.querySelector<HTMLElement>('.overlay-list')
+      const footerEl = uiOverlay.querySelector<HTMLElement>('.overlay-footer')
+      if (listEl && footerEl) {
+        listEl.addEventListener('scroll', () => {
+          if (activeMenu?.more) {
+            const pos = computeScrollPos(listEl)
+            footerEl.innerHTML = formatMoreHtml(activeMenu.more, pos)
+          }
+        }, { passive: true })
+      }
+    }
+  }
+
+  function updateMenuItems(msg: MenuMsg): void {
+    if (!msg.items) return
+    const listEl = uiOverlay.querySelector<HTMLElement>('.overlay-list')
+    if (listEl) {
+      const savedScrollTop = listEl.scrollTop
+      listEl.remove()
+      const footer = uiOverlay.querySelector('.overlay-footer')
+      const newList = document.createElement('div')
+      newList.className = 'overlay-list'
+      fillMenuItems(newList, msg.items)
+      uiOverlay.insertBefore(newList, footer)
+      newList.scrollTop = savedScrollTop
+    } else {
+      renderMenuItems(msg.items)
+    }
+    syncMenuShiftLabels()
+  }
+
+  function renderMenuItems(items: MenuItem[]): void {
+    const listEl = document.createElement('div')
+    listEl.className = 'overlay-list'
+    fillMenuItems(listEl, items)
+    const footer = uiOverlay.querySelector('.overlay-footer')
+    uiOverlay.insertBefore(listEl, footer)
+    syncMenuShiftLabels()
+  }
+
+  // DCSS's "examine visible things" menu (directn.cc _full_describe_menu)
+  // pre-wraps each monster's equipment description for an 80-col terminal and
+  // emits it as several entries: one hotkeyed lead row plus hotkey-less
+  // continuation rows whose text is prefixed with exactly 9 literal spaces
+  // (directn.cc:621). Rendering each as its own row double-wraps on a phone
+  // and loses the grouping. Fold continuations back into their lead so the
+  // whole description is one tappable item that wraps to the live viewport.
+  //
+  // The ≥6-space threshold is load-bearing, not cosmetic. Inventory
+  // (invent.cc:73), spellbook, quiver and mutation menus set
+  // `indent_no_hotkeys`, giving every hotkey-less item a *5-space* preface
+  // (menu.cc:2355); matching ≥2 would wrongly merge an indented hotkey-less
+  // inventory line into the hotkeyed line above it. directn.cc is the only
+  // menu emitting the lead+continuation idiom, and its 9-space prefix is the
+  // only menu source of ≥6-space leading indent — so ≥6 captures exactly it
+  // and nothing else (both the 9 and the 5 are hardcoded literals, stable
+  // across versions). Clone the lead before mutating — fillMenuItems re-runs
+  // on the same activeMenu.items array on every update_menu_items patch.
+  function coalesceMenuItems(items: MenuItem[]): { item: MenuItem; idx: number }[] {
+    const out: { item: MenuItem; idx: number }[] = []
+    let lead: { item: MenuItem; idx: number } | null = null
+    for (let i = 0; i < items.length; i++) {
+      const item = items[i]
+      const isItem = item.level !== 0 && item.level !== 1
+      const noHotkey = !item.hotkeys || item.hotkeys.length === 0
+      const raw = String(item.text ?? '')
+      if (lead && isItem && noHotkey && /^\s{6,}\S/.test(raw)) {
+        lead.item = { ...lead.item, text: `${lead.item.text ?? ''} ${raw.trim()}` }
+        continue
+      }
+      const entry = { item, idx: i }
+      out.push(entry)
+      lead = isItem && !noHotkey ? entry : null
+    }
+    return out
+  }
+
+  function fillMenuItems(listEl: HTMLElement, rawItems: MenuItem[]): void {
+    const coalesced = coalesceMenuItems(rawItems)
+    for (let c = 0; c < coalesced.length; c++) {
+      const { item, idx: i } = coalesced[c]
+      if (item.level === 0) continue  // separator
+      if (item.level === 1) {         // section header
+        const hdr = document.createElement('div')
+        hdr.className = 'overlay-header'
+        if (item.colour != null) hdr.style.color = uiColor(item.colour)
+        hdr.innerHTML = dcssToHtml(String(item.text ?? ''))
+        listEl.appendChild(hdr)
+      } else {                        // level 2: item row
+        const keycode = item.hotkeys?.[0]
+        // Render the row text verbatim (markup → HTML), mirroring the
+        // reference client (menu.js set_item_contents): the hotkey letter and
+        // the " - "/" + " selection marker are part of item.text — DCSS bakes
+        // them in for letter-selectable rows — so we don't destructure them
+        // into separate key/separator chips. The base colour comes from
+        // item.colour (like the reference's fg<col> class); inline markup in
+        // the text overrides per span. The label wraps at our display width.
+        // The hotkey still drives clicks below.
+        const itemColor = item.colour != null ? uiColor(item.colour) : undefined
+        // Detect the DCSS "<key> - " prefix without stripping it (rendering
+        // stays verbatim). Two shapes: a plain hotkey ("a - ...", shop
+        // "<col>a - </col>...") and the gods-style colour-wrapped hotkey
+        // ("<yellow>A</yellow> - ..."). Two things key off the result:
+        //   • the " + " marker drives the selected-row highlight (multiselect
+        //     menus — shop purchase, known-items autopickup);
+        //   • a prefix means wrapped continuation lines should hang-indent 4ch
+        //     (the fixed "<key> - " width) so they sit under the item title.
+        // Prefixless rows (the unrecognised-items list — bare " staff of air"
+        // / " scroll of fog (uncommon)") start at column 0 and must NOT indent.
+        const prefix = String(item.text ?? '')
+          .match(/^\s*(?:<[a-zA-Z]+>.<\/[a-zA-Z]+>|(?:<[^>]+>)*.)\s([-+# $])\s/)
+        const selected = prefix?.[1] === '+'
+        const el = makeItemButton(dcssToHtml(String(item.text ?? '')), () => {
+          // Shop shift-tap: shopping list uses the uppercase letter as a direct
+          // keybind (shopping.cc), separate from the arrows-select activate-on-
+          // hover path — so route it before the MF_ARROWS_SELECT branch below,
+          // which would otherwise preempt it with Space and just mark for
+          // purchase.
+          if (
+            activeMenu?.tag === 'shop'
+            && menuShift.isOn
+            && keycode != null
+            && keycode >= 97 && keycode <= 122
+          ) {
+            conn.send({ msg: 'key', keycode: keycode - 32 })
+            menuShift.consume()
+            return
+          }
+          // ARROWS_SELECT menus expect activation against the current hover,
+          // not via row hotkeys: Enter for singleselect, Space for multiselect
+          // (upstream menu.js:1066). Move server hover to the tapped row and
+          // then send the activation key — leaves server state matching the
+          // user's tap target. (For stash search, sending the row's letter
+          // would happen to produce the same visible X-mode preview, but the
+          // upstream protocol path is more robust.)
+          const flags = activeMenu?.flags ?? 0
+          if (flags & MF_ARROWS_SELECT) {
+            setMenuHover(i, false)
+            const activateKey = (flags & MF_MULTISELECT) ? 32 : 13
+            conn.send({ msg: 'key', keycode: activateKey })
+            menuShift.consume()
+            return
+          }
+          if (keycode == null) return
+          conn.send({ msg: 'key', keycode })
+          menuShift.consume()
+        }, itemColor)
+        if (item.tiles && item.tiles.length > 0) {
+          el.insertBefore(renderTiles(loader, item.tiles), el.firstChild)
+        }
+        el.dataset.menuIdx = String(i)
+        if (selected) el.classList.add('item-selected')
+        if (prefix) el.classList.add('item-hang')
+        if (i === hoveredMenuIdx) el.classList.add('item-hovered')
+        listEl.appendChild(el)
+      }
+    }
+  }
+
+  // --- Monster panel (client-side overlay) ---
+
+  function openMonsterPanel(): void {
+    monsterPanelOpen = true
+    renderOverlay('Monsters', () => {
+      // Client-only overlay: hide the touch d-pad (its Esc would send Esc to
+      // the server, which is not what we want for a local panel) and add an
+      // inline close button to the header.
+      const headerEl = uiOverlay.querySelector('.overlay-title')
+      if (headerEl) {
+        const closeBtn = document.createElement('button')
+        closeBtn.className = 'overlay-close'
+        closeBtn.textContent = '×'
+        closeBtn.addEventListener('click', () => closeMonsterPanel())
+        headerEl.appendChild(closeBtn)
+      }
+      const body = document.createElement('div')
+      body.className = 'overlay-body fg7'
+      body.appendChild(monsterPanel.element)
+      uiOverlay.appendChild(body)
+    })
+    touchControls.element.style.display = 'none'
+
+    monsterPanel.setOnPickCoord((x, y) => {
+      if (uiStack.length === 0 && !crtActive && !activeMenu) {
+        // Leave the overlay frame up: the server's describe-monster ui-push
+        // will land in renderOverlay and swap the body in place, avoiding a
+        // brief flash of the bare map between close and re-open. The ui-push
+        // handler clears monsterPanelOpen, so the keyboard guard hands off.
+        conn.send({ msg: 'click_cell', x, y, button: 3 })
+      } else {
+        closeMonsterPanel()
+      }
+    })
+    monsterPanel.update(store.getMonsters())
+  }
+
+  function closeMonsterPanel(): void {
+    if (!monsterPanelOpen) return
+    monsterPanelOpen = false
+    hideOverlay()  // restores map/hud/msglog/touch via standard restore path
+  }
+
+  // --- shared overlay helpers ---
+
+  function renderOverlay(title: string, buildBody: () => void): void {
+    autoCloseKbdIfOurs()
+    uiOverlay.innerHTML = ''
+    uiOverlay.style.display = ''
+    mapView.element.style.display = 'none'
+    msgLog.style.display = 'none'
+    hud.style.display = 'none'
+    touchControls.element.style.display = ''
+    menuControls.style.display = 'none'
+    menuControls.innerHTML = ''
+
+    const headerEl = document.createElement('div')
+    // fg15 (white) by default so unstyled titles read brighter than the
+    // fg7 (lightgrey) body content; explicit DCSS colour tags override.
+    headerEl.className = 'overlay-title fg15'
+    const titleSpan = document.createElement('span')
+    titleSpan.textContent = title
+    headerEl.appendChild(titleSpan)
+    uiOverlay.appendChild(headerEl)
+
+    buildBody()
+    // No close button: dismissal goes through the touch-controls Esc, which
+    // is always reachable for server-driven overlays. Drop the header when it
+    // ends up with nothing (no title, no tile inserted by buildBody) so help
+    // popups don't render a blank bar.
+    if (!title && headerEl.children.length === 1) headerEl.remove()
+    view.focus({ preventScroll: true })
+  }
+
+  // --- formatted-scroller: client-owned scroll widget ---
+  //
+  // Per the reference client (ui-layouts.js:613 scroller_handle_key,
+  // :720 update_server_scroll, :1066 recv_ui_scroll), the formatted-scroller's
+  // scrollbar is owned by the *client*: page/arrow/home/end keys scroll the
+  // body locally, the new position is debounced back to the server as
+  // `formatted_scroller_scroll`, and server-pushed scrolls with
+  // `from_webtiles=true` are skipped (they're the server echoing our own
+  // request). `ui-scroller-scroll` messages are ignored entirely when the
+  // top popup is a formatted-scroller — the server emits them with a
+  // hardcoded `from_webtiles: false` (ui.cc:1501-1503 says "always false,
+  // since we do not yet synchronize webtiles client-side scrolls"), so the
+  // ui-state pair is the sole valid sync channel here.
+  //
+  // We follow this model. Passing End/Home/PgUp/PgDn through as raw
+  // keycodes doesn't work on phone widths because we wrap differently from
+  // the server, so the server-clamped scroll value lands above our real
+  // bottom and the user sees a visible jump-back-up.
+
+  const SCROLLER_SYNC_DEBOUNCE_MS = 100
+
+  function formattedScrollerActive(): boolean {
+    return uiStack.length > 0
+      && uiStack[uiStack.length - 1].type === 'formatted-scroller'
+      && !!uiOverlay.querySelector('.overlay-body')
+  }
+
+  let scrollerSyncTimer: number | undefined
+  function scheduleScrollerSync(): void {
+    if (scrollerSyncTimer !== undefined) return
+    scrollerSyncTimer = window.setTimeout(flushScrollerSync, SCROLLER_SYNC_DEBOUNCE_MS)
+  }
+  function flushScrollerSync(): void {
+    scrollerSyncTimer = undefined
+    if (!formattedScrollerActive()) return
+    const el = uiOverlay.querySelector<HTMLElement>('.overlay-body')
+    if (!el) return
+    // Reference client: `Math.round(scrollTop / line_height)`. The value the
+    // server stores is opaque to it (m_scroll is just a saved position; see
+    // scroller.cc:166); a wrap-induced drift of a few rows on the server's
+    // side is harmless because we never read it back — from_webtiles=true
+    // skips the echo.
+    const lineH = parseFloat(getComputedStyle(el).lineHeight) || 19
+    const line = Math.max(0, Math.round(el.scrollTop / lineH))
+    conn.send({ msg: 'formatted_scroller_scroll', scroll: line })
+  }
+
+  // Programmatic scrollTop assignment fires a scroll event asynchronously.
+  // Suppress sync for a short window so a server-driven scrollOverlayBody
+  // doesn't bounce its value straight back through formatted_scroller_scroll.
+  let scrollerSyncSuppressUntil = 0
+  function suppressScrollerSync(): void {
+    scrollerSyncSuppressUntil = performance.now() + 50
+  }
+  function onScrollerScroll(): void {
+    if (performance.now() < scrollerSyncSuppressUntil) return
+    scheduleScrollerSync()
+  }
+  function attachScrollerListener(bodyEl: HTMLElement): void {
+    bodyEl.addEventListener('scroll', onScrollerScroll, { passive: true })
+  }
+
+  // Client-side scroll-key interception. Returns true when handled so the
+  // caller stops routing the key further (mirrors handleMenuNavKey).
+  function handleScrollerKey(e: KeyboardEvent): boolean {
+    if (!formattedScrollerActive()) return false
+    if (e.ctrlKey || e.altKey || e.metaKey || e.shiftKey) return false
+    const el = uiOverlay.querySelector<HTMLElement>('.overlay-body')
+    if (!el) return false
+    const lineH = parseFloat(getComputedStyle(el).lineHeight) || 19
+    const page = Math.max(lineH, el.clientHeight - 2 * lineH)
+    switch (e.key) {
+      case 'ArrowUp':   el.scrollTop -= lineH; break
+      case 'ArrowDown': el.scrollTop += lineH; break
+      case 'PageUp': case '<': case '-': case ';':
+        el.scrollTop -= page; break
+      case 'PageDown': case ' ': case '>': case '+': case "'":
+        el.scrollTop += page; break
+      case 'Home': el.scrollTop = 0; break
+      case 'End':  el.scrollTop = el.scrollHeight; break
+      default: return false
+    }
+    e.preventDefault()
+    return true
+  }
+
+  // Touch-controls equivalent (the d-pad / macro buttons emit wire keycodes
+  // through the connection send path, not DOM key events).
+  function handleScrollerKeycode(keycode: number): boolean {
+    if (!formattedScrollerActive()) return false
+    const el = uiOverlay.querySelector<HTMLElement>('.overlay-body')
+    if (!el) return false
+    const lineH = parseFloat(getComputedStyle(el).lineHeight) || 19
+    const page = Math.max(lineH, el.clientHeight - 2 * lineH)
+    switch (keycode) {
+      case CK_UP:   el.scrollTop -= lineH; return true
+      case CK_DOWN: el.scrollTop += lineH; return true
+      case CK_PGUP: el.scrollTop -= page; return true
+      case CK_PGDN: el.scrollTop += page; return true
+      case CK_HOME: el.scrollTop = 0; return true
+      case CK_END:  el.scrollTop = el.scrollHeight; return true
+    }
+    return false
+  }
+
+  function scrollOverlayBody(line: number): void {
+    const el = uiOverlay.querySelector('.overlay-body') as HTMLElement | null
+    if (!el) return
+    // Setting scrollTop synchronously (reading scrollHeight/offsetTop forces
+    // a layout flush) lands the position before the next paint; an rAF wait
+    // would let the user see one paint at the wrong position on a fresh
+    // open. Suppress the resulting scroll event so the listener doesn't
+    // echo our value back to the server.
+    suppressScrollerSync()
+    if (line === 2147483647) {
+      el.scrollTop = el.scrollHeight
+      return
+    }
+    // The server sends `line` as a source-text line index (count of `\n`s
+    // before the section header — see _get_help_section in command.cc, where
+    // webtiles-mode line_height is 1). renderBodyLines emits one
+    // `.overlay-line` per source line, so the index maps directly. We can't
+    // use `line * lineHeight` like the reference client does because long
+    // manual lines wrap on a phone-width body, so source lines and rendered
+    // rows diverge.
+    const lines = el.querySelectorAll<HTMLElement>('.overlay-line')
+    const target = lines[line]
+    if (target) {
+      el.scrollTop = target.offsetTop - el.offsetTop
+      return
+    }
+    const lineH = parseFloat(getComputedStyle(el).lineHeight) || 19
+    el.scrollTop = Math.round(line * lineH)
+  }
+
+  function hideOverlay(): void {
+    autoCloseKbdIfOurs()
+    uiOverlay.style.display = 'none'
+    uiOverlay.innerHTML = ''
+    mapView.element.style.display = ''
+    menuControls.style.display = 'none'
+    menuControls.innerHTML = ''
+    if (!inXMode) {
+      msgLog.style.display = ''
+      showHud()
+    }
+    touchControls.element.style.display = ''
+    requestAnimationFrame(() => {
+      mapView.fitToContainer()
+      view.focus({ preventScroll: true })
+    })
+  }
+
+  function makeItemButton(labelHtml: string, onClick: () => void, color?: string): HTMLButtonElement {
+    const el = document.createElement('button')
+    el.className = 'overlay-item'
+    const labelStyle = color ? ` style="color:${color}"` : ''
+    el.innerHTML = `<span class="overlay-label"${labelStyle}>${labelHtml}</span>`
+    el.addEventListener('click', () => {
+      onClick()
+      view.focus({ preventScroll: true })
+    })
+    return el
+  }
+
+  function showMoreBtn(text?: string): void {
+    moreBtn.textContent = text || '— more —'
+    moreBtn.style.display = ''
+  }
+
+  function hideMoreBtn(): void {
+    moreBtn.style.display = 'none'
+  }
+
+  function disableActivePrompt(): void {
+    activePromptEl?.querySelectorAll('button').forEach(b => { (b as HTMLButtonElement).disabled = true })
+    activePromptEl = null
+  }
+
+  function removeTextInput(): void {
+    const row = msgLog.querySelector<HTMLElement>('.game-text-input-row')
+    if (!row) return
+    row.remove()
+    autoCloseKbdIfOurs()
+  }
+
+  function removeNumpadInput(): void {
+    if (numpadInput.style.display === 'none') return
+    numpadInput.style.display = 'none'
+    numpadInput.innerHTML = ''
+    radiusNumpadActive = false
+  }
+
+  // On-screen numpad for numeric `init_input` prompts (e.g. skill targets).
+  // Each digit/dot tap sends a printable keystroke to the server, which
+  // echoes back via `txt` directly into the highlighted cell — no local
+  // input buffer needed. The server's line_reader sits in OVERWRITE mode
+  // with the prefill selected, so the first keypress replaces it.
+  //
+  // `closeAfterDigit` mode services X-mode 'R' (exclusion radius), where
+  // the server's getchm() reads exactly one digit and resumes immediately.
+  // No prompt is sent for this — we open it client-side after seeing the
+  // outbound 'R' (see afterUserSend).
+  function showNumpadInput(prompt: string, opts?: { closeAfterDigit?: boolean }): void {
+    removeNumpadInput()
+    numpadInput.style.display = ''
+    radiusNumpadActive = opts?.closeAfterDigit ?? false
+
+    if (prompt) {
+      const header = document.createElement('div')
+      header.className = 'numpad-prompt'
+      header.innerHTML = dcssToHtml(prompt)
+      numpadInput.appendChild(header)
+    }
+
+    const grid = document.createElement('div')
+    grid.className = 'numpad-grid'
+
+    // When radiusNumpadActive, the server is blocked in a getchm()
+    // (CMD_MAP_EXCLUDE_RADIUS, viewmap.cc:1101) reading exactly one keystroke.
+    // Whatever we send is computed as `key - '0'` and passed to set_exclude();
+    // for any non-digit key the resulting negative radius is visibly
+    // equivalent to 0 (single cell), because add_exclude_points'
+    // radius_iterator gives up for r < 1 while the root cell still gets
+    // PD_EXCLUDED. So we just close on any tap and dispatch the button's
+    // native message — matches upstream wire behavior exactly.
+    function sendChar(ch: string): void {
+      conn.send({ msg: 'input', text: ch })
+      if (radiusNumpadActive) removeNumpadInput()
+    }
+    function sendKey(keycode: number): void {
+      conn.send({ msg: 'key', keycode })
+      if (radiusNumpadActive) removeNumpadInput()
+    }
+
+    type Btn = { label: string; kind: 'digit' | 'action' | 'primary'; onTap: () => void }
+    // iPhone Numbers-style layout: 7-8-9 across the top, action keys in the
+    // right column. Enter spans two rows at the bottom-right (matches the
+    // tall return key on iOS); digits/`.`/`−` live on the "key" tier, action
+    // keys (⌫, ⎋, ⏎) on a recessed darker tier.
+    const btns: Btn[] = [
+      { label: '7', kind: 'digit', onTap: () => sendChar('7') },
+      { label: '8', kind: 'digit', onTap: () => sendChar('8') },
+      { label: '9', kind: 'digit', onTap: () => sendChar('9') },
+      { label: '⌫', kind: 'action', onTap: () => sendKey(8) },
+      { label: '4', kind: 'digit', onTap: () => sendChar('4') },
+      { label: '5', kind: 'digit', onTap: () => sendChar('5') },
+      { label: '6', kind: 'digit', onTap: () => sendChar('6') },
+      { label: '⎋', kind: 'action', onTap: () => sendKey(27) },
+      { label: '1', kind: 'digit', onTap: () => sendChar('1') },
+      { label: '2', kind: 'digit', onTap: () => sendChar('2') },
+      { label: '3', kind: 'digit', onTap: () => sendChar('3') },
+      { label: '⏎', kind: 'primary', onTap: () => sendKey(13) },
+      { label: '−', kind: 'digit', onTap: () => sendChar('-') },
+      { label: '0', kind: 'digit', onTap: () => sendChar('0') },
+      { label: '.', kind: 'digit', onTap: () => sendChar('.') },
+    ]
+    for (const b of btns) {
+      const btn = document.createElement('button')
+      btn.className = `numpad-btn numpad-${b.kind}`
+      btn.textContent = b.label
+      btn.addEventListener('click', () => {
+        b.onTap()
+        view.focus({ preventScroll: true })
+      })
+      btn.addEventListener('touchstart', (e) => {
+        e.preventDefault()
+        b.onTap()
+      }, { passive: false })
+      grid.appendChild(btn)
+    }
+    numpadInput.appendChild(grid)
+  }
+
+  function showTextInput(prefill: string, maxlen: number, tag?: string): void {
+    removeTextInput()
+    const row = document.createElement('p')
+    row.className = 'game-msg game-text-input-row'
+    const input = document.createElement('input')
+    input.type = 'text'
+    input.className = 'game-text-input'
+    input.inputMode = 'none'
+    input.autocapitalize = 'off'
+    input.autocomplete = 'off'
+    input.spellcheck = false
+    input.value = prefill
+    input.maxLength = maxlen
+    input.addEventListener('keydown', (e) => {
+      e.stopPropagation()
+      if (e.key === 'Enter') {
+        e.preventDefault()
+        const text = input.value + '\r'
+        removeTextInput()
+        // The server's resumable_line_reader still holds the prefill (e.g. the
+        // old ally name) with the cursor at its end, so a bare text_input gets
+        // appended to it ("OldnameNewname"). Wipe the buffer first with Ctrl-U
+        // (kill-to-start, 21) + Ctrl-K (kill-to-end, 11), matching the
+        // reference client (textinput.js send_input_line). The "repeat" count
+        // prompt is excluded there and here — it doesn't carry a prefill.
+        if (tag !== 'repeat') {
+          conn.send({ msg: 'key', keycode: 21 })
+          conn.send({ msg: 'key', keycode: 11 })
+        }
+        conn.send({ msg: 'text_input', text })
+        view.focus({ preventScroll: true })
+      } else if (e.key === 'Escape') {
+        e.preventDefault()
+        removeTextInput()
+        conn.send({ msg: 'key', keycode: 27 })
+        view.focus({ preventScroll: true })
+      }
+    })
+    row.appendChild(input)
+    pushMsgRow(row, false)  // input row isn't pruned by the 50-row cap
+    requestAnimationFrame(() => input.focus())
+    autoOpenKbd()
+  }
+
+  function makePromptRow(text: string): HTMLElement {
+    const row = document.createElement('p')
+    row.className = 'game-msg game-prompt'
+    // Carry a prefix-glyph slot like other .game-msg rows so markLastMsg
+    // can land turn/cmd markers here too (matches reference, where every
+    // .game_message has a .prefix_glyph).
+    const mark = document.createElement('span')
+    mark.className = 'msg-turn-mark'
+    mark.textContent = ' '
+    row.appendChild(mark)
+    const parsed = parsePromptText(text)
+    if (parsed.color) row.style.color = parsed.color
+    // Trigger gate is wider than the per-token matcher, so a message can
+    // pass the gate without producing any buttons (e.g. the inventory
+    // "<w>?</w> for menu" hint sits mid-token). Fall back to rendering
+    // the body in one shot through dcssToHtml — that preserves any
+    // inline markup the comma/or split would have broken.
+    if (!parsed.hasButton) {
+      const body = document.createElement('span')
+      body.innerHTML = dcssToHtml(parsed.body)
+      row.appendChild(body)
+      return row
+    }
+    for (const seg of parsed.segments) {
+      if (seg.kind === 'text') {
+        const span = document.createElement('span')
+        span.innerHTML = dcssToHtml(seg.value)
+        row.appendChild(span)
+      } else {
+        appendActionBtn(row, seg.label, seg.key)
+      }
+    }
+    return row
+  }
+
+  function appendActionBtn(row: HTMLElement, label: string, key: string): void {
+    const btn = document.createElement('button')
+    btn.className = 'action-btn'
+    btn.innerHTML = dcssToHtml(label)
+    btn.addEventListener('click', () => {
+      conn.send({ msg: 'input', text: key })
+      view.focus({ preventScroll: true })
+    })
+    row.appendChild(btn)
+  }
+
+  function buildActionsBar(actionsText: string): HTMLElement {
+    const bar = document.createElement('div')
+    bar.className = 'overlay-footer overlay-actions'
+    const tokens = actionsText.replace(/\.\s*$/, '').split(/,\s*|\s+or\s+/)
+    for (const token of tokens) {
+      // ", or " gets split into ", " + "or X" because the comma alternative
+      // wins first; drop the vestigial "or " so labels read as plain items.
+      const t = token.trim().replace(/^or\s+/, '')
+      if (!t) continue
+      const keyMatch = t.match(/\((.)\)/)
+      if (keyMatch) {
+        const key = keyMatch[1]
+        const btn = document.createElement('button')
+        btn.className = 'action-btn'
+        btn.innerHTML = dcssToHtml(t)
+        btn.addEventListener('click', () => {
+          conn.send({ msg: 'input', text: key })
+          view.focus({ preventScroll: true })
+        })
+        bar.appendChild(btn)
+      } else {
+        const span = document.createElement('span')
+        span.innerHTML = dcssToHtml(t)
+        bar.appendChild(span)
+      }
+    }
+    return bar
+  }
+
+  // Mirrors the reference's `set_last_prefix_glyph` (messages.js): set the
+  // last message's prefix glyph to `_` and tag it `turn` or `cmd` so CSS
+  // can color it (lightgrey turn, darkgrey cmd). If both classes land on
+  // the same span the `turn` color wins, matching reference rule order.
+  function markLastMsg(kind: 'turn' | 'cmd'): void {
+    // msgLog is column-reverse: visual "last" = DOM :first-child.
+    const mark = msgLog.querySelector<HTMLElement>('.game-msg:first-child .msg-turn-mark')
+    if (!mark) return
+    mark.textContent = '_'
+    mark.classList.add(kind)
+  }
+
+  // msgLog uses flex column-reverse: the visual bottom (newest) is DOM
+  // firstChild and the visual top (oldest) is DOM lastChild, so prepend places
+  // a row at the visual bottom (the browser pins scroll there for free) and
+  // pruning the oldest means dropping the DOM lastChild. All message insertion
+  // goes through here so that convention — and the 50-row cap — lives in one
+  // place; reach for appendChild or prune firstChild elsewhere and the log
+  // silently inverts. (rollback / markLastMsg read the newest as firstChild to
+  // match this same convention.)
+  function pushMsgRow(node: Node, prune = true): void {
+    msgLog.prepend(node)
+    if (prune) while (msgLog.children.length > 50) msgLog.lastChild?.remove()
+  }
+
+  function appendMessage(text: string, html = false): void {
+    const p = document.createElement('p')
+    p.className = 'game-msg'
+    const mark = document.createElement('span')
+    mark.className = 'msg-turn-mark'
+    mark.textContent = ' '
+    p.appendChild(mark)
+    const content = document.createElement('span')
+    if (html) content.innerHTML = dcssToHtml(text)
+    else content.textContent = text
+    p.appendChild(content)
+    pushMsgRow(p)
+  }
+
+  return view
+}
+
+// Render a single spellset book as DOM: an optional header line followed
+// by one row per spell with its tile, letter, name, damage effect, and
+// range string. Mirrors the reference client's _fmt_spells_list (see
+// crawl-ref/source/webserver/game_data/static/ui-layouts.js:33).
+function renderSpellbook(loader: TileLoader | null, book: SpellBook, colourSpells: boolean, onSelect: (letter: string) => void): HTMLElement {
+  const wrap = document.createElement('div')
+  wrap.className = 'overlay-spellbook'
+  if (book.label?.trim()) {
+    const label = document.createElement('div')
+    label.className = 'overlay-line'
+    label.innerHTML = dcssToHtml(book.label.replace(/^\n+/, ''))
+    wrap.appendChild(label)
+  }
+  const list = document.createElement('div')
+  list.className = 'overlay-spelllist'
+  for (const spell of book.spells) {
+    const item = document.createElement('button')
+    item.className = 'overlay-spell'
+    if (colourSpells && typeof spell.colour === 'number') {
+      item.style.color = uiColor(spell.colour)
+    }
+    item.appendChild(renderTiles(loader, [{ t: spell.tile, tex: TEX.GUI }], 1))
+    const text = document.createElement('span')
+    text.className = 'overlay-spell-name'
+    text.textContent = ` ${spell.letter} - ${spell.title}`
+    item.appendChild(text)
+    if (spell.effect) {
+      const eff = document.createElement('span')
+      eff.className = 'overlay-spell-effect'
+      eff.innerHTML = dcssToHtml(spell.effect)
+      item.appendChild(eff)
+    }
+    if (spell.range_string) {
+      const rng = document.createElement('span')
+      rng.className = 'overlay-spell-range'
+      rng.innerHTML = dcssToHtml(spell.range_string)
+      item.appendChild(rng)
+    }
+    item.addEventListener('click', () => onSelect(spell.letter))
+    list.appendChild(item)
+  }
+  wrap.appendChild(list)
+  return wrap
+}
+
+// DCSS describe-* bodies mix prose paragraphs with terminal-formatted tables
+// (skill grids, resistance rows). Wrap each line individually so prose lines
+// soft-wrap at the screen edge while tabular lines preserve their column
+// alignment and side-scroll via the body's overflow-x.
+// DCSS quotes (describe-spell, describe-feature, describe-item) are emitted
+// wrapped in <darkgrey>. The wire format from formatted_string::to_colour_string
+// uses opens-only color switches: `<darkgrey>line1\nline2\n...<lightgrey>`
+// with no paired close. Because renderBodyLines runs dcssToHtml per source
+// line with a fresh stack, only line 1 inherits the color; later lines fall
+// back to the default. Walk the body and prepend <darkgrey> to every line of
+// each block so per-line rendering colors them all. The next color tag (or
+// end of body) terminates the switch.
+//
+// Preserve original line breaks and indentation. DCSS quote blocks contain
+// both verse (poems with deliberately short uneven lines, where breaks carry
+// meaning) and prose (80-char hard-wrapped paragraphs). Reflowing one form
+// ruins the other, and the original wire layout is the simplest signal of
+// which is which — let the body's overflow-x handle the prose case rather
+// than guessing.
+//
+// balanceColorTagsAcrossLines won't do this job: opens-only bodies skip it
+// (re-emitting the stack at every newline would blow up the message-log
+// popup), and even on paired bodies it treats `<lightgrey>` as a nested push
+// rather than a color switch.
+function propagateDarkgreyColor(body: string): string {
+  let result = ''
+  let i = 0
+  const OPEN = '<darkgrey>'
+  const CLOSE = '</darkgrey>'
+  while (i < body.length) {
+    const start = body.indexOf(OPEN, i)
+    if (start === -1) { result += body.slice(i); break }
+    result += body.slice(i, start)
+    const innerStart = start + OPEN.length
+    // Terminator: explicit close (paired form, rarely seen in wire data) or
+    // the next color-tag open (opens-only color switch). Pick whichever
+    // comes first; if neither, the block runs to end of body.
+    const closeIdx = body.indexOf(CLOSE, innerStart)
+    const openMatch = body.slice(innerStart).match(/<\w+>/)
+    const nextOpenIdx = openMatch ? innerStart + openMatch.index! : -1
+    let innerEnd: number
+    let isPaired: boolean
+    if (closeIdx !== -1 && (nextOpenIdx === -1 || closeIdx < nextOpenIdx)) {
+      innerEnd = closeIdx; isPaired = true
+    } else if (nextOpenIdx !== -1) {
+      innerEnd = nextOpenIdx; isPaired = false
+    } else {
+      innerEnd = body.length; isPaired = false
+    }
+    const inner = body.slice(innerStart, innerEnd)
+    if (!inner.includes('\n')) {
+      result += isPaired ? `${OPEN}${inner}${CLOSE}` : `${OPEN}${inner}`
+      i = isPaired ? innerEnd + CLOSE.length : innerEnd
+      continue
+    }
+    const propagated = inner.split('\n').map(l => `${OPEN}${l}`).join('\n')
+    if (isPaired) {
+      result += `${propagated}${CLOSE}`
+      i = innerEnd + CLOSE.length
+    } else {
+      result += propagated
+      i = innerEnd
+    }
+  }
+  return result
+}
+
+// Ego/artprop descriptions arrive pre-formatted by the server's
+// _format_prop_desc (describe.cc): a `Label: ` prefix, the description
+// hard-wrapped at 80 columns, and every continuation line padded with
+// spaces to align under the description column. That layout assumes an
+// 80-char terminal — at phone width each source line soft-wraps again and
+// the block turns into a jagged staircase. Detect the shape precisely
+// (first line has `label:` + padding + text; following lines indented with
+// exactly that many spaces), join each block into one logical line with the
+// padding collapsed, and tag it with HANG_MARK so renderBodyLines reflows
+// it as prose with a compact CSS hanging indent. Collapsing the padding
+// also keeps isTabularLine from classifying the joined line as nowrap.
+// Verse/quote lines never carry the exact-column indent, so they pass
+// through untouched. Lines with markup tags before the colon (stat rows,
+// key-help rows) are skipped by the [^<] guard.
+export const HANG_MARK = '\u0001'
+
+export function unwrapHangingIndents(body: string): string {
+  const lines = body.split('\n')
+  const out: string[] = []
+  // Active opens-only color carried across lines. Quote blocks arrive as
+  // `<darkgrey>` on their first line only (formatted_string color switch),
+  // so later quote lines are raw text — dialogue-format quotes
+  // ("Buttercup:    “And to think…”") would otherwise match the label-row
+  // shape. Never mark inside a darkgrey block.
+  let activeColor = ''
+  const trackTags = (l: string): void => {
+    for (const t of l.matchAll(/<(\/?)(\w+)>/g)) {
+      if (t[1]) activeColor = ''
+      else if (t[2] in DCSS_COLOR_MAP) activeColor = t[2]
+    }
+  }
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i]
+    const shielded = activeColor === 'darkgrey'
+    trackTags(line)
+    const m = shielded ? null : line.match(/^([^\s<][^<]*?:)( +)(?=\S)/)
+    if (m) {
+      const col = m[1].length + m[2].length
+      const contRe = new RegExp(`^ {${col}}(?=\\S)`)
+      let j = i + 1
+      while (j < lines.length && contRe.test(lines[j])) j++
+      if (j > i + 1) {
+        // Keep line 1 verbatim (label + original padding) — renderBodyLines
+        // re-derives the description column from it to set the hang width,
+        // so wrapped text aligns under the description column.
+        const joined = [line, ...lines.slice(i + 1, j).map(l => l.slice(col))].join(' ')
+        out.push(HANG_MARK + joined)
+        for (let k = i + 1; k < j; k++) trackTags(lines[k])
+        i = j - 1
+        continue
+      }
+      // Single-line padded-label row: same server formatter, but the
+      // description fit within one wire line so there's no continuation
+      // indent to validate against. At phone width these still misbehave:
+      // ≥3 padding spaces trips isTabularLine into nowrap (row pans
+      // offscreen), while a 2-space pad (9-char labels like "*Corrode:")
+      // soft-wraps flush-left. Mark them so they wrap within the
+      // description column like the joined blocks; rows that fit render
+      // pixel-identical to the nowrap form. Guards: padding ≥2 spaces (a
+      // single space is ordinary prose, e.g. "Mesmerism radius: 2"), short
+      // label, description column ≤18 (the widest real formatter column —
+      // excludes right-aligned-to-col-80 layouts like the god-powers
+      // "Granted powers:        (Cost)" header), and no multi-space runs in
+      // the remainder (multi-column rows keep their alignment).
+      if (m[2].length >= 2 && m[1].length <= 16 && col <= 18 && !/ {3,}/.test(line.slice(col))) {
+        out.push(HANG_MARK + line)
+        continue
+      }
+    }
+    out.push(line)
+  }
+  return out.join('\n')
+}
+
+// `terminal` renders the body as one fixed-width block: every line is nowrap
+// and the stat-row/per-line-tabular reformatting is skipped, so the caller can
+// scale the whole block to fit (see fitTerminalBody). Used for the game-over
+// screen; the describe-* panels keep the per-line heuristic (terminal=false).
+function renderBodyLines(rawBody: string, highlight: string, terminal = false): string {
+  return balanceColorTagsAcrossLines(rawBody).split('\n').map(line => {
+    // Lines marked by unwrapHangingIndents wrap with a hanging indent.
+    // propagateDarkgreyColor may have prepended tags, so the mark isn't
+    // necessarily at index 0. The marked line keeps its original
+    // `label + padding` prefix; re-derive the description column from it so
+    // wrapped text aligns under the column (the body is monospace, so Nch
+    // matches N wire characters exactly). Padded columns are honored up to
+    // 18ch (the widest real DBRAND label, "Manifold Assault:") — beyond
+    // that, and for single-space run-in labels like `'Of mesmerism': `,
+    // fall back to a compact 2ch hang.
+    const hang = line.includes(HANG_MARK)
+    let hangStyle = ''
+    if (hang) {
+      line = line.replace(HANG_MARK, '')
+      const pm = line.match(/^[^\s<][^<]*?:( +)(?=\S)/)
+      const col = pm ? pm[0].length : 0
+      if (pm && pm[1].length >= 2 && col <= 18) hangStyle = ` style="--hang-col:${col}ch"`
+    }
+    if (!terminal && !hang) {
+      const stat = tryStatRow(line)
+      if (stat) return stat
+      const plain = plainStatSegments(line)
+      if (plain) {
+        const chips = plain.map(s => `<span class="overlay-stat">${dcssToHtml(s)}</span>`).join('')
+        return `<div class="overlay-line overlay-stat-row">${chips}</div>`
+      }
+    }
+    let cls = hang
+      ? 'overlay-line overlay-line--hang'
+      : terminal || isTabularLine(line)
+        ? 'overlay-line overlay-line--nowrap'
+        : 'overlay-line'
+    // Indented prose sub-items ("    Your skill: 3.6", "    At 100%
+    // training you would reach 18.0 in about 9.3 XLs." — describe.cc
+    // emits these with a 4-space indent): wrap with a hanging indent at
+    // the line's own depth so continuations stay aligned under the
+    // sub-item instead of falling flush-left. The leading spaces render
+    // on line 1 as-is; the negative text-indent/padding pair only moves
+    // the wrapped lines. Deeply indented lines (>18) are left alone.
+    if (cls === 'overlay-line' && !hang) {
+      const ind = /^( {2,})\S/.exec(line)?.[1].length ?? 0
+      if (ind > 0 && ind <= 18) {
+        cls += ' overlay-line--hang'
+        hangStyle = ` style="--hang-col:${ind}ch"`
+      }
+    }
+    const html = applyHighlight(dcssToHtml(line), highlight) || '&nbsp;'
+    return `<div class="${cls}"${hangStyle}>${html}</div>`
+  }).join('')
+}
+
+// renderBodyLines splits the body on `\n` and runs dcssToHtml per line with
+// a fresh stack — so a `<darkgrey>quote line 1\nquote line 2</darkgrey>` block
+// renders only line 1 in darkgrey, with subsequent lines defaulting. Walk the
+// body once and at each newline emit the current open-stack as closes (before
+// the \n) and reopens (after the \n), so each line is self-contained.
+//
+// Skip this for opens-only bodies: the wire format from
+// formatted_string::to_colour_string (format.cc:357) emits `<newcolor>` with
+// no closing tag — switching color is implicit replace, not nesting. The full
+// message-log popup is encoded this way, with ~1900 opens across ~440 lines.
+// Stacking those would emit the entire growing stack at every newline, blowing
+// up to hundreds of thousands of spans. Opens-only lines also each start with
+// an explicit color, so per-line rendering already gets the right color.
+function balanceColorTagsAcrossLines(body: string): string {
+  if (!body.includes('</')) return body
+  const stack: string[] = []
+  const out: string[] = []
+  for (const token of body.split(/(<\/?[a-zA-Z]+>|\n)/)) {
+    if (!token) continue
+    if (token === '\n') {
+      for (let i = stack.length - 1; i >= 0; i--) out.push(`</${stack[i]}>`)
+      out.push('\n')
+      for (const tag of stack) out.push(`<${tag}>`)
+      continue
+    }
+    const close = token.match(/^<\/([a-zA-Z]+)>$/)
+    const open = token.match(/^<([a-zA-Z]+)>$/)
+    if (close && stack.length > 0) stack.pop()
+    else if (open && open[1] in DCSS_COLOR_MAP) stack.push(open[1])
+    out.push(token)
+  }
+  return out.join('')
+}
+
+// Detect a stat-row line — one whose entire content is fixed-width
+// `<color>label: value   </color>` blocks with whitespace padding (the
+// "Max HP / Will / AC / EV" and "Class / Size / Int" rows in describe-
+// monster). Reformat as a flex row of compact chips so all stats fit on
+// a phone screen instead of overflowing the 80-char column layout.
+function tryStatRow(line: string): string | null {
+  const blocks: { color: string; text: string }[] = []
+  let lastEnd = 0
+  const re = /<(\w+)>([^<]*)<\/\1>/g
+  let m: RegExpExecArray | null
+  while ((m = re.exec(line)) !== null) {
+    if (line.slice(lastEnd, m.index).trim()) return null
+    const inner = m[2].trim()
+    if (!inner.includes(':')) return null
+    blocks.push({ color: m[1], text: inner })
+    lastEnd = m.index + m[0].length
+  }
+  if (line.slice(lastEnd).trim()) return null
+  if (blocks.length < 2) return null
+  const html = blocks
+    .map(b => `<span class="overlay-stat">${dcssToHtml(`<${b.color}>${b.text}</${b.color}>`)}</span>`)
+    .join('')
+  return `<div class="overlay-line overlay-stat-row">${html}</div>`
+}
+
+// Untagged multi-stat lines: `label: value` pairs separated by 2+ spaces,
+// all on one line. Real shapes: the weapon header "Base accuracy: -2  Base
+// damage: 13  Base attack delay: 1.6" (describe.cc:1577), the armour header
+// "Base armour rating: 5     Encumbrance rating: 2" (describe.cc:2288), the
+// spell header "Level: 5        Schools: Conjuration" (describe.cc:4218).
+// At phone width these soft-wrap mid-pair ("Base / attack delay: 1.6");
+// rendering them as the same chip row used for tagged stat rows lets pairs
+// wrap as units. Indented lines are sub-items, not stat headers — skip.
+export function plainStatSegments(line: string): string[] | null {
+  if (line.includes('<') || /^\s/.test(line)) return null
+  const segs = line.trim().split(/ {2,}/)
+  if (segs.length < 2) return null
+  for (const s of segs) {
+    if (!/^[^\s:][^:]{0,23}: \S/.test(s)) return null
+  }
+  return segs
+}
+
+function isTabularLine(line: string): boolean {
+  const stripped = line.replace(/<[^>]+>/g, '')
+  if (/^\s*-{3,}[\s-]*$/.test(stripped)) return true
+  if (/\S {3,}\S/.test(stripped)) return true
+  // Key-help row: line begins with a colour-wrapped key followed by " : "
+  // (e.g. "<white>Shift-Dir.<lightgrey> : Move the cursor..."). The intra-
+  // line gap can be just one space when the key string consumed its
+  // padding, so the \S {3,}\S check above misses it. DCSS's wire format
+  // uses opens-only color switches (not paired closes), so the second tag
+  // matches either form.
+  if (/^<\w+>[^<]+<\/?\w+>\s*:\s/.test(line)) return true
+  // Right-column-only continuation from column_composer: when the left
+  // column is empty the row is ~40-42 leading spaces + right-column content
+  // (column 0 width is 40 in targeting help, 42 in the main keyhelp). The
+  // threshold sits above the manual's deepest prose indent (28 leading
+  // spaces, the cover-page banner; species sub-bullets use 10) so prose
+  // paragraphs keep wrapping.
+  if (/^ {30,}\S/.test(stripped)) return true
+  return false
+}
+
+function applyHighlight(html: string, pattern: string): string {
+  if (!pattern) return html
+  try {
+    const re = new RegExp(`[^\n]*(${pattern})[^\n]*\n?`, 'g')
+    return html.replace(re, (line) => `<span class="crt-highlight">${line}</span>`)
+  } catch { return html }
+}
+
+function stripDcss(text: string): string {
+  return text.replace(/<[^>]+>/g, '')
+}
+
+function formatMore(raw: string, scrollPos = 'top'): string {
+  return stripDcss(raw).replace(/XXX/g, scrollPos).trim()
+}
+
+function formatMoreHtml(raw: string, scrollPos = 'top'): string {
+  return dcssToHtml(raw.replace(/XXX/g, scrollPos))
+}
+
+function computeScrollPos(el: HTMLElement): string {
+  const { scrollTop, scrollHeight, clientHeight } = el
+  if (scrollTop <= 0) return 'top'
+  if (scrollTop + clientHeight >= scrollHeight - 1) return 'bot'
+  return `${Math.round(scrollTop / (scrollHeight - clientHeight) * 100)}%`
+}
+

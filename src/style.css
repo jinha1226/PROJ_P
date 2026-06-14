@@ -1,0 +1,2831 @@
+/* ── Reset & base ─────────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  /* Amber CRT theme — warm near-black surfaces, amber accent.
+     Map (#map-grid) intentionally stays at #000000 because DCSS bg color
+     bytes (bg0–bg15) are calibrated for a black background; tinting it
+     would shift every cell's apparent color. The chrome around the map
+     uses --bg's warm near-black so the seam reads as a deliberate frame. */
+  --bg:        #0a0908;
+  --surface:   #14110f;
+  --surface2:  #1f1b18;
+  --accent:    #f59e0b;
+  --text:      #e7e5e4;
+  --text-dim:  #a8a29e;
+  --danger:    #ef4444;
+  --warn:      #facc15;
+  --ok:        #84cc16;
+  --border:    rgba(245, 158, 11, 0.12);
+
+  --font-mono: ui-monospace, 'SFMono-Regular', Menlo, 'Courier New', monospace;
+  --font-ui:   system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --map-font-size: 17px;
+  --map-line-height: 1.0;
+  --crt-line-height: 1.2;
+
+  /* Server-menu/overlay font scale. Most server menus (i, a, shops,
+     descriptions) read through the .overlay-* classes; the skills menu reads
+     through #crt-display. Both paths share these tokens, so they're the single
+     knob for menu text. --fs-overlay is reading text (rows, descriptions,
+     titles, CRT body); --fs-overlay-chrome is secondary labels (headers,
+     footers). Control buttons stay literal — different role. */
+  --fs-overlay:        0.9rem;
+  --fs-overlay-chrome: 0.8rem;
+
+  --app-bottom-pad: 25px;
+  touch-action: manipulation;
+}
+
+html, body {
+  height: 100%;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-mono);
+  overflow: hidden;
+}
+
+#app {
+  height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  padding-bottom: var(--app-bottom-pad);
+}
+
+/* ── Login view ───────────────────────────────────────────── */
+#login-view {
+  flex: 1;
+  display: flex;
+  align-items: safe center;
+  justify-content: center;
+  padding: 1rem;
+  background: var(--bg);
+  overflow-y: auto;
+}
+
+.login-card {
+  width: 100%;
+  max-width: 360px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 1.5rem 1.25rem;
+}
+
+.login-title {
+  font-size: 1.4rem;
+  color: var(--accent);
+  text-align: center;
+  margin-bottom: 1.25rem;
+  letter-spacing: 0.1em;
+}
+
+.login-section { margin-bottom: 1.5rem; }
+.login-spectate-section { margin-bottom: 0; }
+
+.login-section-label {
+  font-size: 0.72rem;
+  color: var(--text-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  margin-bottom: 0.6rem;
+}
+
+.login-account-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.login-account-card {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  grid-template-areas: "tag user arrow";
+  align-items: center;
+  gap: 0 0.7rem;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  color: var(--text);
+  font-family: var(--font-mono);
+  padding: 0.55rem 0.7rem;
+  cursor: pointer;
+  text-align: left;
+  width: 100%;
+}
+
+.login-account-card:active { background: rgba(245, 158, 11, 0.08); }
+.login-account-card:disabled { opacity: 0.5; cursor: default; }
+
+.login-account-tag {
+  grid-area: tag;
+  background: rgba(245, 158, 11, 0.15);
+  color: var(--accent);
+  border-radius: 3px;
+  padding: 0.25rem 0.5rem;
+  font-size: 0.78rem;
+  font-weight: bold;
+  letter-spacing: 0.05em;
+  min-width: 3rem;
+  text-align: center;
+}
+
+.login-account-username {
+  grid-area: user;
+  font-size: 1rem;
+  color: var(--text);
+}
+
+.login-account-card::after {
+  content: "→";
+  grid-area: arrow;
+  color: var(--text-dim);
+  font-size: 1.1rem;
+}
+.login-account-card:disabled::after { content: "…"; }
+
+.login-add-section > summary {
+  cursor: pointer;
+  font-size: 0.9rem;
+  color: var(--text-dim);
+  list-style: none;
+}
+.login-add-section > summary::-webkit-details-marker { display: none; }
+.login-add-section > summary::before {
+  content: "+";
+  display: inline-block;
+  width: 1ch;
+  margin-right: 0.5ch;
+  text-align: center;
+}
+.login-add-section[open] > summary::before { content: "−"; }
+.login-add-section[open] > summary { margin-bottom: 0.6rem; }
+
+.login-spectate-select {
+  display: block;
+  width: 100%;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  color: var(--text-dim);
+  font-family: var(--font-mono);
+  font-size: 1rem;
+  padding: 0.5rem 0.75rem;
+  outline: none;
+  margin-bottom: 0.5rem;
+}
+.login-spectate-select:focus { border-color: var(--accent); color: var(--text); }
+
+.login-label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  margin-bottom: 0.85rem;
+  font-size: 0.85rem;
+  color: var(--text-dim);
+}
+
+.login-label input,
+.login-label select {
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  font-family: var(--font-mono);
+  font-size: 1rem;
+  padding: 0.5rem 0.75rem;
+  outline: none;
+}
+
+.login-label input { color: var(--text); }
+.login-label select { color: var(--text-dim); }
+
+.login-label input:focus,
+.login-label select:focus { border-color: var(--accent); }
+.login-label select:focus { color: var(--text); }
+
+.login-error {
+  color: var(--danger);
+  font-size: 0.85rem;
+  margin-bottom: 0.75rem;
+}
+
+.login-btn {
+  width: 100%;
+  background: var(--accent);
+  border: none;
+  border-radius: 4px;
+  color: var(--bg);
+  font-family: var(--font-mono);
+  font-size: 1rem;
+  font-weight: bold;
+  padding: 0.7rem;
+  cursor: pointer;
+}
+
+.login-btn:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.login-btn-spectate {
+  background: transparent;
+  color: var(--text-dim);
+  border: 1px solid var(--border);
+  font-weight: normal;
+}
+
+.login-footer {
+  margin-top: 1.5rem;
+  text-align: center;
+  font-size: 0.8rem;
+  color: var(--muted, #888);
+}
+
+.login-footer a {
+  color: inherit;
+  text-decoration: underline;
+}
+
+.login-footer a + a {
+  margin-left: 0.75rem;
+}
+
+/* ── Lobby view ───────────────────────────────────────────── */
+#lobby-view {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  padding: 1rem;
+  gap: 0.75rem;
+  overflow-y: auto;
+}
+
+.lobby-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.5rem;
+  min-height: 36px;
+}
+
+.lobby-account-chip-wrap {
+  position: relative;
+}
+
+.lobby-account-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  color: var(--text);
+  font-family: var(--font-mono);
+  font-size: 0.8rem;
+  padding: 0.4rem 0.6rem;
+  cursor: pointer;
+}
+
+/* Static identity badge (non-interactive). Pill shape distinguishes it from
+   the back button next to it so the user doesn't read it as tappable. */
+.lobby-account-chip.is-guest {
+  cursor: default;
+  background: var(--surface);
+  border: none;
+  border-radius: 999px;
+  color: var(--text-dim);
+  padding: 0.3rem 0.7rem;
+}
+
+.lobby-chip-user { color: var(--accent); }
+.lobby-chip-sep  { color: var(--text-dim); }
+.lobby-chip-tag  { color: var(--accent); }
+.lobby-chip-role {
+  color: var(--text-dim);
+}
+.lobby-account-chip.is-guest .lobby-chip-sep { opacity: 0.55; }
+.lobby-chip-caret {
+  color: var(--text-dim);
+  margin-left: 0.1rem;
+  font-size: 0.7rem;
+}
+
+.lobby-account-chip[aria-expanded="true"] {
+  background: var(--surface2);
+}
+
+.lobby-account-menu {
+  position: absolute;
+  top: calc(100% + 4px);
+  right: 0;
+  z-index: 20;
+  min-width: 8rem;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  flex-direction: column;
+  padding: 0.25rem;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+.lobby-account-menu[hidden] { display: none; }
+.lobby-account-menu:not([hidden]) { display: flex; }
+
+.lobby-account-menu-item {
+  background: transparent;
+  border: none;
+  color: var(--text);
+  font-family: var(--font-mono);
+  font-size: 0.85rem;
+  padding: 0.5rem 0.75rem;
+  text-align: left;
+  cursor: pointer;
+  border-radius: 3px;
+}
+.lobby-account-menu-item:active { background: var(--surface2); }
+
+.lobby-btn-primary {
+  background: var(--accent);
+  border: none;
+  border-radius: 4px;
+  color: var(--bg);
+  font-family: var(--font-mono);
+  font-size: 0.95rem;
+  font-weight: bold;
+  padding: 0.6rem 1rem;
+  cursor: pointer;
+  align-self: flex-start;
+}
+
+.lobby-btn-secondary {
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  color: var(--text-dim);
+  font-family: var(--font-mono);
+  font-size: 0.8rem;
+  padding: 0.4rem 0.6rem;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+/* Trunk headline button: same size/prominence as the filled stable primary,
+   but an outline (not filled) treatment. The two headline buttons render in a
+   fixed order (stable on top); differentiating trunk by fill vs. outline — not
+   just position — keeps a player who's used to a trunk-first server (CAO/CPO)
+   from launching stable by reflex. Overrides the .lobby-btn-primary fill via
+   later source order (equal specificity). */
+.lobby-btn-trunk {
+  background: transparent;
+  border: 1px solid var(--accent);
+  color: var(--accent);
+}
+
+/* Ghost nav button used for "← Back"-style header actions in the lobby and
+   spectator header. No static border so it doesn't compete with the identity
+   pill beside it; press feedback comes from a tinted background. */
+.lobby-btn-ghost {
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  color: var(--text);
+  font-family: var(--font-mono);
+  font-size: 0.9rem;
+  padding: 0.4rem 0.65rem 0.4rem 0.5rem;
+  cursor: pointer;
+  white-space: nowrap;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.2rem;
+  min-height: 32px;
+}
+.lobby-btn-ghost:hover {
+  background: var(--surface);
+  border-color: var(--border);
+}
+.lobby-btn-ghost:active { background: var(--surface2); }
+.lobby-btn-ghost:focus-visible {
+  outline: 1px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.lobby-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  align-items: stretch;
+}
+
+.lobby-actions .lobby-btn-primary,
+.lobby-actions .lobby-btn-secondary {
+  align-self: stretch;
+  text-align: left;
+}
+
+.lobby-more-games {
+  margin-top: 0.25rem;
+}
+
+.lobby-more-games-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin-top: 0.4rem;
+}
+
+.lobby-more-games > summary {
+  cursor: pointer;
+  font-size: 0.8rem;
+  color: var(--text-dim);
+  padding: 0.3rem 0;
+  list-style: none;
+}
+
+.lobby-more-games > summary::-webkit-details-marker { display: none; }
+.lobby-more-games > summary::before { content: "▸ "; }
+.lobby-more-games[open] > summary::before { content: "▾ "; }
+
+.lobby-section-title {
+  font-size: 0.8rem;
+  color: var(--text-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+}
+
+.lobby-section-divider {
+  font-size: 0.75rem;
+  color: var(--text-dim);
+  text-align: center;
+  padding: 0.4rem 0 0.2rem;
+  letter-spacing: 0.05em;
+}
+
+.lobby-notice {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: var(--surface);
+  border: 1px solid var(--warn);
+  border-radius: 4px;
+  color: var(--warn);
+  font-size: 0.85rem;
+  padding: 0.5rem 0.75rem;
+}
+
+.lobby-list { display: flex; flex-direction: column; gap: 0.4rem; }
+.lobby-loading, .lobby-empty { color: var(--text-dim); font-size: 0.85rem; }
+
+.lobby-game-row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 0.5rem 1.6rem 0.5rem 0.75rem;
+  cursor: pointer;
+  position: relative;
+}
+
+.lobby-game-row::after {
+  content: "→";
+  position: absolute;
+  right: 0.6rem;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--text-dim);
+  font-size: 0.95rem;
+  pointer-events: none;
+}
+
+.lobby-game-row:active { background: var(--surface2); }
+.lobby-game-row:focus-visible {
+  outline: 1px solid var(--accent);
+  outline-offset: -1px;
+}
+
+.lobby-game-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+.lobby-game-toprow {
+  display: flex;
+  align-items: baseline;
+  gap: 0.4em;
+  min-width: 0;
+}
+.lobby-game-user {
+  color: var(--accent);
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.lobby-game-row.is-idle .lobby-game-user { color: var(--text-dim); }
+.lobby-game-info { font-size: 0.85rem; color: var(--text-dim); }
+.lobby-game-idle { flex: 0 0 auto; white-space: nowrap; font-size: 0.8rem; color: var(--text-dim); }
+.lobby-game-idle:empty { display: none; }
+
+.lobby-game-watchers {
+  color: var(--accent);
+  opacity: 0.85;
+}
+
+.lobby-game-version {
+  font-style: italic;
+  opacity: 0.7;
+}
+
+/* Post-game exit dialog (forwarded from the game view via GameExit). */
+.lobby-exit-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  background: rgba(0, 0, 0, 0.6);
+}
+.lobby-exit-card {
+  width: 100%;
+  max-width: 30rem;
+  max-height: 100%;
+  overflow-y: auto;
+  background: var(--surface);
+  /* Firmer border + drop shadow so the card reads as floating above the
+     dimmed lobby behind it. */
+  border: 1px solid rgba(245, 158, 11, 0.22);
+  border-radius: 10px;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.55);
+  padding: 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  font-family: var(--font-mono);
+}
+.lobby-exit-reason {
+  font-size: 0.95rem;
+  line-height: 1.5;
+  color: var(--text);
+}
+.lobby-exit-summary {
+  margin: 0;
+  white-space: pre;
+  overflow-x: hidden;
+  font-size: 0.85rem;
+  line-height: 1.5;
+  color: var(--text);
+}
+/* Action row, divided from the recap by a hairline. Close is pushed to the
+   right by margin-auto so it sits opposite the morgue link (or alone at the
+   right when there's no morgue). */
+.lobby-exit-footer {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--border);
+}
+/* Pushed to the right edge, opposite Close — mirrors the reference layout. */
+.lobby-exit-link {
+  margin-left: auto;
+  color: var(--accent);
+  text-decoration: underline;
+  font-size: 0.95rem;
+}
+/* Peer of the morgue link, not a CTA: a light dim text button, padded only
+   enough for a comfortable tap target. */
+.lobby-exit-close {
+  padding: 0.5rem 0.75rem;
+  font-family: var(--font-mono);
+  font-size: 0.95rem;
+  color: var(--text-dim);
+  background: transparent;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.lobby-exit-close:active { background: var(--surface2); }
+
+/* ── In-app document modal (About / What's new) ───────────── */
+/* Floats above login/lobby; rendered from ABOUT.md / CHANGELOG.md. Backdrop and
+   card mirror the exit dialog; z-index sits above it. */
+.doc-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  background: rgba(0, 0, 0, 0.6);
+}
+.doc-card {
+  width: 100%;
+  max-width: 34rem;
+  max-height: 100%;
+  display: flex;
+  flex-direction: column;
+  background: var(--surface);
+  border: 1px solid rgba(245, 158, 11, 0.22);
+  border-radius: 10px;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.55);
+  font-family: var(--font-mono);
+  overflow: hidden;
+}
+.doc-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.85rem 1rem;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+.doc-title { color: var(--accent); font-size: 1rem; }
+.doc-close {
+  padding: 0.35rem 0.6rem;
+  font-family: var(--font-mono);
+  font-size: 1rem;
+  color: var(--text-dim);
+  background: transparent;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.doc-close:active { background: var(--surface2); }
+.doc-body {
+  overflow-y: auto;
+  padding: 0.75rem 1rem 1.5rem;
+  color: var(--text);
+  /* Proportional font for prose readability; inline code/keys stay monospace
+     via the explicit --font-mono on .doc-body code below. */
+  font-family: var(--font-ui);
+  font-size: 0.9rem;
+  line-height: 1.6;
+}
+.doc-body h1, .doc-body h2, .doc-body h3 { line-height: 1.3; }
+.doc-body h1 { font-size: 1.2rem; margin: 1.2rem 0 0.6rem; color: var(--text); }
+.doc-body h2 { font-size: 1.05rem; margin: 1.5rem 0 0.5rem; color: var(--accent); }
+.doc-body h3 { font-size: 0.95rem; margin: 1rem 0 0.4rem; color: var(--text); }
+.doc-body p { margin: 0 0 0.8rem; }
+.doc-body ul { margin: 0 0 0.9rem; padding-left: 1.2rem; }
+.doc-body li { margin-bottom: 0.4rem; }
+.doc-body a { color: var(--accent); text-decoration: underline; }
+.doc-body strong { color: var(--text); }
+.doc-body code {
+  font-family: var(--font-mono);
+  font-size: 0.85em;
+  background: var(--surface2);
+  padding: 0.1em 0.35em;
+  border-radius: 3px;
+  word-break: break-word;
+}
+
+/* ── Game view ────────────────────────────────────────────── */
+#game-view {
+  /* Message-log typography, declared once so the height calc below can never
+     drift from what #game-messages actually renders at. */
+  --msglog-font: 0.75rem;
+  --msglog-line: 1.3;
+  /* Message-log height: 5 lines (≡ the old `5lh`, but usable from other
+     elements' contexts — `lh` would re-resolve against the consumer's own
+     line-height). A var so the spell-row rules below can offset #more-btn
+     by exactly the log's height. */
+  --msglog-h: calc(5 * var(--msglog-font) * var(--msglog-line));
+  /* Floating-log scrim. Text legibility comes from the text-shadow on
+     #game-messages, so the scrim's job is figure/ground separation — dimming
+     the map content behind the log. ASCII is the binding case: behind the log
+     are full-brightness bold glyphs (text over text), and only the scrim
+     keeps the layers apart, so it needs the stronger wash. Tiles are
+     continuous imagery the eye parses as "behind" on its own — the
+     .tiles-mode override lightens it (set by setRenderMode in game-view.ts,
+     which is also what swaps in TileMapView). */
+  --msglog-bg: color-mix(in srgb, var(--bg) 30%, transparent);
+  /* Spell-rail button band: 32px tile + 2×2px button padding + own 0.25rem
+     padding. Shared so the rail's height, the log float that sits just above it,
+     and the --more-- offset that clears both stay locked together. */
+  --spell-rail-h: calc(36px + 0.5rem);
+  position: relative;
+  flex: 1;
+  display: grid;
+  /* No `msg` row: the message log and spell rail both float over the map
+     (position:absolute, see their rules) so the map's 1fr claims the full
+     height. Keeping them out of flow is what makes the rail's post-harvest
+     arrival a non-event for the map's size — no re-fit, no jump. */
+  grid-template-rows: 1fr auto auto auto;
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-areas:
+    "map"
+    "hud"
+    "touch"
+    "menu";
+  overflow: hidden;
+  outline: none;
+}
+
+/* Map wrapper */
+#map-wrap {
+  grid-area: map;
+  position: relative;
+  min-height: 0;
+  overflow: hidden;
+  display: flex;
+}
+#map-wrap > #map-grid { flex: 1; }
+
+/* Map */
+#map-grid {
+  background: #000000;
+  color: var(--text);
+  font-family: var(--font-mono);
+  font-size: var(--map-font-size);
+  line-height: var(--map-line-height);
+  font-weight: bold;
+  overflow: hidden;
+  padding: 2px;
+  white-space: pre;
+  user-select: none;
+  height: 100%;
+  min-height: 0;
+  box-sizing: border-box;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  /* Center the rendered grid vertically. The player glyph sits at the
+     viewport's center, so centering keeps it at the center of the content box
+     regardless of viewport row count — the map stays a fixed reticle the
+     world scrolls under, instead of sliding whenever a refit adds/removes
+     rows (e.g. the HUD revealing on load, or status lights growing it
+     mid-session). fitToContainer always expands the viewport to fill the
+     container, so steady-state slack is sub-row (~8px) and centering vs.
+     bottom-anchoring is visually a wash there; the difference only shows
+     during a resize, which is exactly when centering is calmer. The
+     floating monster-list overlay is position:absolute (top-left), so it
+     doesn't depend on slack landing above the map. The row-drop hazard a
+     1-2px container shrink could introduce (crossing floor(availH/lineH))
+     is handled by the hysteresis in MapView.fitToContainer().
+     EXCEPTION: portrait ASCII mode overrides this to flex-start (see the
+     portrait rules) — there the rows deliberately overrun the content box
+     downward, behind the floating log, and centered overflow would spill
+     out BOTH edges, clipping the top rows. MapView.centerRow keeps the
+     player reticle at the clear-area middle in that anchoring. */
+  justify-content: center;
+}
+
+#map-grid div { display: flex; }
+#map-grid span { display: inline-block; width: 1ch; }
+#map-grid span.map-cursor { position: relative; isolation: isolate; }
+#map-grid span.map-cursor::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  outline: 1px solid #fce94f;
+  outline-offset: -1px;
+  background-color: rgba(252, 233, 79, 0.15);
+  pointer-events: none;
+}
+
+/* Tile-render variant of #map-grid: drops the font-based <pre> layout for a
+   single full-bleed <canvas>. Padding matches the ASCII variant so swapping
+   doesn't shift the surrounding HUD. */
+#map-grid.map-tile {
+  font-family: var(--font-mono);
+  position: relative;
+}
+/* Anchor the full-bleed canvas to the content box's top-left corner in ALL
+   modes: its position must be exactly the --map-col/row-shift sub-cell
+   margins below, so no flex centering may redistribute the overflow. The
+   `#game-view` prefix keeps this ahead of the portrait/x-mode ASCII
+   anchoring rules (equal specificity would let the later x-mode `center`
+   win; those rules are scoped :not(.map-tile) for the same reason). */
+#game-view #map-grid.map-tile {
+  justify-content: flex-start;
+  align-items: flex-start;
+}
+#map-grid.map-tile .map-tile-canvas {
+  display: block;
+  /* The canvas deliberately overruns the content box (full-bleed, clipped at
+     the element edges). As a flex item it would otherwise flex-shrink to fit
+     the container, squishing the CSS scale. */
+  flex: none;
+  /* Sub-cell shifts set inline by TileMapView.fitToContainer: pull the
+     canvas up/left so the player cell's center sits exactly on the element's
+     horizontal center and the clear area's vertical center, with partial
+     cells clipping at the edges instead of leaving slack bands. ASCII never
+     sets these — a clipped half-glyph reads as a bug, so MapView fits whole
+     rows only. */
+  margin-top: var(--map-row-shift, 0px);
+  margin-left: var(--map-col-shift, 0px);
+  /* image-rendering: pixelated downsamples cleanly when the rendered cell is
+     smaller than the 32px atlas tile. Without it WebKit applies bilinear by
+     default and 12-14 px cells become a blurry mush. */
+  image-rendering: pixelated;
+}
+
+/* Messages */
+#game-messages {
+  /* Floats translucently over the map's edge in BOTH orientations (bottom in
+     portrait, top in landscape — the per-orientation rules set the anchor) so
+     the map keeps its full height: the log never occupies an in-flow row that
+     would shrink it. Out of flow also means the log's content/width can't feed
+     back into the map's size, so the map fits once and never re-jumps. */
+  grid-area: map;
+  position: absolute;
+  left: 0;
+  right: 0;
+  z-index: 3;
+  background: var(--msglog-bg);
+  /* Tight black halo + 1px drop: keeps every DCSS message color (incl. brown/
+     darkgrey) legible over bright floor tiles without raising the scrim —
+     the scrim level is tuned for layer separation, not contrast (see
+     --msglog-bg). Inherits to all log content. */
+  text-shadow: 0 1px 2px #000, 0 0 3px #000;
+  font-size: var(--msglog-font);
+  line-height: var(--msglog-line);
+  /* A fixed 5-line floating box; newest message pinned to the anchored edge
+     via column-reverse below. */
+  height: var(--msglog-h);
+  overflow-y: auto;
+  /* Vertical padding is the Safari fix, not cosmetic — don't zero it. With
+     box-sizing:border-box the padding-bottom lifts the bottom-pinned column up
+     off the bottom edge, which pushes the row scrolled just out of view a few
+     px clear of the top edge. That gap absorbs WebKit's fractional column-reverse
+     scroll offset (which Chrome rounds away but Safari/iOS doesn't), so the
+     hidden row's descenders no longer bleed in at the top. It also makes the
+     content box no longer an exact 5×line-box multiple, removing the
+     boundary-aligned cut that made the artifact possible. */
+  padding: 0.2rem 0.2rem;
+  cursor: pointer;
+  /* Bottom-pinned chat-log pattern: column-reverse lays children from the
+     visual bottom upward, which lets the browser keep scroll naturally at
+     the latest message without any JS scrollTop writes (which force layout).
+     Caller-side: insert new messages with `prepend`, not `appendChild`, so
+     they land at the DOM start = visual bottom. Order-dependent ops flip:
+     "most recent" is `firstChild`, "oldest" is `lastChild`,
+     `:first-child` is the most-recent message. */
+  display: flex;
+  flex-direction: column-reverse;
+}
+
+/* Tile rendering: lighter scrim — see --msglog-bg. */
+#game-view.tiles-mode { --msglog-bg: color-mix(in srgb, var(--bg) 15%, transparent); }
+
+/* Per-line scrim ("pill") variant — toggle live via the dev hook
+   __dcssMsgPill() in game-view.ts. The strip scrim goes fully transparent and
+   each message line carries its own backing instead, so the map shows through
+   wherever there's no text (short lines, quiet turns). Lines shrink to their
+   text (align-self overrides the column-reverse stretch). Horizontal padding
+   only: vertical would break the 5-lines-in---msglog-h rhythm. */
+#game-view.msg-pill #game-messages { background: transparent; }
+#game-view.msg-pill .game-msg {
+  align-self: flex-start;
+  max-width: 100%;
+  background: color-mix(in srgb, var(--bg) 50%, transparent);
+  padding: 0;
+}
+
+/* Portrait: the log (base rule) floats over the map's BOTTOM edge; these rules
+   set its anchor and float the quick-cast rail. Both are out of flow, so the
+   map keeps its full height and — crucially — the rail's late arrival (a
+   round-trip after load, when the silent harvest populates it) only fades in
+   over the map; it never resizes the map, which would re-fit and jump. Casters
+   and non-casters share the float; the only caster delta is the rail itself
+   and the log/--more-- offsets that clear it. An abspos grid item's containing
+   block is its grid area, so bottom:0 = the map cell's bottom edge. */
+@media (orientation: portrait) {
+  #game-messages { bottom: 0; }
+  /* Rail present: float the log just above it. */
+  #game-view.spell-row #game-messages { bottom: var(--spell-rail-h); }
+
+  /* Quick-cast rail floats over the map's very bottom edge (casters only —
+     hidden via inline display otherwise). */
+  #spell-rail {
+    grid-area: map;
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 3;
+  }
+
+  /* --more-- (z-index 4) sits above the floating log — and the rail, for
+     casters — so it never covers the newest message lines. (`#game-view` prefix
+     to outrank the base `#more-btn { bottom: 0 }`, which is later in source.) */
+  #game-view #more-btn { bottom: var(--msglog-h); }
+  #game-view.spell-row #more-btn { bottom: calc(var(--msglog-h) + var(--spell-rail-h)); }
+  /* X-mode hides the log (and drops the rail), so there's nothing to clear —
+     --more-- hugs the bottom edge. Equal specificity to the two rules above;
+     later in source wins. */
+  #game-view.x-mode #more-btn { bottom: 0; }
+
+  /* Reserve the log's strip as extra BOTTOM padding so the map centers the
+     player in the clear area above the floating log/rail, not in the geometric
+     middle of the full element (which would drop the player — and the tiles
+     around it — under the log). fitToContainer reads this asymmetry and still
+     fills rows on down behind the translucent log. Constant (log height only,
+     not + rail) so the rail's arrival doesn't re-center the map. `#game-view`
+     prefix outranks the base `#map-grid` padding regardless of source order. */
+  #game-view #map-grid { padding-bottom: calc(2px + var(--msglog-h)); }
+  /* Top-anchor the ASCII row stack: it deliberately overruns the content box
+     DOWNWARD (whole rows filling behind the log — availHFit in
+     MapView.fitToContainer), and the base justify-content:center would split
+     that overflow across BOTH edges, clipping the top rows at the 2px top
+     padding while backing only half the log strip. Anchored, the overflow
+     all hangs below and MapView.centerRow biases the player up to the
+     clear-area middle. (Tiles are anchored globally by the .map-tile rules —
+     they full-bleed both axes — so this only matters for the ASCII <pre>.) */
+  #game-view #map-grid { justify-content: flex-start; }
+  /* X-mode hides the log and zooms the examine map to fill everything — drop
+     the reserve so the map isn't pinned above an empty strip, and restore
+     ASCII centering to match (reserve 0 ⇒ no overrun). :not(.map-tile) keeps
+     the equal-specificity, later-in-source `center` from beating the tile
+     anchoring rule — the full-bleed canvas must stay top-left anchored. */
+  #game-view.x-mode #map-grid { padding-bottom: 2px; }
+  #game-view.x-mode #map-grid:not(.map-tile) { justify-content: center; }
+}
+
+.game-msg { color: var(--text); line-height: var(--msglog-line); }
+
+.msg-turn-mark {
+  display: inline-block;
+  min-width: 1ch;
+  user-select: none;
+  -webkit-user-select: none;
+}
+/* Reference colors (style.css:276-281): command_marker darkgrey (fg8),
+   turn_marker lightgrey (fg7). Rule order matters: when both classes
+   land on the same glyph, `turn` wins (later rule, equal specificity). */
+.msg-turn-mark.cmd  { color: #555753; }
+.msg-turn-mark.turn { color: #babdb6; }
+
+.game-prompt .action-btn {
+  vertical-align: middle;
+  margin: 0 0.1rem;
+}
+
+.game-text-input {
+  background: var(--surface2);
+  border: 1px solid var(--accent);
+  color: var(--text);
+  -webkit-text-fill-color: var(--text);
+  font-family: var(--font-mono);
+  font-size: 16px;
+  padding: 0.15rem 0.4rem;
+  outline: none;
+  width: 12ch;
+}
+
+#numpad-input {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 40;
+  background: var(--bg);
+  border-top: 1px solid var(--border);
+  padding: 0.5rem 0.5rem max(0.6rem, env(safe-area-inset-bottom));
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.numpad-prompt {
+  font-family: var(--font-mono);
+  font-size: 0.85rem;
+  color: var(--text-dim);
+  text-align: center;
+  padding: 0 0.25rem;
+  max-width: 100%;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.numpad-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  grid-auto-rows: 3rem;
+  gap: 0.35rem;
+  width: 100%;
+  max-width: 22rem;
+}
+
+.numpad-btn {
+  font-family: var(--font-mono);
+  font-size: 1.25rem;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  user-select: none;
+  -webkit-user-select: none;
+  touch-action: manipulation;
+  padding: 0;
+  color: var(--text);
+}
+
+/* Digit / "key" tier — raised, brighter surface, subtle drop shadow.
+   Mirrors the white key vs. gray action key separation in iOS Numbers. */
+.numpad-btn.numpad-digit {
+  background: var(--surface2);
+  box-shadow: 0 1px 0 rgba(0, 0, 0, 0.5);
+}
+
+/* Action tier — recessed, darker, dimmer text. */
+.numpad-btn.numpad-action {
+  background: var(--surface);
+  color: var(--text-dim);
+}
+
+/* Primary action (Enter) spans rows 3–4 in the right column, like the tall
+   return key on iOS. Uses the accent fill to read as the default submit. */
+.numpad-btn.numpad-primary {
+  grid-row: span 2;
+  background: var(--accent);
+  color: var(--bg);
+  font-weight: bold;
+  font-size: 1.35rem;
+}
+
+.numpad-btn:active {
+  filter: brightness(1.25);
+}
+
+.input-dialog {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  padding: 1rem;
+  max-width: 32rem;
+  margin: 1.5rem auto 0;
+}
+
+.input-dialog-prompt {
+  font-family: var(--font-mono);
+  font-size: 0.95rem;
+  color: var(--text);
+  /* Server pre-wraps at 80 cols (linebreak_string in message.cc); collapse
+     those newlines so the browser can reflow at our actual width. */
+  white-space: normal;
+  line-height: 1.4;
+}
+
+.input-dialog-field {
+  background: var(--surface2);
+  border: 1px solid var(--accent);
+  color: var(--text);
+  -webkit-text-fill-color: var(--text);
+  font-family: var(--font-mono);
+  /* 16px keeps iOS Safari from auto-zooming on focus */
+  font-size: 16px;
+  padding: 0.4rem 0.6rem;
+  outline: none;
+}
+
+/* Menu filter input (Ctrl-F search). Inline-sized so it flows next to the
+   prompt label in the title bar. */
+.menu-filter-input {
+  flex: 1 1 auto;
+  min-width: 0;
+  padding: 0.15rem 0.4rem;
+}
+
+.menu-filter-prompt {
+  font-family: var(--font-mono);
+  flex-shrink: 0;
+}
+
+/* Seed-selection (custom-seed newgame entry) */
+.seed-selection {
+  display: flex;
+  flex-direction: column;
+  gap: 0.7rem;
+  padding: 1rem;
+  max-width: 32rem;
+  margin: 1rem auto 0;
+  font-family: var(--font-mono);
+}
+
+.seed-header {
+  font-size: 1rem;
+  color: var(--accent);
+  line-height: 1.3;
+}
+
+.seed-body-text,
+.seed-footer {
+  font-size: 0.85rem;
+  line-height: 1.4;
+  white-space: pre-wrap;
+}
+
+.seed-input-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.seed-input-label {
+  font-size: 0.9rem;
+  color: var(--text);
+}
+
+.seed-input-field {
+  flex: 1 1 12rem;
+  min-width: 0;
+  background: var(--surface2);
+  border: 1px solid var(--accent);
+  color: var(--text);
+  -webkit-text-fill-color: var(--text);
+  font-family: var(--font-mono);
+  /* 16px avoids iOS Safari auto-zoom on focus */
+  font-size: 16px;
+  padding: 0.4rem 0.6rem;
+  outline: none;
+}
+
+.seed-btn {
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  color: var(--text);
+  font-family: var(--font-mono);
+  font-size: 0.85rem;
+  padding: 0.4rem 0.7rem;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+.seed-btn:active { background: var(--surface); color: var(--accent); }
+
+.seed-pregen {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.85rem;
+  color: var(--text);
+  cursor: pointer;
+}
+.seed-pregen-checkbox {
+  width: 1.1rem;
+  height: 1.1rem;
+  accent-color: var(--accent);
+}
+
+.seed-button-bar {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 0.3rem;
+}
+
+.seed-btn-primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--bg);
+  font-weight: bold;
+  min-width: 9rem;
+}
+.seed-btn-primary:active { background: var(--surface); color: var(--accent); }
+
+#more-btn {
+  grid-area: map;
+  position: absolute;
+  left: 0.25rem;
+  right: 0.25rem;
+  bottom: 0;
+  z-index: 4;
+  background: var(--surface2);
+  border: 1px solid #eeeeec;
+  color: #eeeeec;
+  font-family: var(--font-mono);
+  font-size: 0.8rem;
+  padding: 0.4rem 0.5rem;
+  cursor: pointer;
+  text-align: center;
+  touch-action: manipulation;
+}
+
+#more-btn:active { background: var(--surface); }
+
+/* HUD */
+#game-hud {
+  grid-area: hud;
+  background: var(--bg);
+  padding: 0.2rem 0.2rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  /* Non-casters have no rail, so the floating log's bottom edge lands right at
+     the HUD boundary — text above text at near-identical size, and a yellow log
+     warning can scan as part of the yellow name line. Keep the hairline for
+     that boundary. */
+  border-top: 1px solid var(--border);
+}
+/* In spell-row mode the rail's icon band already separates log from HUD, so
+   casters get the fully borderless stack. (Landscape drops the border for
+   everyone — its sidebar HUD rule below wins over the base by source order.) */
+#game-view.spell-row #game-hud { border-top: none; }
+
+#hud-top {
+  display: flex;
+  flex-direction: column;
+}
+
+#hud-stats {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  font-size: 0.72rem;
+  font-family: var(--font-mono);
+  /* DCSS lightgrey (.fg7) — default value text, matches reference #stats. */
+  color: #babdb6;
+}
+
+#monster-list {
+  /* Shared card styling. Placement is orientation-specific and lives in the
+     media blocks: portrait floats it over the map's top-left, landscape slots
+     it into the sidebar. position:relative is the in-flow default; portrait
+     promotes it to absolute so the float overlays the map without consuming
+     layout space. */
+  position: relative;
+  z-index: 2;
+  font-size: 0.82rem;
+  font-family: var(--font-mono);
+  /* No max-height / overflow: the JS caps content at MAX_ROWS rows, with
+     an inline right-aligned "+N" suffix on the last row when more groups
+     exist. The panel auto-sizes and never scrolls. Tapping opens the full
+     monster panel. */
+  background: rgba(0, 0, 0, 0.7);
+  -webkit-backdrop-filter: blur(2px);
+  backdrop-filter: blur(2px);
+  border: 1px solid rgba(186, 189, 182, 0.35);
+  border-radius: 3px;
+  padding: 2px 5px;
+  pointer-events: auto;
+  cursor: pointer;
+  transition: border-color 0.15s;
+}
+
+#monster-list:empty { display: none; }
+
+/* Portrait: float over the map's top-left. An abspos grid item's containing
+   block is its grid area (same trick as #more-btn), so this overlays the map
+   cell without consuming layout space; max-width keeps a 0.25rem gutter each
+   side. Scoped to portrait — like the spell-row log float above — so the
+   landscape block can place the in-flow card without neutralizing each float
+   property individually. */
+@media (orientation: portrait) {
+  #monster-list {
+    grid-area: map;
+    position: absolute;
+    top: 0.25rem;
+    left: 0.25rem;
+    max-width: calc(100% - 0.5rem);
+  }
+}
+
+/* Red outline when any hostile is visible — ambient danger cue. Differs
+   from the baseline grey outline by both hue AND thickness (1px → 2px),
+   so the signal survives red/grey color confusion. The per-row 2px
+   .ml-bar still owns the focal "this one is deadly" signal since outline
+   and stripe occupy different visual modes. */
+#monster-list.has-hostile {
+  border-color: rgba(239, 41, 41, 0.55);
+  border-width: 2px;
+}
+
+.ml-row {
+  line-height: 1.4;
+  padding-left: 1em;
+  position: relative;
+  overflow-wrap: break-word;
+}
+/* Contain both float directions: glyphs float left; the chevron and "+N"
+   suffix float right inside their rows. */
+.ml-row::after {
+  content: "";
+  display: block;
+  clear: both;
+}
+/* Threat bar lives in the panel's left padding so glyph alignment is identical
+   between bordered and unbordered rows. left:-5px abuts the 1px panel border. */
+.ml-bar::before {
+  content: "";
+  position: absolute;
+  left: -5px;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  background: var(--bar-color);
+}
+
+.ml-glyphs {
+  float: left;
+  margin-left: -1em;
+  margin-right: 0.3em;
+  white-space: nowrap;
+}
+
+.ml-glyph {
+  display: inline-block;
+  width: 1ch;
+  font-weight: bold;
+}
+
+.ml-hp {
+  display: inline-block;
+  width: 8px;
+  height: 1em;
+  margin: 0 0.3em;
+  vertical-align: middle;
+}
+
+.ml-name {
+  margin-left: 0.3em;
+}
+
+/* Collapse chevron, floated right inside the FIRST row (JS re-inserts it as
+   that row's first child each render — first-in-source right floats sit
+   rightmost, so on the collapsed single line it lands at the far right edge
+   with the "+N" suffix to its left). Spatial-motion icon: ▴ when expanded
+   (tap collapses upward), ▾ when collapsed (tap expands down). Matches the
+   abc▴/abc▾ keyboard toggle. Being a float, it only widens the panel when
+   its own row is the longest. */
+.ml-toggle {
+  float: right;
+  position: relative; /* containing block for the ::before tap zone */
+  margin-left: 0.6em;
+  font-size: 0.85em;
+  color: var(--text-dim);
+  cursor: pointer;
+  pointer-events: auto;
+  user-select: none;
+}
+/* Hit-target expansion: the bare glyph is ~10px, so grow the tap zone to
+   roughly 28px square. It overlaps adjacent row text; a tap in the halo
+   toggles collapse instead of opening the full panel, which is the right
+   bias for a control this small. Pointer events bubble to the parent
+   .ml-toggle so the click handler still fires. */
+.ml-toggle::before {
+  content: "";
+  position: absolute;
+  inset: -8px;
+}
+
+/* The collapsed-mode row uses the same layout as an expanded top row —
+   .ml-collapsed is kept on the element as a DOM marker but needs no
+   styling beyond what .ml-row already provides. The "+N" suffix (collapsed
+   line, or the last expanded row when groups overflow MAX_ROWS) is muted
+   italic secondary text floated to the row's right edge — right-aligned
+   under longer rows above, and emitted after the name so it lands on the
+   row's LAST line (bottom-right of the panel when the name wraps);
+   margin-left keeps a minimum gap from the name. */
+.ml-collapsed-more {
+  float: right;
+  /* No font-size/line-height override: inheriting the row's keeps +N on the
+     name's baseline. A smaller font here would top-align off the baseline and
+     ride high — don't reintroduce one without baseline-aligning another way. */
+  color: var(--text-dim);
+  margin-left: 0.6em;
+  font-style: italic;
+}
+
+/* Tile-mode rows: replace each glyph span with a 20x20 tile-stack. Row
+   line-height grows from ~18px to 20px so the sprite stacks aren't clipped
+   vertically. Floats go away; the stacks lay out as an inline-flex run.
+   padding-left:0 keeps the tile column flush at the panel's inner edge to
+   match the ASCII row's `margin-left:-1em` float trick — otherwise the tile
+   strip floats noticeably right of where ASCII glyphs sit. */
+.ml-tile-row { padding-left: 0; line-height: 20px; }
+.ml-tile-row .ml-glyphs-tiles {
+  float: none;
+  margin: 0 0.3em 0 0;
+  display: inline-flex;
+  gap: 1px;
+  vertical-align: middle;
+}
+.ml-tile { width: 20px; height: 20px; }
+
+/* Monster panel (full-screen takeover variant of #monster-list) */
+.mp-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  padding: 0.4rem;
+}
+.mp-row {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.4rem 0.5rem;
+  background: rgba(255, 255, 255, 0.03);
+  border-radius: 4px;
+  min-height: 48px;
+  cursor: pointer;
+}
+.mp-row:active { background: rgba(255, 255, 255, 0.10); }
+.mp-glyph {
+  width: 1.25rem;
+  flex: 0 0 auto;
+  font-family: var(--font-mono);
+  font-size: 1.4rem;
+  line-height: 1;
+  text-align: center;
+}
+.mp-tile {
+  width: 48px;
+  height: 48px;
+  flex: 0 0 auto;
+}
+.mp-hp-bar {
+  width: 6px;
+  height: 48px;
+  background: rgba(255, 255, 255, 0.12);
+  position: relative;
+  flex: 0 0 auto;
+}
+.mp-hp-fill {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+}
+.mp-name {
+  flex: 1 1 auto;
+  font-size: 1rem;
+  overflow-wrap: anywhere;
+}
+.mp-status {
+  color: var(--text-dim);
+  font-size: 0.85rem;
+}
+.mp-empty {
+  padding: 1rem;
+  color: var(--text-dim);
+  text-align: center;
+}
+
+.hs-id { font-size: 0.75rem; line-height: 1.2; display: flex; align-items: baseline; }
+.hs-id #hud-id { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.hg-piety { margin-left: 0.4em; flex-shrink: 0; }
+
+.hg-bar-pair {
+  display: flex;
+  gap: 0.4rem;
+  align-items: center;
+  margin-bottom: 0.05rem;
+}
+.hg-bar-pair .hg-hp { flex: 3 1 0; }
+.hg-bar-pair .hg-mp { flex: 2 1 0; }
+
+.hg-bar-row {
+  display: flex;
+  align-items: center;
+  gap: 0.35em;
+  min-width: 0;
+  line-height: 1.2;
+}
+.hg-bar-row .hg-bar-cell { flex: 1; min-width: 2rem; }
+.hg-bar-val { font-size: 0.7rem; white-space: nowrap; }
+
+.hg-bar-cell {
+  height: 0.55rem;
+  background: #555753; /* DCSS darkgrey (.fg8) — bar trough, matches reference */
+  overflow: hidden;
+}
+
+.hud-bar-seg {
+  display: inline-block;
+  vertical-align: top;
+  height: 100%;
+  width: 0;
+  transition: width 0.1s;
+}
+
+/* Segment colors mirror #stats_hp_bar_* / #stats_mp_bar_* in the reference
+   WebTiles client (webserver/game_data/static/style.css:111-148). */
+.hud-bar-seg.hp-full     { background-color: #8ae234; } /* DCSS lightgreen (--color-10) */
+.hud-bar-seg.hp-poison   { background-color: #fce94f; } /* DCSS yellow      (--color-14) */
+.hud-bar-seg.hp-decrease { background-color: #b30009; } /* DCSS red        (--color-4)  */
+.hud-bar-seg.hp-increase { background-color: #4e9a06; } /* DCSS green      (--color-2)  */
+.hud-bar-seg.mp-full     { background-color: #5e78ff; } /* DCSS lightblue  (--color-9)  */
+.hud-bar-seg.mp-decrease { background-color: #cd21cb; } /* DCSS magenta    (--color-5)  */
+.hud-bar-seg.mp-increase { background-color: #005afa; } /* DCSS blue       (--color-1)  */
+
+.hg-inline-stats {
+  display: flex;
+  flex-wrap: nowrap;
+  gap: 0.15rem 0.4rem;
+  font-size: 0.7rem;
+  line-height: 1.2;
+  /* Tighten the spaces between stat items and inside the drained "(max)" parens
+     so the row reclaims width before the right-aligned Contam/Doom clips. */
+  word-spacing: -0.15em;
+}
+.hg-grp { white-space: nowrap; }
+
+.hg-stats-row {
+  display: flex;
+  align-items: baseline;
+  gap: 0.6rem;
+  font-size: 0.7rem;
+  line-height: 1.2;
+  overflow: hidden;
+}
+/* Non-shrinking, so the right-aligned .hg-warn (Contam/Doom) keeps its width.
+   Edge case: the row only overflows (clipping the rightmost warning) when BOTH
+   Contam and Doom are active AND a stat is drained ("St 5 (10)") at the same
+   time — an uncommon conjunction, and Doom may not even be sent by 0.34. Any
+   single warning, or both with no drain, fits at iPhone width. If that triple
+   conjunction matters, let this shrink/wrap or tighten gaps in a media query. */
+.hg-stats-row .hg-inline-stats { flex: 0 0 auto; }
+/* Noise + Time form a right-aligned group on the XL row (.hg-noise-time pins it
+   right). inline-flex centers the bar cell against the "N" cap; the Noise↔Time
+   gap is set to match the inter-stat gap (e.g. AC↔EV ≈ 0.47em). */
+.hg-noise-time { margin-left: auto; display: inline-flex; align-items: center; gap: 0.47em; white-space: nowrap; }
+.hg-noise { display: inline-flex; align-items: center; white-space: nowrap; }
+
+/* Graphical noise bar, mirroring #stats_noise_bar in the reference client.
+   Trough is darker than the HP/MP cell (#555753) so the darkgray decrease
+   tail stays visible against it. Fixed width (the reference sizes the bar by
+   percentage of a wide desktop panel, which doesn't translate to our row). */
+.hg-noise-cell {
+  display: inline-block;
+  width: 3rem;
+  height: 0.55rem;
+  background: #2f2f2f; /* reference #stats_noise_bar bg (dark slate) */
+  overflow: hidden;
+}
+.hud-bar-seg.noise-decrease { background-color: #555753; } /* DCSS darkgrey (--color-8) */
+.hg-noise-cell[data-level="quiet"]     .noise-full { background-color: #babdb6; } /* lightgrey */
+.hg-noise-cell[data-level="loud"]      .noise-full { background-color: #fce94f; } /* yellow */
+.hg-noise-cell[data-level="veryloud"]  .noise-full { background-color: #b30009; } /* red */
+.hg-noise-cell[data-level="superloud"] .noise-full { background-color: #fd59fa; } /* lightmagenta */
+/* When silenced the bar carries no info (noise is 0), so we hide it and let the
+   "Silenced" label stand in its place at the normal HUD size, spaced like any
+   other caption value. The reference overlays the label on its bar because that
+   bar gets its own wide row; ours shares a row with Time, so we reserve the
+   label's width instead of overlapping (which would collide with N and T). */
+.hg-noise-cell[data-level="blank"] { display: none; }
+.hg-noise-status { margin-left: 0.15em; color: #fd59fa; /* DCSS lightmagenta — reference #stats_noise_status */ }
+.hg-noise-status:empty { display: none; }
+/* word-spacing matches the inter-stat gap (5.3px) for the space between the
+   time value and its (delta), keeping it consistent with AC↔EV / Noise↔Time. */
+.hg-time { word-spacing: -0.15em; font-variant-numeric: tabular-nums; }
+.hg-xl-row {
+  display: flex;
+  align-items: baseline;
+  gap: 0.6rem;
+  font-size: 0.7rem;
+  line-height: 1.2;
+  overflow: hidden;
+}
+/* word-spacing tightens the literal spaces between the XL/progress/@/$ readouts
+   to the unified 5.3px inter-readout gap (matches AC↔EV, Noise↔Time, etc.). */
+.hg-xl-place { flex: 0 0 auto; white-space: nowrap; word-spacing: -0.15em; }
+.hg-quiver {
+  font-size: 0.72rem;
+  line-height: 1.2;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.hg-wq {
+  font-size: 0.72rem;
+  line-height: 1.2;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+/* Caption text — labels like AC/EV/SH, weapon-letter prefix, XL/Time/$.
+   DCSS brown (.fg6 / --color-6), matches reference .stats_caption. */
+.hg-caption { color: #8f5902; }
+.hg-caption + span { margin-left: 0.15em; }
+
+/* Stat / defense state colors (matches reference player.js classes).
+   .weapon-corroded uses class-class specificity to override the .fgN
+   color class on the same element (matches reference's #game #stats_weapon
+   .corroded_weapon override). */
+.stat-boosted, .def-boosted { color: #5e78ff; /* DCSS lightblue (.fg9) */ }
+.stat-zero { color: #ef2929; /* DCSS lightred (.fg12) */ }
+.stat-degenerated { color: #fce94f; /* DCSS yellow (.fg14) — reference degenerated_stat (drained) */ }
+.stat-max { margin-left: 0.15em; /* tight gap from the drained value to its "(max)" */ }
+.def-degenerated { color: #b30009; /* DCSS red (.fg4) */ }
+.hg-wq .weapon-corroded { color: #b30009; /* DCSS red (.fg4) */ }
+
+/* Contamination / Doom readouts, right-aligned on the stats row (margin-left:
+   auto). Only rendered when nonzero, so :empty collapses them out entirely —
+   in the common case the stats row's right end is empty, like it was with the
+   short Time value. */
+.hg-warn {
+  margin-left: auto;
+  display: inline-block;
+  white-space: nowrap;
+  /* Contam and Doom are space-separated (see renderWarnings); the same negative
+     word-spacing as .hg-inline-stats makes that gap match the inter-stat gap
+     (e.g. AC↔EV). */
+  word-spacing: -0.15em;
+}
+.hg-warn:empty { display: none; }
+
+/* Square HUD (the landscape template — StatsView.squareTemplate). Mirrors
+   the reference stats panel (game.html #stats): Health/Magic caption lines
+   with right-anchored bars, then a 45/55 two-column block pairing AC|Str,
+   EV|Int, SH|Dex, XL+Next|Place, Noise|Time. Doom and Contam ride the Str
+   and Int rows (reference #stats_doom_ui / #stats_contam_ui), so the danger
+   meters get a real slot instead of the compact row's clipped right end. */
+.hs-species {
+  font-size: 0.75rem;
+  line-height: 1.2;
+  display: flex;
+  align-items: baseline;
+}
+.hs-species #hud-species { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.hud-sq-gold { margin-left: 0.5em; white-space: nowrap; flex-shrink: 0; }
+/* Caption + value at the reference's stat size; the bar anchors right at the
+   reference's 55% width so the Health and Magic bars start aligned. It may
+   shrink (never grow) when a drained "(real max)" lengthens the value. */
+.hud-sq-barline { font-size: 0.7rem; }
+.hud-sq-barline .hg-bar-cell {
+  flex: 1 1 55%;
+  max-width: 55%;
+  margin-left: auto;
+}
+.hud-grid {
+  display: grid;
+  /* The reference splits 45%/55%, but its panel is wider — at 15rem that
+     wastes width the right column needs ("Str: 5(10) Doom: 40%"). Size the
+     left column to its widest cell (XL+Next or Noise+bar) instead; minmax(0)
+     keeps a long right cell overflow-painting rather than pushing the grid
+     wide. */
+  grid-template-columns: max-content minmax(0, 1fr);
+  gap: 0.15rem 0.5rem;
+  font-size: 0.7rem;
+  line-height: 1.2;
+}
+.hud-grid > span { white-space: nowrap; }
+/* Doom/Contam offset from the Str/Int values (reference uses fixed margins;
+   ours is smaller — the worst case "Str: 5(10) Doom: 40%" runs within a few
+   px of the sidebar edge) */
+.hud-sq-warn { margin-left: 0.5em; }
+
+/* Status row is locked to a single fixed-height line. flex-wrap:nowrap +
+   overflow:hidden prevents 10+ active lights from wrapping to a second
+   row, which would shrink the map (grid `1fr`) and risk a row drop. */
+#hud-status {
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: center;
+  gap: 0.4rem;
+  height: 0.9rem;
+  overflow: hidden;
+}
+
+.status-light {
+  font-size: 0.72rem;
+  line-height: 1;
+  flex: 0 0 auto;
+  white-space: nowrap;
+}
+
+#game-lobby-btn {
+  align-self: flex-end;
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  color: var(--text-dim);
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  padding: 0.2rem 0.4rem;
+  cursor: pointer;
+  margin-top: 0.15rem;
+}
+
+/* Game UI overlay (char creation, menus, descriptions) */
+#ui-overlay {
+  grid-area: map;
+  position: relative;
+  z-index: 5;
+  overflow-y: auto;
+  background: var(--bg);
+  padding: 0.75rem 0.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.overlay-title {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: var(--fs-overlay);
+  flex-shrink: 0;
+}
+
+.overlay-title .tile {
+  flex-shrink: 0;
+}
+
+.overlay-close {
+  background: none;
+  border: none;
+  color: var(--text-dim);
+  font-size: 1.2rem;
+  line-height: 1;
+  padding: 0 0.25rem;
+  margin-left: auto;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.tile-stack {
+  position: relative;
+  display: inline-block;
+  vertical-align: middle;
+  flex-shrink: 0;
+}
+
+.tile-stack .tile {
+  position: absolute;
+  image-rendering: pixelated;
+  background-repeat: no-repeat;
+}
+
+.overlay-item .tile-stack {
+  margin-right: -0.2rem;
+  /* Centre the 32px tile on the FIRST text line (not the whole row): the row
+     is align-items:flex-start, so pull the tile up by half its overhang vs one
+     line-height. Matches the reference client's vertical-align:middle tile on
+     its (non-wrapping) rows, but stays correct when our rows wrap to 2+ lines —
+     the icon sits next to the title/first line instead of floating at the
+     vertical middle of the block. */
+  margin-top: calc((1lh - 32px) / 2);
+}
+.overlay-close:active { color: var(--text); }
+
+.overlay-list {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  overflow-y: auto;
+  flex: 1;
+  min-height: 0;
+  height: 0;
+}
+
+.overlay-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.6rem;
+  background: transparent;
+  border: none;
+  color: var(--text);
+  font-family: var(--font-mono);
+  font-size: var(--fs-overlay);
+  padding: 0.35rem 0.25rem;
+  text-align: left;
+  cursor: pointer;
+  border-radius: 3px;
+  width: 100%;
+  touch-action: manipulation;
+}
+
+.overlay-item.item-selected { background: var(--surface); }
+.overlay-item.item-hovered {
+  /*outline: 1px solid var(--accent);
+  outline-offset: -1px;*/
+  background: var(--surface);
+}
+
+/* Rows render item.text verbatim (hotkey + selection marker are inline in
+   the text), so the label span carries the whole row and wraps at width.
+   Note we don't follow the reference convention of right-aligned item prices
+   within a 4-char column, followed by literal spaces before item names. To
+   match that, append `white-space: pre-wrap;`. Tested and rejected. */
+.overlay-label { color: var(--text); min-width: 0; }
+
+/* Rows carrying a fixed-width "<key> - " prefix (4 monospace cells) get a 4ch
+   hanging indent so wrapped continuation lines sit under the item title:
+   pull the first line back 4ch, pad the rest in by 4ch. Gated by .item-hang
+   (set in fillMenuItems) — prefixless rows like the unrecognised-items list
+   start at column 0 and must wrap flush, not indent. */
+.overlay-item.item-hang .overlay-label { padding-left: 4ch; text-indent: -4ch; }
+
+.overlay-header {
+  font-size: var(--fs-overlay-chrome);
+  padding: 0.5rem 0.25rem 0.15rem;
+}
+
+.overlay-body {
+  font-size: var(--fs-overlay);
+  line-height: 1.5;
+  overflow-x: auto;
+  overflow-y: auto;
+  flex: 1;
+  min-height: 0;
+  height: 0;
+  position: relative;
+}
+
+.overlay-line { min-height: 1lh; white-space: pre-wrap; }
+.overlay-line--nowrap { white-space: pre; }
+/* Unwrapped `Label: description` blocks (unwrapHangingIndents). Wrapped
+   text hangs at the row's own description column (--hang-col, derived from
+   the wire's label + padding; monospace so ch units line up exactly), giving
+   the server's two-column look with in-column wrapping. Run-in labels
+   (single-space, e.g. `'Of mesmerism': `) and over-wide columns fall back
+   to the compact 2ch default. */
+.overlay-line--hang {
+  padding-left: var(--hang-col, 2ch);
+  text-indent: calc(-1 * var(--hang-col, 2ch));
+}
+
+/* Server `show_dialog` modal (save-transfer prompt on trunk resume,
+   end-of-game prompts). The server HTML carries class="button" and inline
+   float:right; we neutralize that and present a content-sized card centered
+   in the overlay. Buttons are grouped into .dialog-buttons (row-reverse to
+   mirror the server's float:right order, e.g. "Yes  No") as equal-width
+   touch targets. */
+.dialog-body {
+  flex: 0 1 auto;
+  height: auto;
+  max-height: 100%;
+  margin: auto;
+  width: 100%;
+  max-width: 30rem;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 1.5rem 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  text-align: center;
+  font-size: 1.05rem;
+  line-height: 1.5;
+  overflow: auto;
+}
+.dialog-body p { margin: 0; }
+.dialog-buttons {
+  display: flex;
+  flex-direction: row-reverse;
+  gap: 0.75rem;
+}
+/* Quiet outlined buttons, matching the lobby exit dialog's tone: a prompt
+   like "Transfer? / No" is a real either/or, so neither choice should shout
+   as a filled accent CTA. Normal weight, body text on a transparent fill with
+   a hairline border for tap affordance; the dim surface2 on :active is the
+   same press feedback as .lobby-exit-close. */
+.dialog-body .button,
+.dialog-body input[type="button"] {
+  float: none !important;
+  display: block;
+  flex: 1 1 0;
+  min-width: 0;
+  margin: 0;
+  padding: 0.6rem 1rem;
+  font: 0.95rem var(--font-mono);
+  color: var(--text);
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.dialog-body .button:active,
+.dialog-body input[type="button"]:active { background: var(--surface2); }
+
+.overlay-stat-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.1rem 0.9rem;
+  white-space: normal;
+}
+.overlay-stat { white-space: nowrap; }
+
+.overlay-spellbook { margin: 0.4em 0; }
+.overlay-spelllist {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+.overlay-spell {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  min-height: 32px;
+  background: transparent;
+  border: 0;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  width: 100%;
+  cursor: pointer;
+  border-radius: 4px;
+  padding: 0.15rem 0.3rem;
+  margin: 0 -0.3rem;
+  -webkit-tap-highlight-color: transparent;
+}
+.overlay-spell:active { background: rgba(255, 255, 255, 0.12); }
+@media (hover: hover) {
+  .overlay-spell:hover { background: rgba(255, 255, 255, 0.06); }
+}
+.overlay-spell .tile-stack { flex-shrink: 0; }
+.overlay-spell-name {
+  flex: 1 1 auto;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.overlay-spell-effect, .overlay-spell-range { flex: 0 0 auto; }
+
+/* Spell rail: persistent quick-cast button row pinned to the map's bottom edge
+   (portrait floats it there; landscape places it in the sidebar `spells` row). */
+#spell-rail {
+  /* grid-area is overridden per orientation (portrait floats it over the map,
+     landscape uses the sidebar row); this default just keeps it in the map
+     area. Fixed at one button-row tall: overflow spells wrap onto a clipped
+     second line, so the row shows the first N that fit and the z tab carries
+     the full list. */
+  grid-area: map;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+  padding: 0.25rem;
+  background: var(--bg);
+  /* No border-top: the translucent log overlay sits directly above, and a
+     hard line under it reads as stray chrome — the opaque icon band is its
+     own separator (and the HUD's hairline is non-caster-only, so the whole
+     caster stack below the map is borderless). */
+  height: var(--spell-rail-h);
+  overflow: hidden;
+}
+.spell-rail-btn {
+  position: relative;
+  display: block;
+  padding: 2px;
+  line-height: 0;
+  background: color-mix(in srgb, var(--bg) 70%, transparent);
+  border: 0;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.spell-rail-btn:active { background: var(--surface); }
+/* Corner cast-keystroke letter ("za"), shared by the rail and the z-tab grid
+   (both built by makeSpellButton) so it looks/sits the same in both. */
+.spell-letter {
+  position: absolute;
+  right: 0;
+  bottom: -2px;
+  font-size: 0.62rem;
+  line-height: 1;
+  color: var(--text);
+  text-shadow: 0 0 2px #000, 0 0 3px #000;
+  pointer-events: none;
+}
+
+/* Terminal-mode: engaged when server sends scroll positions */
+.overlay-body--term .overlay-line { white-space: nowrap; }
+
+.overlay-footer {
+  color: var(--text);
+  font-size: var(--fs-overlay-chrome);
+  padding-top: 0.4rem;
+  border-top: 1px solid var(--border);
+  flex-shrink: 0;
+  white-space: pre-wrap;
+}
+
+
+.overlay-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+}
+
+.action-btn {
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  color: var(--text);
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  padding: 0.2rem 0.5rem;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+.action-btn:active {
+  background: var(--surface);
+  color: var(--accent);
+}
+
+.action-btn:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+/* Newgame choice grid */
+.ngc-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.ngc-grid {
+  display: grid;
+  grid-template-columns: repeat(var(--ngc-cols, 3), 1fr);
+  gap: 2px;
+}
+
+.ngc-col-header {
+  font-size: 0.7rem;
+  text-align: center;
+  padding: 0.15rem 0.1rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.ngc-btn {
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 2px;
+  color: var(--text);
+  font-family: var(--font-mono);
+  font-size: 0.78rem;
+  padding: 0.2rem 0.25rem;
+  text-align: left;
+  cursor: pointer;
+  width: 100%;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.ngc-btn:active { background: rgba(245, 158, 11, 0.15); }
+.ngc-btn.ngc-selected { background: rgba(245, 158, 11, 0.18); border-color: rgba(245, 158, 11, 0.4); }
+
+.ngc-desc {
+  font-size: 0.75rem;
+  line-height: 1.45;
+  padding: 0.4rem 0.5rem;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  color: var(--text);
+  min-height: 3.8em;
+}
+
+.ngc-desc-text { color: var(--text-dim); }
+.ngc-confirm-hint { color: var(--text-dim); font-size: 0.7rem; }
+
+.ngc-sub-grid {
+  border-top: 1px solid var(--border);
+  padding-top: 0.25rem;
+}
+
+.ngc-sub-grid .ngc-btn {
+  font-size: 0.75rem;
+}
+
+.ngc-btn .ngc-btn-main {
+  display: inline-block;
+}
+
+.ngc-btn .ngc-btn-suffix {
+  float: right;
+  margin-left: 0.5rem;
+  color: var(--text-dim);
+}
+
+/* Menu controls (replaces touch controls during menus) */
+#menu-controls {
+  grid-area: menu;
+  display: flex;
+  gap: 0.5rem;
+  padding: 0.4rem;
+  background: var(--bg);
+  border-top: 1px solid var(--border);
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
+.menu-ctrl-btn {
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  color: var(--text);
+  font-family: var(--font-mono);
+  font-size: 0.95rem;
+  flex: 1;
+  min-height: 2.6rem;
+  max-width: 10rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  touch-action: manipulation;
+  user-select: none;
+  -webkit-user-select: none;
+  padding: 0.3rem 0.5rem;
+  text-align: center;
+}
+.menu-ctrl-btn:active { background: var(--surface); color: var(--accent); }
+.menu-ctrl-glyph { font-size: 1.25rem; line-height: 1; }
+
+.skill-letter-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+  width: 100%;
+  flex-basis: 100%;
+  order: -1;
+  padding-bottom: 0.2rem;
+}
+/* No selectable skills (distributed training) → no letter buttons. */
+.skill-letter-row:empty { display: none; }
+.skill-letter-btn {
+  flex: 0 0 auto;
+  min-width: 2.2rem;
+  max-width: unset;
+  font-size: 0.95rem;
+  min-height: 2.2rem;
+  padding: 0.2rem 0.3rem;
+}
+
+.menu-ctrl-btn[data-dynamic="accept"] {
+  background: var(--accent);
+  color: var(--bg);
+  font-weight: bold;
+}
+
+.menu-ctrl-btn[data-shift="true"].active {
+  background: var(--accent);
+  color: var(--bg);
+  border-color: var(--accent);
+}
+.menu-ctrl-btn[data-shift="true"].locked {
+  background: var(--warn);
+  color: var(--bg);
+  border-color: var(--warn);
+  box-shadow: inset 0 0 0 1px var(--bg);
+}
+
+/* ── Unified touch controls ─────────────────────────────────── */
+#touch-controls {
+  --tc-dpad: 3.6rem;  /* d-pad cell size (consumed by .tc-dpad / .tc-dpad-btn) */
+  /* Resting palette one step darker than the app-wide tokens: at night the
+     map is sparse dim glyphs on near-black, so --text/--surface2 buttons
+     outshine the play area. Presses brighten (--tc-press + accent label) —
+     the inverse of the app-wide darken-on-press — so tap feedback stays
+     crisp against the dim resting state. */
+  --tc-fill: var(--surface);
+  --tc-press: var(--surface2);
+  --tc-label: var(--text-dim);
+  --tc-label-dim: #78716c;  /* one stone step below --text-dim, for the wait btn */
+  --tc-border: rgba(245, 158, 11, 0.07);
+  grid-area: touch;
+  display: flex;
+  flex-direction: row;
+  gap: 0.35rem;
+  padding: 0.1rem 0.35rem;
+  background: var(--bg);
+  /* Transparent (not removed): X-mode colors this border as its active-mode
+     indicator (.x-mode rule below), and keeping the 1px avoids a layout
+     shift when entering/leaving X-mode. */
+  border-top: 1px solid transparent;
+  align-items: stretch;
+  /* Cap the strip to the d-pad's height (3 cells + 2 gaps + own padding) so a
+     tall z spell grid scrolls inside the panel instead of growing the whole
+     strip and eating the map. The flex chain below needs min-height:0 to let
+     the grid shrink and scroll rather than forcing the panel taller. */
+  max-height: calc(var(--tc-dpad) * 3 + 4px + 0.4rem);
+}
+
+#touch-controls.x-mode { border-top-color: var(--accent); }
+
+/* Spectator bar: occupies the same `touch` slot the d-pad would, so swapping
+   from playing to spectating doesn't change overall vertical layout.
+   Layout mirrors the lobby header ("← Lobby" ghost button on the left,
+   "Spectating · @user" pill on the right). */
+#spectator-bar {
+  grid-area: touch;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.3rem 0.55rem;
+  background: var(--bg);
+  border-top: 1px solid var(--border);
+}
+
+/* D-pad: 3×3 CSS grid of large buttons */
+.tc-dpad {
+  display: grid;
+  grid-template-columns: repeat(3, var(--tc-dpad));
+  grid-template-rows: repeat(3, var(--tc-dpad));
+  gap: 2px;
+  flex-shrink: 0;
+}
+
+.tc-dpad-btn {
+  background: var(--tc-fill);
+  border: 1px solid var(--tc-border);
+  border-radius: 4px;
+  color: var(--tc-label);
+  font-size: 1.4rem;
+  width: var(--tc-dpad);
+  height: var(--tc-dpad);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  user-select: none;
+  -webkit-user-select: none;
+  touch-action: manipulation;
+}
+
+.tc-dpad-btn:active { background: var(--tc-press); color: var(--accent); }
+.tc-dpad-btn.wait { color: var(--tc-label-dim); }
+
+/* Right panel */
+.tc-panel {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  gap: 2px;
+  min-width: 0;
+  min-height: 0;
+}
+
+/* Header: Esc | tabs | Enter */
+.tc-header {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 2px;
+}
+
+.tc-esc,
+.tc-enter {
+  background: var(--tc-fill);
+  border: 1px solid var(--tc-border);
+  border-radius: 3px;
+  color: var(--tc-label);
+  font-size: 0.8rem;
+  height: 1.4rem;
+  min-width: 2.6rem;
+  flex-shrink: 0;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  user-select: none;
+  -webkit-user-select: none;
+  touch-action: manipulation;
+}
+
+.tc-esc:active,
+.tc-enter:active { background: var(--tc-press); color: var(--accent); }
+
+/* Tab strip */
+.tc-tabs {
+  display: flex;
+  flex-direction: row;
+  flex: 1;
+  gap: 2px;
+}
+
+.tc-tab {
+  flex: 1;
+  background: var(--tc-fill);
+  border: 1px solid var(--tc-border);
+  border-radius: 3px;
+  color: var(--tc-label);
+  font-size: 0.72rem;
+  height: 1.4rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  user-select: none;
+  -webkit-user-select: none;
+  touch-action: manipulation;
+  padding: 0 0.1rem;
+}
+
+.tc-tab.active {
+  border-color: var(--accent);
+  color: var(--accent);
+  background: rgba(245, 158, 11, 0.18);
+}
+
+.tc-tab:active { background: var(--tc-press); }
+
+/* Content area: tab-specific buttons */
+.tc-content {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+  min-height: 0;
+}
+
+.tc-row {
+  display: flex;
+  gap: 2px;
+  flex: 1;
+}
+
+.tc-btn {
+  flex: 1;
+  background: var(--tc-fill);
+  border: 1px solid var(--tc-border);
+  border-radius: 3px;
+  color: var(--tc-label);
+  font-family: var(--font-mono);
+  font-size: 0.95rem;
+  min-height: 2rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  user-select: none;
+  -webkit-user-select: none;
+  touch-action: manipulation;
+}
+
+.tc-btn:active { background: var(--tc-press); color: var(--accent); }
+
+.tc-btn-spacer { background: transparent; border-color: transparent; pointer-events: none; }
+
+/* Symbol macro buttons (⇥ auto-fight, ⎋, ⏎, …): a fixed size matched to the
+   d-pad arrows so the panel's large glyphs read consistently. Was a vw clamp,
+   which pinned to its ceiling in landscape and dwarfed the adjacent text. */
+.tc-btn.glyph {
+  font-size: 1.4rem;
+  line-height: 1;
+}
+
+/* z tab: quick-cast spell grid hosted in the panel's content area. 4 columns,
+   scrolls when spells overflow — so it scales to any spell count without
+   covering the map. Buttons get the rail's treatment: just the tile with a
+   corner letter, no button box (justify-items:center keeps each content-sized
+   icon centered in its column). A border frames the whole area so the boxless
+   icons read as one grouped region. */
+.tc-spell-grid {
+  flex: 1;
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  grid-auto-rows: min-content;
+  justify-items: center;
+  gap: 4px 2px;
+  align-content: start;
+  padding: 4px;
+  background: var(--tc-fill);
+  border: 1px solid var(--tc-border);
+  border-radius: 3px;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
+.tc-spell-btn {
+  position: relative;
+  display: block;
+  padding: 2px;
+  line-height: 0;
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+}
+/* --tc-press (not --tc-fill) so the tap still contrasts against the tray fill. */
+.tc-spell-btn:active { background: var(--tc-press); }
+
+/* Footer: Shift, Ctrl, Keyboard */
+.tc-footer {
+  display: flex;
+  flex-direction: row;
+  gap: 2px;
+}
+
+.tc-shift,
+.tc-ctrl,
+.tc-kbd {
+  flex: 1;
+  background: var(--tc-fill);
+  border: 1px solid var(--tc-border);
+  border-radius: 3px;
+  color: var(--tc-label);
+  font-size: 0.65rem;
+  height: 1.4rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  user-select: none;
+  -webkit-user-select: none;
+  touch-action: manipulation;
+}
+
+.tc-shift.active,
+.tc-ctrl.active {
+  background: var(--accent);
+  color: var(--bg);
+  border-color: var(--accent);
+}
+
+.tc-shift.locked {
+  background: var(--warn);
+  color: var(--bg);
+  border-color: var(--warn);
+  box-shadow: inset 0 0 0 1px var(--bg);
+}
+
+.tc-shift:active,
+.tc-ctrl:active,
+.tc-kbd:active { background: var(--tc-press); color: var(--accent); }
+
+/* Virtual QWERTY keyboard overlay */
+#kbd-overlay {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: var(--app-bottom-pad);
+  z-index: 200;
+  background: var(--bg);
+  border-top: 2px solid var(--accent);
+  padding: 0.4rem 0.3rem calc(0.4rem + env(safe-area-inset-bottom, 0px));
+  flex-direction: column;
+  align-items: center;
+  gap: 0.3rem;
+  /* Single base for all key text. Letters use 1em, glyph keys a fixed em
+     bump and corner marks a fixed em fraction — so every label scales from
+     this one value and stays in proportion across orientations (no vw). */
+  --kbd-font: 1.1rem;
+  font-size: var(--kbd-font);
+  --kbd-key-w: calc((100% - 9 * var(--kbd-gap)) / 10);
+  --kbd-key-h: clamp(2.6rem, 11vw, 4.2rem);
+  --kbd-gap: 0.3rem;
+  --kbd-row-gap: clamp(0.4rem, 2.5vw, 0.7rem);
+}
+
+.kbd-layer {
+  display: flex;
+  flex-direction: column;
+  gap: var(--kbd-row-gap);
+  align-items: center;
+  width: 100%;
+}
+
+.kbd-row {
+  display: flex;
+  gap: var(--kbd-gap);
+  justify-content: center;
+  align-items: stretch;
+  width: 100%;
+}
+
+.kbd-key {
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  color: var(--text);
+  font-family: var(--font-mono);
+  font-size: 1em;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  user-select: none;
+  -webkit-user-select: none;
+  touch-action: manipulation;
+  width: var(--kbd-key-w);
+  height: var(--kbd-key-h);
+  padding: 0;
+  flex-shrink: 1;
+  flex-grow: 0;
+  min-width: 0;
+}
+
+.kbd-key:active { background: var(--surface); color: var(--accent); }
+
+.kbd-key.wide {
+  width: auto;
+  min-width: var(--kbd-key-w);
+  padding: 0 0.45rem;
+}
+
+.kbd-key.wide.flex {
+  flex: 1 1 0;
+  min-width: 0;
+}
+
+/* Glyph keys (⎋ ⌃ ⇥ ⏎ ⌫ ⇧) — a fixed em bump over the key text so the thinner
+   Unicode symbols read at a comparable weight to the letters, without coupling
+   to viewport width (which blew them up to the clamp ceiling in landscape). */
+.kbd-key.glyph {
+  font-size: 1.3em;
+  line-height: 1;
+}
+
+.kbd-key.mod.active {
+  background: var(--accent);
+  color: var(--bg);
+  border-color: var(--accent);
+}
+
+.kbd-key.mod.locked {
+  background: var(--warn);
+  color: var(--bg);
+  border-color: var(--warn);
+  box-shadow: inset 0 0 0 1px var(--bg);
+}
+
+.kbd-key.with-shifted,
+.kbd-key.with-corner { position: relative; }
+
+.kbd-shifted,
+.kbd-corner {
+  position: absolute;
+  top: 2px;
+  right: 4px;
+  font-size: 0.55em;
+  line-height: 1;
+  color: var(--text-dim);
+  pointer-events: none;
+}
+
+#kbd-overlay.shift-on .kbd-key.with-shifted .kbd-shifted { color: var(--accent); }
+#kbd-overlay.shift-on .kbd-key.with-shifted .kbd-main { color: var(--text-dim); }
+
+#kbd-overlay.shift-on .kbd-key.letter { text-transform: uppercase; }
+#kbd-overlay.ctrl-on .kbd-key.letter::before { content: "^"; }
+
+/* Half-dim the QWERTY overlay keys. The persistent touch strip dims further
+   (--tc-label, set in the #touch-controls block) — the keyboard is transient
+   and summoned deliberately, so it can afford to stay more readable. */
+.kbd-key { color: #c9c4be; }
+
+/* CRT terminal color classes (fg0–fg15, bg0–bg15) */
+.fg0{color:#000000}.fg1{color:#005afa}.fg2{color:#4e9a06}.fg3{color:#06989a}
+.fg4{color:#b30009}.fg5{color:#cd21cb}.fg6{color:#8f5902}.fg7{color:#babdb6}
+.fg8{color:#555753}.fg9{color:#5e78ff}.fg10{color:#8ae234}.fg11{color:#34e2e2}
+.fg12{color:#ef2929}.fg13{color:#fd59fa}.fg14{color:#fce94f}.fg15{color:#eeeeec}
+.bg0{background-color:#000000}.bg1{background-color:#005afa}.bg2{background-color:#4e9a06}
+.bg3{background-color:#06989a}.bg4{background-color:#b30009}.bg5{background-color:#cd21cb}
+.bg6{background-color:#8f5902}.bg7{background-color:#babdb6}.bg8{background-color:#555753}
+.bg9{background-color:#5e78ff}.bg10{background-color:#8ae234}.bg11{background-color:#34e2e2}
+.bg12{background-color:#ef2929}.bg13{background-color:#fd59fa}.bg14{background-color:#fce94f}
+.bg15{background-color:#eeeeec}
+
+/* CRT full-screen display (skills menu `m`, plus the unreachable-in-mobile
+   startup/arena popups). Shares --fs-overlay with .overlay-body so the skills
+   screen reads like every other overlay rather than at map-glyph size. */
+#crt-display {
+  flex: 1;
+  font-family: var(--font-mono);
+  font-size: var(--fs-overlay);
+  line-height: var(--crt-line-height);
+  overflow-x: auto;
+  white-space: pre;
+}
+
+/* Skills menu (`m`) is reflowed to a single column (skill-reflow.ts), so the
+   grid fits without horizontal panning; pre-wrap lets the full-width help text
+   below the grid wrap instead of overflowing. */
+#crt-display.crt-skills {
+  white-space: pre-wrap;
+  overflow-x: hidden;
+}
+
+.crt-line { min-height: 1em; }
+/* DCSS assumes a black terminal, so it tags ordinary CRT text with bg0
+   (#000000) as the "no background" colour. On our warm near-black overlay
+   that paints a visible black rectangle behind each text run; make bg0
+   transparent here so the panel background shows through uniformly. Coloured
+   backgrounds (bg1–bg15, e.g. selection highlights) are intentional, so leave
+   them. */
+#crt-display .bg0 { background-color: transparent; }
+.crt-highlight { background: rgba(255,255,100,0.15); display: block; }
+
+/* ── Landscape layout ────────────────────────────────────────
+   2 columns: the map takes everything left of a 16rem sidebar.
+   (The map binds on viewport height, so sidebar width only trims
+   the map's outermost expansion columns, never its cell size.)
+   The sidebar groups info at the top (HUD, then monster list) and
+   controls at the bottom (quick-cast rail, then touch panel), with
+   a flexible spacer row holding the slack between them — so the
+   monster list sits directly under the HUD rather than drifting to
+   the controls on a tall sidebar (e.g. iPad). The message log
+   floats over the map's top edge on a translucent scrim (the
+   portrait spell-row trick, anchored top instead of bottom), and
+   the d-pad floats over the bottom-left corner.
+   ──────────────────────────────────────────────────────────── */
+@media (orientation: landscape) {
+  #app { padding-bottom: 0; }
+
+  #game-view {
+    grid-template-columns: minmax(0, 1fr) 16rem;
+    /* The 1fr spacer (3rd row) absorbs the sidebar's vertical slack, pinning
+       HUD+monster list to the top and spell rail+panel to the bottom. The HUD
+       row is minmax(0, auto): content-sized when there's room, but able to
+       shrink so it scrolls (overflow-y:auto below) when a short landscape
+       viewport can't fit everything — keeping the bottom controls visible. */
+    grid-template-rows: minmax(0, auto) auto 1fr auto auto;
+    grid-template-areas:
+      "map hud"
+      "map mons"
+      "map ."
+      "map spells"
+      "map panel";
+    column-gap: 0;
+  }
+
+  /* Inventory / menus / ui-push overlays render only over the map area
+     (not over the sidebar), and stack above the floating log, d-pad and
+     monster list via z-index. */
+  #ui-overlay {
+    grid-area: map;
+    position: relative;
+    z-index: 5;
+  }
+
+  /* The log floats over the map's TOP edge in landscape. Everything else —
+     grid-area, abspos, translucent scrim, z-index, height, column-reverse —
+     comes from the base #game-messages rule; only the anchor differs (the
+     portrait block sets bottom instead). */
+  #game-messages { top: 0; }
+
+  /* Monster list: in-flow sidebar card in the `mons` row, directly beneath the
+     HUD and aligned to its horizontal padding. On a tablet-height sidebar this
+     is the normal multi-row list (expanding up to MAX_ROWS, the 1fr spacer
+     below absorbing the slack). A phone in landscape can't afford those rows —
+     HUD + spells + touch panel already claim nearly the whole height — so
+     game-view's `(max-height: 600px)` matchMedia flips MonsterListView into
+     compact mode there, collapsing this to a single-line chip (top-threat
+     glyph(s) + name + "+N", red .has-hostile outline, tap-through to the full
+     panel). Either way it stays in flow (position:relative is the base default;
+     portrait promotes it to absolute to float over the map). */
+  #monster-list {
+    grid-area: mons;
+    margin: 0.3rem 0.4rem 0;
+    max-width: calc(16rem - 0.8rem);
+  }
+
+  /* --more-- re-anchors directly below the floating log (the base rule
+     already provides grid-area:map, absolute, left/right, z-index 4). */
+  #more-btn {
+    top: var(--msglog-h);
+    bottom: auto;
+  }
+
+  #map-wrap { grid-area: map; }
+
+  #game-hud {
+    grid-area: hud;
+    border-top: none;
+    overflow-y: auto;
+    padding: 0.3rem 0.4rem;
+  }
+
+  /* Stack HP and MP bars vertically when the HUD is a narrow sidebar */
+  .hg-bar-pair { flex-direction: column; align-items: stretch; gap: 0.15rem; }
+  .hg-bar-pair .hg-hp,
+  .hg-bar-pair .hg-mp { flex: none; }
+
+  /* Split touch controls so d-pad and panel become separate grid cells */
+  #touch-controls {
+    display: contents;
+  }
+
+  /* D-pad floats over the map's bottom-left corner (the same float trick
+     as the message log above), with translucent buttons so the map reads
+     through. */
+  .tc-dpad {
+    grid-area: map;
+    align-self: end;
+    justify-self: start;
+    position: relative;
+    z-index: 3;
+    /* Bottom margin matches the sidebar panel's home-indicator lift (see
+       the .tc-panel comment below) so ↓/↘ taps don't ride the home swipe. */
+    margin: 0.3rem 0.3rem 1.25rem;
+  }
+  .tc-dpad-btn {
+    background: color-mix(in srgb, var(--surface2) 20%, transparent);
+    color: color-mix(in srgb, var(--text) 55%, transparent);
+    /* The 20%-opaque fill leaves the border as the button's visible edge
+       over the map, so the app-wide border is needed here — the dimmer
+       --tc-border is tuned for the solid portrait strip and all but
+       disappears on a floating translucent button. */
+    border-color: var(--border);
+  }
+  /* The center "·" (.wait) has its own dimmer color at higher specificity than
+     .tc-dpad-btn, so fade it explicitly too. :active stays fully opaque (the
+     base var(--accent) rule wins) for press feedback. */
+  .tc-dpad-btn.wait {
+    color: color-mix(in srgb, var(--text-dim) 55%, transparent);
+  }
+
+  /* The 1.25rem bottom margins here (panel, menu controls, spectator bar,
+     d-pad) lift the bottom-row buttons clear of the iOS home-indicator
+     gesture zone (~20px), where taps get swallowed by the swipe-up-home
+     gesture. Portrait gets this from #app's --app-bottom-pad, which this
+     block zeroes to keep the map full height — padding #app here instead
+     would shrink the height-bound map cells. (No viewport-fit=cover, so
+     env(safe-area-inset-bottom) is 0 and the gap must be a fixed value.) */
+  .tc-panel {
+    grid-area: panel;
+    padding: 0;
+    margin: 0.35rem 0 1.25rem 0;
+  }
+  /* Footer keys are 1.4rem in portrait, where dead padding sits below
+     them; flush against a screen edge they need real height to hit. */
+  .tc-shift,
+  .tc-ctrl,
+  .tc-kbd { height: 1.8rem; }
+
+  /* Menu-specific touch buttons replace the regular touch panel
+     while a CRT/menu is active. */
+  #menu-controls {
+    grid-area: panel;
+    margin-bottom: 1.25rem;
+  }
+
+  /* Spectator mode appends no touch/menu controls, so the panel slot is
+     free — the bar takes it (bottom of the sidebar; its base grid-area
+     `touch` is unmapped here and would create implicit tracks). The chip
+     is hidden — the sidebar is too narrow to fit it without clipping, and
+     the watched player's name already shows in the HUD stats line. */
+  #spectator-bar {
+    grid-area: panel;
+    border-top: 0;
+    margin-bottom: 1.25rem;
+  }
+  #spectator-bar .lobby-account-chip { display: none; }
+
+  /* When an overlay is shown, the JS sets inline display:none on these
+     elements to maximize overlay space (a portrait-mode assumption).
+     In landscape the overlay is confined to the map cell, so these
+     panels stay visible alongside it. !important is needed to win
+     against the inline style. The log forces flex (not block) so the
+     base column-reverse bottom-pin survives — block would render the
+     newest message at the top. #spell-rail is deliberately absent:
+     renderSpellRail hides it via inline display (X-mode / spectating /
+     no spells) and that must keep winning. */
+  #game-messages { display: flex  !important; }
+  #game-hud      { display: flex  !important; }
+  #touch-controls { display: contents !important; }
+
+  /* Spell rail: in-flow sidebar row directly above the touch panel. Base
+     styling applies — including the fixed one-row height, so the rail
+     shows the first seven 36px buttons that fit the 16rem column (zero
+     horizontal padding) and the wrapped line beyond is clipped (same
+     clip behavior as portrait). */
+  #spell-rail {
+    grid-area: spells;
+    padding: 0.25rem 0.0rem;
+  }
+
+  /* QWERTY overlay: the base key height scales with viewport WIDTH
+     (11vw, clamped) — sensible in portrait where width is the narrow
+     dimension, but in landscape it pins every key at the clamp ceiling
+     and the keyboard swallows ~80% of a phone screen. Scale against
+     height here instead, keeping the whole keyboard to roughly 40-45%
+     of the viewport. */
+  #kbd-overlay {
+    --kbd-key-h: clamp(1.8rem, 9vh, 2.8rem);
+    --kbd-row-gap: clamp(0.25rem, 1.2vh, 0.5rem);
+  }
+}
+
+/* Landscape on short viewports: compact the login card so it fits
+   without scrolling on a phone in landscape (≤500px tall). */
+@media (orientation: landscape) and (max-height: 500px) {
+  .login-card { padding: 1rem 1.25rem; max-width: 380px; }
+  .login-title { font-size: 1.2rem; margin-bottom: 0.6rem; }
+  .login-section { margin-bottom: 0.85rem; }
+  .login-label { margin-bottom: 0.5rem; font-size: 0.8rem; }
+  .login-label input,
+  .login-label select,
+  .login-spectate-select { font-size: 0.9rem; padding: 0.4rem 0.6rem; }
+  .login-btn { padding: 0.5rem; font-size: 0.95rem; }
+  .login-account-list { gap: 0.35rem; }
+  .login-account-card { padding: 0.45rem 0.6rem; }
+  .login-account-username { font-size: 0.9rem; }
+  .login-account-tag { padding: 0.2rem 0.4rem; font-size: 0.72rem; }
+  .login-footer { margin-top: 0.75rem; font-size: 0.75rem; }
+}
