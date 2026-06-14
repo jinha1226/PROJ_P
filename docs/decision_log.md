@@ -133,3 +133,21 @@ Design:
 - Settings panel gains a "게임 옵션 (RC)" section (v1 toggles: `language=ko`,
   `hp_warning=50`, `autofight_stop=50`). UI notes: applies to the NEXT character;
   login required; Korean coverage partial. Framework makes adding toggles easy.
+
+## 2026-06-14 — Beginner Coach v1 (real-time threat-vs-stats nudges)
+
+Implemented as a reactive coach using VERIFIED real-time signals (PlayerMsg:
+hp/hp_max/ac/ev/sh/xl/place/depth pushed every turn; MonsterInfo.threat 0-3 +
+att for visible monsters). Skills/resists are NOT real-time (need a screen) →
+excluded from v1.
+
+Pure evaluator `evaluateCoach(input) → hintId|null`, priority order:
+1. poison_lethal (poison will near-kill)
+2. critical_hp (hp<33% with a hostile visible)
+3. nasty_monster (a threat=3 hostile visible while not in good shape)
+4. low_defense (calm — no tough/nasty in view — but AC/EV low for depth)
+Conservative thresholds; one hint at a time; throttled; dismissible
+`#coach-hint` banner above the message log; localized via uiLang. Toggle
+`coachEnabled` pref (default ON) in the settings overlay. Threat estimate is
+approximate (DCSS threat tier + depth heuristic) — may be wrong, hence
+conservative. Skill-based advice deferred (needs skill screen).
