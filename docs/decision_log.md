@@ -94,3 +94,18 @@ Deferred (next feature, needs its own brainstorm):
   already receives them) and surface a skill-priority guide + contextual hints,
   scoped to a few beginner-recommended species/background combos. Content/curation
   is the hard part, not the data access.
+
+## 2026-06-14 — Beginner guide reframed: threat-vs-stats diagnostic (not build matrix)
+
+The per-species×background build-guide matrix is infeasible/subjective. Reframe to
+a **reactive diagnostic coach** using live signals the client already receives:
+- HUD: HP / AC / EV / SH / XL / str·dex·int (real-time)
+- Monster list threat coloring (PocketZot already classifies danger)
+- Current depth
+Heuristics (nudges, not prescriptions): defense-too-low-for-depth → suggest
+armour/shield/retreat; deadly monster + low HP → avoid/heal/funnel; frequent
+misses → accuracy/weapon-skill gap. Caveats: server sends no "expected damage"
+(estimate from HD/threat + depth danger table); skill values need the skill (m)
+screen, so skill-specific advice is secondary to real-time HUD/threat nudges;
+keep thresholds conservative and make it toggleable to avoid nagging. To be
+brainstormed as its own feature after tap-to-move.
