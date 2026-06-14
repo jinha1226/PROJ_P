@@ -1,6 +1,7 @@
 import type { WsConnection } from '../ws/connection'
 import type { GameExit, LobbyEntry, ServerMsg } from '../ws/types'
 import { clearSession, loadSession } from '../auth/session'
+import { setCurrentGameId } from '../game/current-game'
 import { getTileLoader, type TileLoader } from '../game/tiles/tile-loader'
 import type { SpectateTarget } from './game-view'
 import { tagFor } from '../servers'
@@ -259,7 +260,10 @@ export function buildLobbyView(
     const btn = document.createElement('button')
     btn.className = cls
     btn.textContent = g.label
-    btn.addEventListener('click', () => conn.send({ msg: 'play', game_id: g.gameId }))
+    btn.addEventListener('click', () => {
+      setCurrentGameId(g.gameId)
+      conn.send({ msg: 'play', game_id: g.gameId })
+    })
     return btn
   }
 

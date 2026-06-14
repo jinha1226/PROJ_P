@@ -164,6 +164,7 @@ export type ServerMsg =
   | { msg: 'title_prompt'; prompt?: string; close?: boolean; raw?: boolean }
   | { msg: 'ui-state-sync'; widget_id?: string; text?: string; cursor?: number; checked?: boolean; has_focus?: boolean; from_webtiles?: boolean; generation_id?: number }
   | { msg: 'text_cursor'; enabled?: boolean }
+  | { msg: 'rcfile_contents'; game_id: string; contents: string }
 
 export interface PlayerMsg {
   name?: string
@@ -245,3 +246,5 @@ export type ClientMsg =
   | { msg: 'menu_scroll'; first: number; last: number; hover: number }
   | { msg: 'click_cell'; x: number; y: number; button: 1 | 2 | 3; force?: boolean }
   | { msg: 'formatted_scroller_scroll'; scroll: number }
+  | { msg: 'get_rc'; game_id: string }
+  | { msg: 'set_rc'; game_id: string; contents: string }
