@@ -35,3 +35,29 @@ describe('semantic labels in the touch HUD', () => {
     expect(sent).toContainEqual({ msg: 'input', text: 'o' })
   })
 })
+
+describe('language toggle', () => {
+  it('flips labels KO -> EN when the toggle is tapped', () => {
+    const tc = buildTouchControls(() => {})
+    const toggle = tc.element.querySelector('.tc-lang') as HTMLButtonElement
+    expect(toggle).toBeTruthy()
+    toggle.click()
+    const texts = [...tc.element.querySelectorAll('.tc-content .tc-btn')].map(b => b.textContent)
+    expect(texts).toContain('Explore')
+    expect(texts).not.toContain('자동탐색')
+  })
+
+  it('persists the chosen language to prefs', () => {
+    const tc = buildTouchControls(() => {})
+    const toggle = tc.element.querySelector('.tc-lang') as HTMLButtonElement
+    toggle.click()
+    expect(localStorage.getItem('pocketzot:prefs')).toContain('"uiLang":"en"')
+  })
+
+  it('shows semantic tab names', () => {
+    const tc = buildTouchControls(() => {})
+    const tabTexts = [...tc.element.querySelectorAll('.tc-tab')].map(b => b.textContent)
+    expect(tabTexts).toContain('행동') // micro
+    expect(tabTexts).toContain('정보') // info
+  })
+})

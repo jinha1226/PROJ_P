@@ -9,8 +9,8 @@ import {
   CK_CTRL_BKSP, CAPTURED_CTRL,
 } from './keyboard'
 import { createShiftToggle } from './shift-state'
-import { getPref } from '../../prefs'
-import { actionLabel } from './action-labels'
+import { getPref, setPref } from '../../prefs'
+import { actionLabel, TAB_LABELS } from './action-labels'
 import type { UiLang } from '../../prefs'
 
 type SendFn = (msg: ClientMsg) => void
@@ -520,12 +520,12 @@ export function buildTouchControls(send: SendFn, opts: { spellTab?: SpellTabConf
 
   tabsEl = document.createElement('div')
   tabsEl.className = 'tc-tabs'
-  const tabDefs: { key: TabKey; label: string }[] = [{ key: 'micro', label: '@' }]
+  const tabDefs: { key: TabKey; label: string }[] = [{ key: 'micro', label: TAB_LABELS.micro[lang] }]
   // Quick-cast spells get their own tab (playing client only — spectators have
   // no spells to cast), sitting immediately right of the @ tab. Swaps the
   // content grid like any other tab.
-  if (opts.spellTab) tabDefs.push({ key: 'spells', label: 'z' })
-  tabDefs.push({ key: 'macro', label: '>' }, { key: 'info', label: '?' })
+  if (opts.spellTab) tabDefs.push({ key: 'spells', label: TAB_LABELS.spells[lang] })
+  tabDefs.push({ key: 'macro', label: TAB_LABELS.macro[lang] }, { key: 'info', label: TAB_LABELS.info[lang] })
   for (const td of tabDefs) {
     const btn = document.createElement('button')
     btn.className = 'tc-tab' + (td.key === 'micro' ? ' active' : '')
@@ -595,6 +595,28 @@ export function buildTouchControls(send: SendFn, opts: { spellTab?: SpellTabConf
   kbdBtn.addEventListener('touchstart', e => { e.preventDefault(); openKbd() }, { passive: false })
   kbdBtn.addEventListener('click', () => openKbd())
   footerEl.appendChild(kbdBtn)
+
+  const langBtn = document.createElement('button')
+  langBtn.className = 'tc-lang'
+  langBtn.title = 'Language / 언어'
+  function syncLangBtn(): void { langBtn.textContent = lang === 'ko' ? '한' : 'EN' }
+  function updateTabLabels(): void {
+    tabsEl.querySelectorAll<HTMLElement>('.tc-tab').forEach(el => {
+      const key = el.dataset.tab as TabKey | undefined
+      if (key && key in TAB_LABELS) el.textContent = TAB_LABELS[key as keyof typeof TAB_LABELS][lang]
+    })
+  }
+  function toggleLang(): void {
+    lang = lang === 'ko' ? 'en' : 'ko'
+    setPref('uiLang', lang)
+    syncLangBtn()
+    updateTabLabels()
+    renderTab(activeTab)
+  }
+  syncLangBtn()
+  langBtn.addEventListener('touchstart', e => { e.preventDefault(); toggleLang() }, { passive: false })
+  langBtn.addEventListener('click', toggleLang)
+  footerEl.appendChild(langBtn)
 
   // --- Render helpers ---
 
