@@ -2185,7 +2185,6 @@ html, body {
 
 /* ── Unified touch controls ─────────────────────────────────── */
 #touch-controls {
-  --tc-dpad: 3.6rem;  /* d-pad cell size (consumed by .tc-dpad / .tc-dpad-btn) */
   /* Resting palette one step darker than the app-wide tokens: at night the
      map is sparse dim glyphs on near-black, so --text/--surface2 buttons
      outshine the play area. Presses brighten (--tc-press + accent label) —
@@ -2194,24 +2193,18 @@ html, body {
   --tc-fill: var(--surface);
   --tc-press: var(--surface2);
   --tc-label: var(--text-dim);
-  --tc-label-dim: #78716c;  /* one stone step below --text-dim, for the wait btn */
+  --tc-label-dim: #78716c;
   --tc-border: rgba(245, 158, 11, 0.07);
   grid-area: touch;
   display: flex;
-  flex-direction: row;
-  gap: 0.35rem;
+  flex-direction: column;
+  gap: 2px;
   padding: 0.1rem 0.35rem;
   background: var(--bg);
   /* Transparent (not removed): X-mode colors this border as its active-mode
      indicator (.x-mode rule below), and keeping the 1px avoids a layout
      shift when entering/leaving X-mode. */
   border-top: 1px solid transparent;
-  align-items: stretch;
-  /* Cap the strip to the d-pad's height (3 cells + 2 gaps + own padding) so a
-     tall z spell grid scrolls inside the panel instead of growing the whole
-     strip and eating the map. The flex chain below needs min-height:0 to let
-     the grid shrink and scroll rather than forcing the panel taller. */
-  max-height: calc(var(--tc-dpad) * 3 + 4px + 0.4rem);
 }
 
 #touch-controls.x-mode { border-top-color: var(--accent); }
@@ -2231,42 +2224,11 @@ html, body {
   border-top: 1px solid var(--border);
 }
 
-/* D-pad: 3×3 CSS grid of large buttons */
-.tc-dpad {
-  display: grid;
-  grid-template-columns: repeat(3, var(--tc-dpad));
-  grid-template-rows: repeat(3, var(--tc-dpad));
-  gap: 2px;
-  flex-shrink: 0;
-}
-
-.tc-dpad-btn {
-  background: var(--tc-fill);
-  border: 1px solid var(--tc-border);
-  border-radius: 4px;
-  color: var(--tc-label);
-  font-size: 1.4rem;
-  width: var(--tc-dpad);
-  height: var(--tc-dpad);
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  user-select: none;
-  -webkit-user-select: none;
-  touch-action: manipulation;
-}
-
-.tc-dpad-btn:active { background: var(--tc-press); color: var(--accent); }
-.tc-dpad-btn.wait { color: var(--tc-label-dim); }
-
-/* Right panel */
+/* Panel — full-width column; no d-pad sibling so no flex-grow needed */
 .tc-panel {
   display: flex;
   flex-direction: column;
-  flex: 1;
   gap: 2px;
-  min-width: 0;
   min-height: 0;
 }
 
@@ -2334,19 +2296,33 @@ html, body {
 
 .tc-tab:active { background: var(--tc-press); }
 
-/* Content area: tab-specific buttons */
+/* Content area: tab-specific buttons (strip variant just has one child) */
 .tc-content {
   display: flex;
   flex-direction: column;
   gap: 2px;
-  flex: 1;
-  min-height: 0;
 }
 
 .tc-row {
   display: flex;
   gap: 2px;
   flex: 1;
+}
+
+/* Compact wrapping button strip (Layout v2 — no d-pad). All action buttons for
+   the active tab flow into one flex container; they wrap naturally so any tab
+   can have any number of buttons without JS row calculation. */
+.tc-strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px;
+  flex: none;  /* don't stretch; height is determined by wrapping content */
+}
+
+.tc-strip .tc-btn {
+  flex: 1 1 auto;
+  min-width: 3.2rem;
+  min-height: 2rem;
 }
 
 .tc-btn {
@@ -2706,42 +2682,16 @@ html, body {
   .hg-bar-pair .hg-hp,
   .hg-bar-pair .hg-mp { flex: none; }
 
-  /* Split touch controls so d-pad and panel become separate grid cells */
+  /* In landscape the touch panel becomes a sidebar column cell (grid-area:panel).
+     No d-pad to float over the map, so #touch-controls stays as a normal flex
+     column. Keep display:contents only if needed for panel/menu-controls split —
+     with no d-pad the controls are a single unit, so we can let it be in-flow. */
   #touch-controls {
     display: contents;
   }
 
-  /* D-pad floats over the map's bottom-left corner (the same float trick
-     as the message log above), with translucent buttons so the map reads
-     through. */
-  .tc-dpad {
-    grid-area: map;
-    align-self: end;
-    justify-self: start;
-    position: relative;
-    z-index: 3;
-    /* Bottom margin matches the sidebar panel's home-indicator lift (see
-       the .tc-panel comment below) so ↓/↘ taps don't ride the home swipe. */
-    margin: 0.3rem 0.3rem 1.25rem;
-  }
-  .tc-dpad-btn {
-    background: color-mix(in srgb, var(--surface2) 20%, transparent);
-    color: color-mix(in srgb, var(--text) 55%, transparent);
-    /* The 20%-opaque fill leaves the border as the button's visible edge
-       over the map, so the app-wide border is needed here — the dimmer
-       --tc-border is tuned for the solid portrait strip and all but
-       disappears on a floating translucent button. */
-    border-color: var(--border);
-  }
-  /* The center "·" (.wait) has its own dimmer color at higher specificity than
-     .tc-dpad-btn, so fade it explicitly too. :active stays fully opaque (the
-     base var(--accent) rule wins) for press feedback. */
-  .tc-dpad-btn.wait {
-    color: color-mix(in srgb, var(--text-dim) 55%, transparent);
-  }
-
-  /* The 1.25rem bottom margins here (panel, menu controls, spectator bar,
-     d-pad) lift the bottom-row buttons clear of the iOS home-indicator
+  /* The 1.25rem bottom margins here (panel, menu controls, spectator bar)
+     lift the bottom-row buttons clear of the iOS home-indicator
      gesture zone (~20px), where taps get swallowed by the swipe-up-home
      gesture. Portrait gets this from #app's --app-bottom-pad, which this
      block zeroes to keep the map full height — padding #app here instead

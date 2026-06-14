@@ -1,11 +1,5 @@
 import type { ClientMsg } from '../../ws/types'
 import {
-  CK_UP, CK_DOWN, CK_LEFT, CK_RIGHT,
-  CK_HOME, CK_END, CK_PGUP, CK_PGDN,
-  CK_SHIFT_UP, CK_SHIFT_DOWN, CK_SHIFT_LEFT, CK_SHIFT_RIGHT,
-  CK_SHIFT_HOME, CK_SHIFT_END, CK_SHIFT_PGUP, CK_SHIFT_PGDN,
-  CK_CTRL_UP, CK_CTRL_DOWN, CK_CTRL_LEFT, CK_CTRL_RIGHT,
-  CK_CTRL_HOME, CK_CTRL_END, CK_CTRL_PGUP, CK_CTRL_PGDN,
   CK_CTRL_BKSP, CAPTURED_CTRL,
 } from './keyboard'
 import { createShiftToggle } from './shift-state'
@@ -29,10 +23,6 @@ interface TabButtonDef {
   key?: number
 }
 
-type DpadDef =
-  | { label: string; plain: number; shifted: number; ctrled: number }
-  | { label: string; text: string }
-
 // game-view owns the spell data (and the tile loader / cast logic), so it
 // supplies the grid DOM for the z tab; touch.ts just hosts it in the panel's
 // content area and manages tab switching.
@@ -49,27 +39,6 @@ export interface TouchControls {
   closeKbd(): void
   refreshSpellTab(): void  // re-render the z tab if it is the active tab
 }
-
-// Arrow + numpad keycodes; shift = run-variant; ctrl = open-door / attack-stationary.
-// Center is the wait/confirm slot; sends '.' as text so it both waits one turn in
-// normal play and accepts the cursor target in X mode.
-const DPAD_LAYOUT: DpadDef[][] = [
-  [
-    { label: '↖', plain: CK_HOME,  shifted: CK_SHIFT_HOME,  ctrled: CK_CTRL_HOME  },
-    { label: '↑', plain: CK_UP,    shifted: CK_SHIFT_UP,    ctrled: CK_CTRL_UP    },
-    { label: '↗', plain: CK_PGUP,  shifted: CK_SHIFT_PGUP,  ctrled: CK_CTRL_PGUP  },
-  ],
-  [
-    { label: '←', plain: CK_LEFT,  shifted: CK_SHIFT_LEFT,  ctrled: CK_CTRL_LEFT  },
-    { label: '·', text: '.' },
-    { label: '→', plain: CK_RIGHT, shifted: CK_SHIFT_RIGHT, ctrled: CK_CTRL_RIGHT },
-  ],
-  [
-    { label: '↙', plain: CK_END,   shifted: CK_SHIFT_END,   ctrled: CK_CTRL_END   },
-    { label: '↓', plain: CK_DOWN,  shifted: CK_SHIFT_DOWN,  ctrled: CK_CTRL_DOWN  },
-    { label: '↘', plain: CK_PGDN,  shifted: CK_SHIFT_PGDN,  ctrled: CK_CTRL_PGDN  },
-  ],
-]
 
 // Static tabs only; the 'spells' tab renders dynamic content from game-view.
 export const TAB_BUTTONS: Record<Exclude<TabKey, 'spells'>, TabButtonDef[][]> = {
@@ -423,7 +392,6 @@ export function buildTouchControls(send: SendFn, opts: { spellTab?: SpellTabConf
   let ctrlBtn!: HTMLButtonElement
   let contentEl!: HTMLDivElement
   let tabsEl!: HTMLDivElement
-  let dpadEl!: HTMLDivElement
 
   const shift = createShiftToggle({ onChange: refreshMods })
 
@@ -435,9 +403,8 @@ export function buildTouchControls(send: SendFn, opts: { spellTab?: SpellTabConf
     ctrlBtn.classList.toggle('active', ctrlActive)
   }
 
-  // Called after each key dispatch. Keeps shift lock engaged so the next d-pad
-  // tap is still shifted (e.g. running across the level in X mode); clears
-  // one-shot shift and ctrl.
+  // Called after each key dispatch. Keeps shift lock engaged so the next
+  // tap is still shifted (e.g. running in X mode); clears one-shot shift and ctrl.
   function clearOneshot(): void {
     shift.consume()
     if (ctrlActive) {
@@ -473,16 +440,6 @@ export function buildTouchControls(send: SendFn, opts: { spellTab?: SpellTabConf
     clearOneshot()
   }
 
-  function sendDpad(def: DpadDef): void {
-    if ('text' in def) {
-      send({ msg: 'input', text: def.text })
-    } else {
-      const code = ctrlActive ? def.ctrled : shift.isOn ? def.shifted : def.plain
-      send({ msg: 'key', keycode: code })
-    }
-    clearOneshot()
-  }
-
   // --- Root element ---
 
   const root = document.createElement('div')
@@ -492,13 +449,7 @@ export function buildTouchControls(send: SendFn, opts: { spellTab?: SpellTabConf
   const { element: kbdEl, open: openKbd, close: closeKbd } = buildKeyboardOverlay(send)
   root.appendChild(kbdEl)
 
-  // --- D-pad ---
-
-  dpadEl = document.createElement('div')
-  dpadEl.className = 'tc-dpad'
-  root.appendChild(dpadEl)
-
-  // --- Right panel ---
+  // --- Panel ---
 
   const panel = document.createElement('div')
   panel.className = 'tc-panel'
@@ -619,21 +570,6 @@ export function buildTouchControls(send: SendFn, opts: { spellTab?: SpellTabConf
 
   // --- Render helpers ---
 
-  function buildDpad(): void {
-    dpadEl.innerHTML = ''
-    for (let r = 0; r < DPAD_LAYOUT.length; r++) {
-      for (let c = 0; c < DPAD_LAYOUT[r].length; c++) {
-        const def = DPAD_LAYOUT[r][c]
-        const btn = document.createElement('button')
-        btn.className = 'tc-dpad-btn' + (r === 1 && c === 1 ? ' wait' : '')
-        btn.textContent = def.label
-        btn.addEventListener('touchstart', e => { e.preventDefault(); sendDpad(def) }, { passive: false })
-        btn.addEventListener('click', () => sendDpad(def))
-        dpadEl.appendChild(btn)
-      }
-    }
-  }
-
   function renderTab(tab: TabKey): void {
     activeTab = tab
     tabsEl.querySelectorAll<HTMLElement>('.tc-tab').forEach(el => {
@@ -668,29 +604,27 @@ export function buildTouchControls(send: SendFn, opts: { spellTab?: SpellTabConf
 
   function renderContent(rows: TabButtonDef[][]): void {
     contentEl.innerHTML = ''
-    for (const row of rows) {
-      const rowEl = document.createElement('div')
-      rowEl.className = 'tc-row'
-      for (const def of row) {
-        if (!def.label) {
-          const spacer = document.createElement('div')
-          spacer.className = 'tc-btn tc-btn-spacer'
-          rowEl.appendChild(spacer)
-          continue
-        }
-        const btn = document.createElement('button')
-        btn.className = 'tc-btn'
-        const { text, named } = actionLabel(def, lang)
-        if (named) btn.classList.add('named')
-        else if (/[^\x20-\x7e]/.test(def.label)) btn.classList.add('glyph')
-        btn.textContent = text
-        if (def.title) { btn.title = def.title; btn.setAttribute('aria-label', def.title) }
-        btn.addEventListener('touchstart', e => { e.preventDefault(); sendTabKey(def) }, { passive: false })
-        btn.addEventListener('click', () => sendTabKey(def))
-        rowEl.appendChild(btn)
+    const stripEl = document.createElement('div')
+    stripEl.className = 'tc-row tc-strip'
+    for (const def of rows.flat()) {
+      if (!def.label) {
+        const spacer = document.createElement('div')
+        spacer.className = 'tc-btn tc-btn-spacer'
+        stripEl.appendChild(spacer)
+        continue
       }
-      contentEl.appendChild(rowEl)
+      const btn = document.createElement('button')
+      btn.className = 'tc-btn'
+      const { text, named } = actionLabel(def, lang)
+      if (named) btn.classList.add('named')
+      else if (/[^\x20-\x7e]/.test(def.label)) btn.classList.add('glyph')
+      btn.textContent = text
+      if (def.title) { btn.title = def.title; btn.setAttribute('aria-label', def.title) }
+      btn.addEventListener('touchstart', e => { e.preventDefault(); sendTabKey(def) }, { passive: false })
+      btn.addEventListener('click', () => sendTabKey(def))
+      stripEl.appendChild(btn)
     }
+    contentEl.appendChild(stripEl)
   }
 
   function enterXMode(): void {
@@ -704,7 +638,6 @@ export function buildTouchControls(send: SendFn, opts: { spellTab?: SpellTabConf
   }
 
   // Initial render
-  buildDpad()
   renderContent(TAB_BUTTONS.micro)
 
   return { element: root, enterXMode, exitXMode, openKbd, closeKbd, refreshSpellTab }

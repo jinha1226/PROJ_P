@@ -1,0 +1,30 @@
+// @vitest-environment happy-dom
+import { describe, it, expect, beforeEach } from 'vitest'
+import { buildTouchControls } from './touch'
+
+beforeEach(() => { localStorage.clear() })
+
+describe('layout v2: no d-pad, action strip present', () => {
+  it('builds no d-pad element', () => {
+    const tc = buildTouchControls(() => {})
+    expect(tc.element.querySelector('.tc-dpad')).toBeNull()
+    expect(tc.element.querySelector('.tc-dpad-btn')).toBeNull()
+  })
+
+  it('renders the action buttons in a single strip container', () => {
+    const tc = buildTouchControls(() => {})
+    const strips = tc.element.querySelectorAll('.tc-content .tc-strip')
+    expect(strips.length).toBe(1)
+    const btns = tc.element.querySelectorAll('.tc-content .tc-btn')
+    expect(btns.length).toBeGreaterThanOrEqual(8) // the active tab's actions
+  })
+
+  it('action buttons still send their key on tap', () => {
+    const sent: unknown[] = []
+    const tc = buildTouchControls(m => sent.push(m))
+    const explore = [...tc.element.querySelectorAll('.tc-content .tc-btn')]
+      .find(b => b.textContent === '자동탐색') as HTMLButtonElement
+    explore.click()
+    expect(sent).toContainEqual({ msg: 'input', text: 'o' })
+  })
+})
