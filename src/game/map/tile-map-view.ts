@@ -7,6 +7,7 @@
 
 import type { Cell, MapStore } from './map-store'
 import { parseCellKey } from './map-store'
+import { cellFromPoint } from './cell-hit'
 import { decodeColor, DEFAULT_FG, flashColor } from './colors'
 import { TEX, type TileLoader, type TileSprite } from '../tiles/tile-loader'
 import {
@@ -223,6 +224,11 @@ export class TileMapView {
   // drop the round-to-even-pixels constraint that previously left ~9 px of
   // dead space on each side of the binding axis.
   private cellPx = 16
+  // Absolute canvas-origin shifts (from the container's BoundingClientRect
+  // origin) set by fitToContainer via pinAxis. colShiftAbs = x.shift,
+  // rowShiftAbs = y.shift. Used by cellAtClient to hit-test a client point.
+  private colShiftAbs = 0
+  private rowShiftAbs = 0
   // Flipped true once every PRELOAD_TEX atlas + tileinfo + tileinfo-dngn has
   // loaded. Until then we draw ASCII glyphs on the canvas — same shape, lets
   // the user see the map while ~10 MB of atlas downloads.
@@ -406,6 +412,8 @@ export class TileMapView {
     this.centerRow = Math.min(y.centerCell, y.count - 1)
     this.container.style.setProperty('--map-col-shift', `${x.shift - padLeft}px`)
     this.container.style.setProperty('--map-row-shift', `${y.shift - padTop}px`)
+    this.colShiftAbs = x.shift
+    this.rowShiftAbs = y.shift
 
     // A centerCol/centerRow shift remaps every cell (offX/offY change); if
     // setViewportSize early-exited (nothing else changed), repaint explicitly.
@@ -576,6 +584,24 @@ export class TileMapView {
     this.ctx.fillStyle = '#000'
     this.ctx.fillRect(0, 0, this.viewportW * ATLAS_CELL, this.viewportH * ATLAS_CELL)
     this.render()
+  }
+
+  // Convert a client-coordinate point to the dungeon cell it lands on, or
+  // null if the point is outside the rendered grid or layout hasn't settled.
+  // colShiftAbs/rowShiftAbs are the canvas's absolute offsets from the
+  // container's rect origin, stored by fitToContainer.
+  cellAtClient(clientX: number, clientY: number): { x: number; y: number } | null {
+    if (this.cellPx <= 0) return null
+    const rect = this.container.getBoundingClientRect()
+    if (rect.width === 0 || rect.height === 0) return null
+    return cellFromPoint(
+      clientX, clientY,
+      rect.left, rect.top,
+      this.colShiftAbs, this.rowShiftAbs,
+      this.cellPx, this.cellPx,
+      this.offX, this.offY,
+      this.viewportW, this.viewportH,
+    )
   }
 
   setCursor(loc?: { x: number; y: number }): void {

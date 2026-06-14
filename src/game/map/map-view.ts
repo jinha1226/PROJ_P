@@ -1,6 +1,7 @@
 import type { MapStore } from './map-store'
 import { parseCellKey } from './map-store'
 import { decodeColor, DEFAULT_BG, flashColor } from './colors'
+import { cellFromPoint } from './cell-hit'
 
 const NORMAL_W = 33
 const NORMAL_H = 21
@@ -25,6 +26,9 @@ export class MapView {
   private centerRow = Math.floor(NORMAL_H / 2)
   private fontScale = 1.0
   private zoomMode = false
+  // Cell dimensions computed by fitToContainer, used by cellAtClient.
+  private cellCharW = 0
+  private cellLineH = 0
   // Absolute viewport center (matches vgrdc from server). In normal play equals playerPos.
   private viewCenter = { x: 0, y: 0 }
   private cursorLoc: { x: number; y: number } | null = null
@@ -155,6 +159,8 @@ export class MapView {
     // edge — far less disruptive than losing a whole row.
     const charW = fontSize * charWPerFs
     const lineH = fontSize * lineHPerFs
+    this.cellCharW = charW
+    this.cellLineH = lineH
     const fitW = Math.floor(availW / charW)
     const keepW = this.viewportW > fitW && this.viewportW * charW - availW < charW / 2
     const w = Math.max(minW, keepW ? this.viewportW : fitW)
@@ -265,6 +271,27 @@ export class MapView {
   fullRender(): void {
     this.render()
     this.updateCursorSpan()
+  }
+
+  // Convert a client-coordinate point to the dungeon cell it lands on, or
+  // null if the point is outside the rendered grid or layout hasn't settled.
+  // cellCharW/cellLineH are set by fitToContainer; padLeft/padTop shift the
+  // client rect origin to the content box where the spans actually start.
+  cellAtClient(clientX: number, clientY: number): { x: number; y: number } | null {
+    if (this.cellCharW <= 0 || this.cellLineH <= 0) return null
+    const rect = this.container.getBoundingClientRect()
+    if (rect.width === 0 || rect.height === 0) return null
+    const cs = getComputedStyle(this.container)
+    const padLeft = parseFloat(cs.paddingLeft)
+    const padTop = parseFloat(cs.paddingTop)
+    return cellFromPoint(
+      clientX, clientY,
+      rect.left, rect.top,
+      padLeft, padTop,
+      this.cellCharW, this.cellLineH,
+      this.offX, this.offY,
+      this.viewportW, this.viewportH,
+    )
   }
 
   // Show or hide the examine cursor.

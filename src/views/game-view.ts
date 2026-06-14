@@ -379,11 +379,19 @@ export function buildGameView(
   mapWrap.appendChild(mapView.element)
 
   // Double-tap the map to toggle zoom. Bypassed while X-mode is active
-  // (font scale is overridden there) — single-tap behavior is undefined on
-  // the map today, so we don't need to suppress click propagation.
+  // (font scale is overridden there).
   // Bound to mapWrap (not mapView.element) so it survives the in-place swap
   // between MapView and TileMapView.
+  //
+  // Single-tap-to-travel shares the same 300 ms double-tap window: a tap is
+  // not confirmed until that window expires with no second tap. `pendingTravel`
+  // holds the candidate's coords and a timer id; any event that satisfies the
+  // double-tap (a second pointerdown) or starts a two-finger gesture clears it.
   let lastTap = { t: 0, x: 0, y: 0 }
+  let pendingTravel: { timer: number; clientX: number; clientY: number } | null = null
+  const cancelPendingTravel = (): void => {
+    if (pendingTravel) { window.clearTimeout(pendingTravel.timer); pendingTravel = null }
+  }
   mapWrap.addEventListener('pointerdown', (e) => {
     if (inXMode || e.button !== 0) return
     // Ignore the secondary finger of a multi-touch gesture — otherwise two
@@ -396,12 +404,41 @@ export function buildGameView(
     const dx = e.clientX - lastTap.x
     const dy = e.clientY - lastTap.y
     if (dt < 300 && dx * dx + dy * dy < 30 * 30) {
+      // Double-tap confirmed → zoom. Cancel any pending single-tap travel.
+      cancelPendingTravel()
       mapView.setZoomMode(!mapView.isZoomMode())
       mapView.fitToContainer()
       lastTap = { t: 0, x: 0, y: 0 }
       return
     }
     lastTap = { t: now, x: e.clientX, y: e.clientY }
+  })
+  mapWrap.addEventListener('pointerup', (e) => {
+    if (inXMode || e.button !== 0 || !e.isPrimary) return
+    const target = e.target as HTMLElement | null
+    if (!target || !target.closest('#map-grid')) return
+    // Candidate tap: quick (<300 ms from the matching down) and small movement.
+    const dt = e.timeStamp - lastTap.t
+    const dx = e.clientX - lastTap.x
+    const dy = e.clientY - lastTap.y
+    if (dt >= 300 || dx * dx + dy * dy >= 12 * 12) return
+    // Debounce: defer travel until the double-tap window passes. A second
+    // pointerdown that satisfies the zoom check will cancel this timer first.
+    cancelPendingTravel()
+    const { clientX, clientY } = e
+    pendingTravel = {
+      clientX,
+      clientY,
+      timer: window.setTimeout(() => {
+        pendingTravel = null
+        // Normal-play guard: skip when any overlay, menu, dialog, or harvest is active.
+        if (uiStack.length > 0 || crtActive || dialogActive || activeMenu || isHarvesting() || monsterPanelOpen) return
+        // Skip while X-mode (examine) is active.
+        if (inXMode) return
+        const cell = mapView.cellAtClient(clientX, clientY)
+        if (cell) conn.send({ msg: 'click_cell', x: cell.x, y: cell.y, button: 1 })
+      }, 300),
+    }
   })
 
   // Two-finger long-press on the map flips between ASCII and tile rendering.
@@ -420,8 +457,10 @@ export function buildGameView(
     const target = e.target as HTMLElement | null
     if (!target || !target.closest('#map-grid')) { cancelTileGesture(); return }
     // Suppress any pending single-tap-zoom state so the two-finger landings
-    // can't accidentally satisfy the double-tap-zoom check.
+    // can't accidentally satisfy the double-tap-zoom check. Also cancel any
+    // pending single-tap travel — a two-finger gesture isn't a movement tap.
     lastTap = { t: 0, x: 0, y: 0 }
+    cancelPendingTravel()
     const t1 = e.touches[0]; const t2 = e.touches[1]
     tileGestureCenter = { x: (t1.clientX + t2.clientX) / 2, y: (t1.clientY + t2.clientY) / 2 }
     if (tileGestureTimer != null) window.clearTimeout(tileGestureTimer)
