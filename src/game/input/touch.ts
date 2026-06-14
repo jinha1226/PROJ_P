@@ -70,7 +70,7 @@ const DPAD_LAYOUT: DpadDef[][] = [
 ]
 
 // Static tabs only; the 'spells' tab renders dynamic content from game-view.
-const TAB_BUTTONS: Record<Exclude<TabKey, 'spells'>, TabButtonDef[][]> = {
+export const TAB_BUTTONS: Record<Exclude<TabKey, 'spells'>, TabButtonDef[][]> = {
   micro: [
     [
       { label: '⇥',   title: 'Auto-fight nearest',    key: 9 },
