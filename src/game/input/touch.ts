@@ -9,9 +9,8 @@ import {
   CK_CTRL_BKSP, CAPTURED_CTRL,
 } from './keyboard'
 import { createShiftToggle } from './shift-state'
-import { getPref, setPref } from '../../prefs'
+import { getPref, setPref, type UiLang } from '../../prefs'
 import { actionLabel, TAB_LABELS } from './action-labels'
-import type { UiLang } from '../../prefs'
 
 type SendFn = (msg: ClientMsg) => void
 type TabKey = 'micro' | 'macro' | 'info' | 'spells'
