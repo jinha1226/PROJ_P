@@ -347,7 +347,7 @@ export const BUILD_GUIDES: Record<string, BuildGuide> = {
     }
   },
   "Gargoyle/Earth Elementalist": {
-    "n": 12,
+    "n": 15,
     "milestones": {
       "1": {
         "Earth Magic": 3.6,
@@ -366,7 +366,7 @@ export const BUILD_GUIDES: Record<string, BuildGuide> = {
         "Fighting": 0.0
       },
       "5": {
-        "Earth Magic": 4.5,
+        "Earth Magic": 4.0,
         "Stealth": 2.1,
         "Spellcasting": 2.0,
         "Conjurations": 2.0,
@@ -375,59 +375,144 @@ export const BUILD_GUIDES: Record<string, BuildGuide> = {
       },
       "7": {
         "Earth Magic": 6.0,
-        "Conjurations": 4.2,
-        "Spellcasting": 3.4,
+        "Conjurations": 4.0,
+        "Spellcasting": 3.2,
+        "Stealth": 2.1,
+        "Dodging": 1.5,
+        "Fighting": 0.0
+      },
+      "9": {
+        "Earth Magic": 9.5,
+        "Conjurations": 6.0,
+        "Spellcasting": 5.9,
         "Stealth": 2.1,
         "Fighting": 2.0,
         "Dodging": 1.5
       },
-      "9": {
-        "Earth Magic": 9.6,
-        "Spellcasting": 6.0,
-        "Conjurations": 6.0,
-        "Fighting": 3.0,
-        "Stealth": 2.5,
-        "Dodging": 1.5
-      },
       "12": {
-        "Spellcasting": 10.0,
-        "Earth Magic": 9.8,
-        "Conjurations": 6.8,
-        "Fighting": 6.1,
+        "Earth Magic": 10.0,
+        "Spellcasting": 9.9,
+        "Conjurations": 7.0,
+        "Fighting": 6.0,
         "Ice Magic": 4.0,
-        "Translocations": 3.0
+        "Stealth": 2.8
       },
       "15": {
-        "Earth Magic": 12.3,
-        "Spellcasting": 11.6,
-        "Fighting": 9.0,
-        "Conjurations": 8.4,
-        "Ice Magic": 4.0,
-        "Stealth": 3.3
+        "Earth Magic": 12.0,
+        "Spellcasting": 11.2,
+        "Fighting": 8.0,
+        "Conjurations": 8.0,
+        "Stealth": 3.0,
+        "Dodging": 2.0
       },
       "18": {
-        "Spellcasting": 12.9,
         "Earth Magic": 12.7,
-        "Fighting": 9.3,
-        "Conjurations": 8.4,
-        "Ice Magic": 4.0,
-        "Stealth": 3.3
+        "Spellcasting": 12.0,
+        "Fighting": 8.9,
+        "Conjurations": 8.8,
+        "Stealth": 3.0,
+        "Dodging": 2.0
       },
       "21": {
-        "Spellcasting": 12.9,
-        "Earth Magic": 12.7,
-        "Fighting": 11.0,
-        "Conjurations": 8.4,
-        "Ice Magic": 4.0,
-        "Stealth": 3.3
+        "Earth Magic": 12.3,
+        "Spellcasting": 12.0,
+        "Fighting": 11.9,
+        "Conjurations": 9.8,
+        "Stealth": 3.0,
+        "Translocations": 2.0
       },
       "27": {
-        "Earth Magic": 14.7,
-        "Spellcasting": 12.9,
-        "Fighting": 11.0,
-        "Conjurations": 9.9,
+        "Earth Magic": 13.3,
+        "Fighting": 12.0,
+        "Spellcasting": 12.0,
+        "Conjurations": 10.0,
+        "Shields": 5.2,
+        "Stealth": 3.0
+      }
+    }
+  },
+  "Formicid/Fighter": {
+    "n": 23,
+    "milestones": {
+      "1": {
+        "Shields": 4.0,
+        "Fighting": 3.2,
+        "Armour": 3.2,
+        "Axes": 2.0,
+        "Maces & Flails": 1.1,
+        "Polearms": 1.1
+      },
+      "3": {
+        "Shields": 4.0,
+        "Fighting": 3.2,
+        "Armour": 3.2,
+        "Axes": 2.0,
+        "Maces & Flails": 1.1,
+        "Polearms": 1.1
+      },
+      "5": {
+        "Shields": 4.0,
+        "Fighting": 3.2,
+        "Armour": 3.2,
+        "Axes": 2.0,
+        "Maces & Flails": 1.1,
+        "Polearms": 1.1
+      },
+      "7": {
+        "Shields": 4.0,
+        "Fighting": 3.2,
+        "Armour": 3.2,
+        "Axes": 2.6,
+        "Maces & Flails": 1.8,
+        "Polearms": 1.5
+      },
+      "9": {
+        "Axes": 6.3,
+        "Fighting": 5.6,
         "Shields": 5.0,
-        "Stealth": 3.3
+        "Maces & Flails": 4.4,
+        "Polearms": 4.2,
+        "Armour": 3.9
+      },
+      "12": {
+        "Axes": 11.4,
+        "Fighting": 8.0,
+        "Maces & Flails": 7.3,
+        "Polearms": 7.2,
+        "Shields": 5.0,
+        "Armour": 4.7
+      },
+      "15": {
+        "Axes": 14.0,
+        "Fighting": 11.9,
+        "Shields": 10.0,
+        "Maces & Flails": 9.6,
+        "Polearms": 9.2,
+        "Armour": 8.9
+      },
+      "18": {
+        "Axes": 16.0,
+        "Shields": 13.9,
+        "Fighting": 13.7,
+        "Armour": 12.0,
+        "Polearms": 10.6,
+        "Maces & Flails": 10.5
+      },
+      "21": {
+        "Axes": 16.5,
+        "Fighting": 15.0,
+        "Shields": 14.5,
+        "Armour": 12.7,
+        "Maces & Flails": 11.1,
+        "Polearms": 11.1
+      },
+      "27": {
+        "Axes": 16.9,
+        "Fighting": 15.4,
+        "Shields": 15.0,
+        "Armour": 13.6,
+        "Maces & Flails": 11.6,
+        "Polearms": 11.3
       }
     }
   },
@@ -517,7 +602,7 @@ export const BUILD_GUIDES: Record<string, BuildGuide> = {
     }
   },
   "Demonspawn/Fighter": {
-    "n": 12,
+    "n": 15,
     "milestones": {
       "1": {
         "Fighting": 3.0,
@@ -531,73 +616,243 @@ export const BUILD_GUIDES: Record<string, BuildGuide> = {
         "Fighting": 3.0,
         "Armour": 2.6,
         "Shields": 2.6,
-        "Axes": 1.8,
-        "Maces & Flails": 1.1,
+        "Axes": 1.7,
+        "Maces & Flails": 1.0,
         "Polearms": 1.0
       },
       "5": {
-        "Fighting": 3.1,
-        "Armour": 2.8,
-        "Shields": 2.8,
-        "Axes": 2.2,
+        "Fighting": 3.0,
+        "Armour": 2.7,
+        "Shields": 2.7,
+        "Axes": 2.0,
         "Maces & Flails": 1.4,
-        "Polearms": 1.4
+        "Polearms": 1.2
       },
       "7": {
-        "Fighting": 3.5,
+        "Fighting": 3.6,
         "Armour": 3.0,
         "Shields": 3.0,
-        "Axes": 2.5,
-        "Maces & Flails": 1.9,
-        "Polearms": 1.8
+        "Axes": 2.6,
+        "Maces & Flails": 2.0,
+        "Polearms": 1.9
       },
       "9": {
-        "Fighting": 3.5,
-        "Armour": 3.1,
-        "Shields": 3.0,
-        "Axes": 2.5,
+        "Fighting": 3.7,
+        "Armour": 3.3,
+        "Shields": 3.1,
+        "Axes": 2.6,
         "Maces & Flails": 2.0,
         "Polearms": 2.0
       },
       "12": {
-        "Axes": 9.4,
+        "Axes": 9.5,
         "Fighting": 8.4,
-        "Armour": 7.7,
-        "Shields": 7.3,
-        "Invocations": 6.5,
-        "Maces & Flails": 6.2
+        "Armour": 7.6,
+        "Shields": 7.5,
+        "Polearms": 6.2,
+        "Maces & Flails": 6.1
       },
       "15": {
-        "Axes": 12.6,
-        "Fighting": 11.2,
-        "Armour": 10.8,
-        "Shields": 9.8,
-        "Maces & Flails": 9.2,
+        "Axes": 14.3,
+        "Fighting": 10.8,
+        "Armour": 10.0,
+        "Shields": 9.5,
+        "Maces & Flails": 9.3,
         "Polearms": 9.2
       },
       "18": {
-        "Axes": 15.0,
-        "Fighting": 13.2,
-        "Armour": 12.7,
-        "Shields": 11.8,
-        "Maces & Flails": 10.1,
-        "Polearms": 9.8
+        "Axes": 15.9,
+        "Fighting": 13.4,
+        "Armour": 12.3,
+        "Invocations": 12.0,
+        "Shields": 11.9,
+        "Polearms": 10.4
       },
       "21": {
-        "Axes": 15.0,
-        "Fighting": 13.8,
-        "Armour": 13.1,
-        "Shields": 12.0,
-        "Maces & Flails": 10.1,
-        "Polearms": 9.8
+        "Axes": 15.9,
+        "Fighting": 14.2,
+        "Armour": 13.3,
+        "Shields": 12.7,
+        "Invocations": 12.0,
+        "Polearms": 10.6
       },
       "27": {
-        "Axes": 15.0,
-        "Fighting": 13.8,
-        "Armour": 13.1,
-        "Shields": 12.0,
-        "Maces & Flails": 10.1,
-        "Polearms": 9.8
+        "Axes": 15.9,
+        "Fighting": 14.2,
+        "Armour": 13.3,
+        "Shields": 12.7,
+        "Invocations": 12.0,
+        "Maces & Flails": 10.9
+      }
+    }
+  },
+  "Barachi/Hunter": {
+    "n": 12,
+    "milestones": {
+      "1": {
+        "Ranged Weapons": 4.0,
+        "Fighting": 2.4,
+        "Dodging": 2.1,
+        "Stealth": 0.8,
+        "Spellcasting": 0.0,
+        "Unarmed Combat": 0.0
+      },
+      "3": {
+        "Ranged Weapons": 4.0,
+        "Fighting": 2.4,
+        "Dodging": 2.1,
+        "Stealth": 0.8,
+        "Spellcasting": 0.0,
+        "Unarmed Combat": 0.0
+      },
+      "5": {
+        "Ranged Weapons": 4.0,
+        "Fighting": 2.4,
+        "Dodging": 2.1,
+        "Stealth": 0.8,
+        "Spellcasting": 0.0,
+        "Unarmed Combat": 0.0
+      },
+      "7": {
+        "Ranged Weapons": 4.0,
+        "Fighting": 2.4,
+        "Dodging": 2.1,
+        "Stealth": 0.8,
+        "Spellcasting": 0.0,
+        "Unarmed Combat": 0.0
+      },
+      "9": {
+        "Ranged Weapons": 11.0,
+        "Fighting": 2.4,
+        "Dodging": 2.1,
+        "Stealth": 0.8,
+        "Spellcasting": 0.0,
+        "Unarmed Combat": 0.0
+      },
+      "12": {
+        "Ranged Weapons": 11.6,
+        "Fighting": 8.6,
+        "Dodging": 7.8,
+        "Invocations": 4.6,
+        "Armour": 4.5,
+        "Stealth": 0.8
+      },
+      "15": {
+        "Ranged Weapons": 14.2,
+        "Fighting": 11.2,
+        "Invocations": 9.9,
+        "Dodging": 9.7,
+        "Armour": 9.5,
+        "Stealth": 0.8
+      },
+      "18": {
+        "Ranged Weapons": 18.0,
+        "Fighting": 11.2,
+        "Armour": 10.8,
+        "Invocations": 10.5,
+        "Dodging": 9.7,
+        "Stealth": 0.8
+      },
+      "21": {
+        "Ranged Weapons": 18.8,
+        "Fighting": 11.2,
+        "Armour": 11.1,
+        "Invocations": 10.5,
+        "Dodging": 9.7,
+        "Stealth": 0.8
+      },
+      "27": {
+        "Ranged Weapons": 18.8,
+        "Fighting": 11.2,
+        "Armour": 11.1,
+        "Invocations": 11.0,
+        "Dodging": 9.7,
+        "Stealth": 0.8
+      }
+    }
+  },
+  "Djinni/Conjurer": {
+    "n": 10,
+    "milestones": {
+      "1": {
+        "Spellcasting": 3.4,
+        "Conjurations": 3.4,
+        "Hexes": 3.4,
+        "Summonings": 3.4,
+        "Necromancy": 3.4,
+        "Forgecraft": 3.4
+      },
+      "3": {
+        "Spellcasting": 3.4,
+        "Conjurations": 3.4,
+        "Hexes": 3.4,
+        "Summonings": 3.4,
+        "Necromancy": 3.4,
+        "Forgecraft": 3.4
+      },
+      "5": {
+        "Spellcasting": 3.9,
+        "Conjurations": 3.9,
+        "Hexes": 3.9,
+        "Summonings": 3.9,
+        "Necromancy": 3.9,
+        "Forgecraft": 3.9
+      },
+      "7": {
+        "Spellcasting": 4.2,
+        "Conjurations": 4.2,
+        "Hexes": 4.2,
+        "Summonings": 4.2,
+        "Necromancy": 4.2,
+        "Forgecraft": 4.2
+      },
+      "9": {
+        "Spellcasting": 8.2,
+        "Conjurations": 8.2,
+        "Hexes": 8.2,
+        "Summonings": 8.2,
+        "Necromancy": 8.2,
+        "Forgecraft": 8.2
+      },
+      "12": {
+        "Spellcasting": 10.4,
+        "Conjurations": 10.4,
+        "Hexes": 10.4,
+        "Summonings": 10.4,
+        "Necromancy": 10.4,
+        "Forgecraft": 10.4
+      },
+      "15": {
+        "Spellcasting": 12.8,
+        "Conjurations": 12.8,
+        "Hexes": 12.8,
+        "Summonings": 12.8,
+        "Necromancy": 12.8,
+        "Forgecraft": 12.8
+      },
+      "18": {
+        "Spellcasting": 14.2,
+        "Conjurations": 14.2,
+        "Hexes": 14.2,
+        "Summonings": 14.2,
+        "Necromancy": 14.2,
+        "Forgecraft": 14.2
+      },
+      "21": {
+        "Spellcasting": 15.1,
+        "Conjurations": 15.1,
+        "Hexes": 15.1,
+        "Summonings": 15.1,
+        "Necromancy": 15.1,
+        "Forgecraft": 15.1
+      },
+      "27": {
+        "Spellcasting": 16.8,
+        "Conjurations": 16.8,
+        "Hexes": 16.8,
+        "Summonings": 16.8,
+        "Necromancy": 16.8,
+        "Forgecraft": 16.8
       }
     }
   },
@@ -771,6 +1026,91 @@ export const BUILD_GUIDES: Record<string, BuildGuide> = {
       }
     }
   },
+  "Demigod/Hunter": {
+    "n": 9,
+    "milestones": {
+      "1": {
+        "Ranged Weapons": 3.6,
+        "Fighting": 1.7,
+        "Dodging": 1.7,
+        "Stealth": 0.8,
+        "Spellcasting": 0.0,
+        "Unarmed Combat": 0.0
+      },
+      "3": {
+        "Ranged Weapons": 3.6,
+        "Fighting": 1.7,
+        "Dodging": 1.7,
+        "Stealth": 0.8,
+        "Spellcasting": 0.0,
+        "Unarmed Combat": 0.0
+      },
+      "5": {
+        "Ranged Weapons": 4.3,
+        "Fighting": 1.7,
+        "Dodging": 1.7,
+        "Stealth": 0.8,
+        "Spellcasting": 0.0,
+        "Unarmed Combat": 0.0
+      },
+      "7": {
+        "Ranged Weapons": 5.5,
+        "Fighting": 1.7,
+        "Dodging": 1.7,
+        "Stealth": 0.8,
+        "Spellcasting": 0.0,
+        "Unarmed Combat": 0.0
+      },
+      "9": {
+        "Ranged Weapons": 9.2,
+        "Fighting": 2.5,
+        "Stealth": 1.9,
+        "Dodging": 1.7,
+        "Spellcasting": 0.0,
+        "Unarmed Combat": 0.0
+      },
+      "12": {
+        "Ranged Weapons": 14.8,
+        "Fighting": 8.0,
+        "Dodging": 6.9,
+        "Stealth": 1.9,
+        "Evocations": 0.5,
+        "Spellcasting": 0.0
+      },
+      "15": {
+        "Ranged Weapons": 17.6,
+        "Fighting": 13.0,
+        "Dodging": 11.6,
+        "Stealth": 2.0,
+        "Evocations": 2.0,
+        "Translocations": 1.0
+      },
+      "18": {
+        "Ranged Weapons": 20.0,
+        "Fighting": 15.1,
+        "Dodging": 14.6,
+        "Translocations": 4.4,
+        "Armour": 3.0,
+        "Evocations": 3.0
+      },
+      "21": {
+        "Ranged Weapons": 20.0,
+        "Dodging": 15.6,
+        "Fighting": 15.1,
+        "Translocations": 5.0,
+        "Armour": 4.0,
+        "Evocations": 3.0
+      },
+      "27": {
+        "Ranged Weapons": 20.0,
+        "Dodging": 15.6,
+        "Fighting": 15.1,
+        "Translocations": 5.0,
+        "Armour": 4.0,
+        "Evocations": 3.0
+      }
+    }
+  },
   "Minotaur/Shapeshifter": {
     "n": 8,
     "milestones": {
@@ -853,6 +1193,257 @@ export const BUILD_GUIDES: Record<string, BuildGuide> = {
         "Shields": 17.2,
         "Maces & Flails": 13.9,
         "Dodging": 11.5
+      }
+    }
+  },
+  "Minotaur/Gladiator": {
+    "n": 8,
+    "milestones": {
+      "1": {
+        "Axes": 3.6,
+        "Dodging": 3.2,
+        "Fighting": 2.4,
+        "Maces & Flails": 2.1,
+        "Polearms": 2.1,
+        "Staves": 2.1
+      },
+      "3": {
+        "Axes": 3.8,
+        "Dodging": 3.2,
+        "Fighting": 2.8,
+        "Polearms": 2.8,
+        "Maces & Flails": 2.3,
+        "Staves": 2.1
+      },
+      "5": {
+        "Axes": 4.7,
+        "Fighting": 3.4,
+        "Dodging": 3.2,
+        "Polearms": 3.0,
+        "Maces & Flails": 2.8,
+        "Throwing": 2.0
+      },
+      "7": {
+        "Axes": 6.7,
+        "Fighting": 5.6,
+        "Polearms": 4.8,
+        "Maces & Flails": 4.2,
+        "Staves": 3.6,
+        "Armour": 3.5
+      },
+      "9": {
+        "Axes": 8.5,
+        "Fighting": 8.3,
+        "Polearms": 7.5,
+        "Maces & Flails": 6.4,
+        "Armour": 5.0,
+        "Staves": 3.6
+      },
+      "12": {
+        "Axes": 14.7,
+        "Fighting": 10.6,
+        "Polearms": 10.4,
+        "Maces & Flails": 9.7,
+        "Staves": 7.7,
+        "Armour": 7.3
+      },
+      "15": {
+        "Axes": 15.2,
+        "Fighting": 13.1,
+        "Polearms": 10.8,
+        "Maces & Flails": 10.0,
+        "Armour": 7.8,
+        "Shields": 5.5
+      },
+      "18": {
+        "Axes": 16.6,
+        "Fighting": 15.2,
+        "Maces & Flails": 11.7,
+        "Polearms": 11.7,
+        "Armour": 7.8,
+        "Shields": 7.0
+      },
+      "21": {
+        "Axes": 16.9,
+        "Fighting": 15.2,
+        "Maces & Flails": 11.7,
+        "Polearms": 11.7,
+        "Armour": 7.8,
+        "Invocations": 7.2
+      },
+      "27": {
+        "Axes": 17.3,
+        "Fighting": 14.4,
+        "Maces & Flails": 11.7,
+        "Polearms": 11.7,
+        "Armour": 7.8,
+        "Invocations": 7.2
+      }
+    }
+  },
+  "Troll/Berserker": {
+    "n": 8,
+    "milestones": {
+      "1": {
+        "Unarmed Combat": 3.0,
+        "Fighting": 2.4,
+        "Dodging": 2.4,
+        "Armour": 0.0,
+        "Stealth": 0.0
+      },
+      "3": {
+        "Unarmed Combat": 3.0,
+        "Fighting": 2.4,
+        "Dodging": 2.4,
+        "Armour": 0.0,
+        "Stealth": 0.0
+      },
+      "5": {
+        "Unarmed Combat": 3.0,
+        "Fighting": 2.4,
+        "Dodging": 2.4,
+        "Armour": 0.0,
+        "Stealth": 0.0
+      },
+      "7": {
+        "Unarmed Combat": 4.3,
+        "Fighting": 3.0,
+        "Dodging": 2.4,
+        "Armour": 0.0,
+        "Stealth": 0.0
+      },
+      "9": {
+        "Unarmed Combat": 6.5,
+        "Fighting": 4.0,
+        "Dodging": 3.1,
+        "Armour": 0.0,
+        "Stealth": 0.0,
+        "Shapeshifting": 0.0
+      },
+      "12": {
+        "Unarmed Combat": 13.4,
+        "Shapeshifting": 10.1,
+        "Fighting": 6.8,
+        "Dodging": 4.0,
+        "Evocations": 0.0,
+        "Throwing": 0.0
+      },
+      "15": {
+        "Shapeshifting": 18.8,
+        "Unarmed Combat": 16.7,
+        "Fighting": 10.6,
+        "Dodging": 5.5,
+        "Evocations": 0.0,
+        "Throwing": 0.0
+      },
+      "18": {
+        "Shapeshifting": 19.8,
+        "Unarmed Combat": 18.1,
+        "Fighting": 12.0,
+        "Shields": 9.4,
+        "Dodging": 6.2,
+        "Evocations": 0.0
+      },
+      "21": {
+        "Shapeshifting": 21.8,
+        "Unarmed Combat": 19.2,
+        "Fighting": 12.4,
+        "Shields": 9.4,
+        "Dodging": 6.2,
+        "Evocations": 0.0
+      },
+      "27": {
+        "Shapeshifting": 22.5,
+        "Unarmed Combat": 17.8,
+        "Fighting": 12.4,
+        "Shields": 9.4,
+        "Dodging": 6.2,
+        "Evocations": 0.0
+      }
+    }
+  },
+  "Octopode/Shapeshifter": {
+    "n": 8,
+    "milestones": {
+      "1": {
+        "Unarmed Combat": 3.0,
+        "Shapeshifting": 3.0,
+        "Fighting": 2.0,
+        "Dodging": 2.0,
+        "Spellcasting": 0.0,
+        "Stealth": 0.0
+      },
+      "3": {
+        "Shapeshifting": 3.1,
+        "Unarmed Combat": 3.0,
+        "Fighting": 2.0,
+        "Dodging": 2.0,
+        "Spellcasting": 0.0,
+        "Stealth": 0.0
+      },
+      "5": {
+        "Shapeshifting": 3.1,
+        "Unarmed Combat": 3.0,
+        "Fighting": 2.0,
+        "Dodging": 2.0,
+        "Spellcasting": 0.0,
+        "Stealth": 0.0
+      },
+      "7": {
+        "Shapeshifting": 6.6,
+        "Unarmed Combat": 3.0,
+        "Fighting": 2.0,
+        "Dodging": 2.0,
+        "Spellcasting": 0.0,
+        "Stealth": 0.0
+      },
+      "9": {
+        "Shapeshifting": 9.2,
+        "Unarmed Combat": 7.2,
+        "Fighting": 5.8,
+        "Dodging": 2.0,
+        "Spellcasting": 0.0,
+        "Stealth": 0.0
+      },
+      "12": {
+        "Unarmed Combat": 11.9,
+        "Shapeshifting": 11.2,
+        "Fighting": 7.9,
+        "Dodging": 4.2,
+        "Spellcasting": 0.0,
+        "Stealth": 0.0
+      },
+      "15": {
+        "Unarmed Combat": 14.6,
+        "Shapeshifting": 14.1,
+        "Fighting": 11.3,
+        "Dodging": 8.8,
+        "Stealth": 2.5,
+        "Spellcasting": 0.0
+      },
+      "18": {
+        "Shapeshifting": 15.3,
+        "Unarmed Combat": 15.2,
+        "Fighting": 12.0,
+        "Dodging": 11.4,
+        "Stealth": 2.5,
+        "Evocations": 1.0
+      },
+      "21": {
+        "Unarmed Combat": 15.5,
+        "Shapeshifting": 15.3,
+        "Fighting": 12.0,
+        "Dodging": 11.4,
+        "Stealth": 2.5,
+        "Evocations": 1.0
+      },
+      "27": {
+        "Unarmed Combat": 15.5,
+        "Shapeshifting": 15.3,
+        "Fighting": 12.0,
+        "Dodging": 11.4,
+        "Stealth": 2.5,
+        "Evocations": 1.0
       }
     }
   },
@@ -1023,6 +1614,176 @@ export const BUILD_GUIDES: Record<string, BuildGuide> = {
         "Fighting": 14.5,
         "Armour": 14.1,
         "Dodging": 9.7
+      }
+    }
+  },
+  "Merfolk/Gladiator": {
+    "n": 7,
+    "milestones": {
+      "1": {
+        "Polearms": 4.4,
+        "Dodging": 4.0,
+        "Fighting": 2.1,
+        "Throwing": 2.0,
+        "Axes": 1.3,
+        "Staves": 1.3
+      },
+      "3": {
+        "Polearms": 4.4,
+        "Dodging": 4.0,
+        "Fighting": 2.1,
+        "Throwing": 2.0,
+        "Axes": 1.3,
+        "Staves": 1.3
+      },
+      "5": {
+        "Polearms": 5.1,
+        "Dodging": 4.0,
+        "Fighting": 2.1,
+        "Throwing": 2.0,
+        "Axes": 1.6,
+        "Staves": 1.6
+      },
+      "7": {
+        "Polearms": 6.5,
+        "Dodging": 5.1,
+        "Fighting": 3.1,
+        "Axes": 2.1,
+        "Staves": 2.1,
+        "Throwing": 2.0
+      },
+      "9": {
+        "Polearms": 8.2,
+        "Dodging": 6.7,
+        "Fighting": 4.7,
+        "Axes": 3.2,
+        "Staves": 3.2,
+        "Throwing": 2.0
+      },
+      "12": {
+        "Polearms": 12.9,
+        "Dodging": 11.5,
+        "Fighting": 9.4,
+        "Shields": 5.6,
+        "Invocations": 5.0,
+        "Axes": 4.7
+      },
+      "15": {
+        "Polearms": 13.9,
+        "Fighting": 13.6,
+        "Dodging": 13.0,
+        "Invocations": 9.5,
+        "Shields": 6.9,
+        "Axes": 5.1
+      },
+      "18": {
+        "Fighting": 15.0,
+        "Dodging": 15.0,
+        "Polearms": 13.9,
+        "Invocations": 9.5,
+        "Shields": 8.9,
+        "Axes": 5.1
+      },
+      "21": {
+        "Fighting": 15.0,
+        "Dodging": 15.0,
+        "Polearms": 13.9,
+        "Invocations": 9.5,
+        "Shields": 8.9,
+        "Axes": 5.1
+      },
+      "27": {
+        "Fighting": 15.0,
+        "Dodging": 15.0,
+        "Polearms": 13.9,
+        "Invocations": 9.5,
+        "Shields": 8.9,
+        "Axes": 5.1
+      }
+    }
+  },
+  "Octopode/Fighter": {
+    "n": 7,
+    "milestones": {
+      "1": {
+        "Fighting": 3.0,
+        "Dodging": 3.0,
+        "Shields": 3.0,
+        "Polearms": 2.0,
+        "Axes": 1.1,
+        "Staves": 1.1
+      },
+      "3": {
+        "Fighting": 3.0,
+        "Dodging": 3.0,
+        "Shields": 3.0,
+        "Polearms": 2.0,
+        "Axes": 1.1,
+        "Staves": 1.1
+      },
+      "5": {
+        "Fighting": 3.0,
+        "Dodging": 3.0,
+        "Shields": 3.0,
+        "Polearms": 2.0,
+        "Axes": 1.1,
+        "Staves": 1.1
+      },
+      "7": {
+        "Fighting": 3.0,
+        "Dodging": 3.0,
+        "Shields": 3.0,
+        "Polearms": 2.0,
+        "Axes": 1.1,
+        "Staves": 1.1
+      },
+      "9": {
+        "Dodging": 5.8,
+        "Shields": 5.6,
+        "Stealth": 5.3,
+        "Polearms": 5.2,
+        "Fighting": 4.9,
+        "Axes": 3.1
+      },
+      "12": {
+        "Dodging": 9.0,
+        "Polearms": 8.7,
+        "Fighting": 8.5,
+        "Shields": 8.4,
+        "Stealth": 8.0,
+        "Axes": 5.3
+      },
+      "15": {
+        "Dodging": 11.8,
+        "Polearms": 11.8,
+        "Shields": 11.7,
+        "Fighting": 11.6,
+        "Stealth": 8.0,
+        "Axes": 7.4
+      },
+      "18": {
+        "Dodging": 14.1,
+        "Shields": 13.9,
+        "Fighting": 13.4,
+        "Polearms": 12.0,
+        "Stealth": 8.0,
+        "Axes": 7.5
+      },
+      "21": {
+        "Dodging": 14.4,
+        "Shields": 14.0,
+        "Fighting": 13.4,
+        "Polearms": 12.0,
+        "Stealth": 8.0,
+        "Axes": 7.5
+      },
+      "27": {
+        "Dodging": 14.4,
+        "Shields": 14.0,
+        "Fighting": 13.4,
+        "Polearms": 12.0,
+        "Stealth": 8.0,
+        "Axes": 7.5
       }
     }
   },
@@ -1278,6 +2039,686 @@ export const BUILD_GUIDES: Record<string, BuildGuide> = {
         "Shields": 6.3,
         "Earth Magic": 6.3,
         "Stealth": 2.6
+      }
+    }
+  },
+  "Merfolk/Shapeshifter": {
+    "n": 5,
+    "milestones": {
+      "1": {
+        "Shapeshifting": 4.0,
+        "Unarmed Combat": 3.2,
+        "Dodging": 2.6,
+        "Fighting": 2.1,
+        "Spellcasting": 0.0,
+        "Armour": 0.0
+      },
+      "3": {
+        "Shapeshifting": 5.1,
+        "Unarmed Combat": 3.2,
+        "Dodging": 2.6,
+        "Fighting": 2.4,
+        "Axes": 0.2,
+        "Spellcasting": 0.0
+      },
+      "5": {
+        "Shapeshifting": 6.2,
+        "Unarmed Combat": 3.4,
+        "Dodging": 3.0,
+        "Fighting": 2.8,
+        "Polearms": 1.8,
+        "Axes": 0.5
+      },
+      "7": {
+        "Shapeshifting": 8.0,
+        "Fighting": 4.0,
+        "Unarmed Combat": 4.0,
+        "Dodging": 3.0,
+        "Polearms": 2.8,
+        "Axes": 0.8
+      },
+      "9": {
+        "Fighting": 8.0,
+        "Shapeshifting": 8.0,
+        "Polearms": 5.1,
+        "Unarmed Combat": 4.0,
+        "Dodging": 3.0,
+        "Staves": 1.8
+      },
+      "12": {
+        "Shapeshifting": 11.4,
+        "Fighting": 10.6,
+        "Polearms": 10.0,
+        "Dodging": 6.5,
+        "Unarmed Combat": 4.0,
+        "Staves": 3.9
+      },
+      "15": {
+        "Shapeshifting": 17.1,
+        "Fighting": 12.2,
+        "Unarmed Combat": 10.0,
+        "Polearms": 10.0,
+        "Evocations": 7.7,
+        "Ice Magic": 7.4
+      },
+      "18": {
+        "Shapeshifting": 18.2,
+        "Unarmed Combat": 16.6,
+        "Fighting": 14.4,
+        "Polearms": 10.0,
+        "Evocations": 10.0,
+        "Ice Magic": 7.4
+      },
+      "21": {
+        "Shapeshifting": 18.2,
+        "Unarmed Combat": 16.6,
+        "Fighting": 15.4,
+        "Polearms": 10.0,
+        "Evocations": 10.0,
+        "Ice Magic": 7.4
+      },
+      "27": {
+        "Shapeshifting": 18.2,
+        "Unarmed Combat": 16.6,
+        "Fighting": 15.4,
+        "Polearms": 10.0,
+        "Evocations": 10.0,
+        "Ice Magic": 7.4
+      }
+    }
+  },
+  "Kobold/Enchanter": {
+    "n": 5,
+    "milestones": {
+      "1": {
+        "Stealth": 4.0,
+        "Hexes": 3.0,
+        "Dodging": 2.4,
+        "Spellcasting": 2.1,
+        "Short Blades": 1.3,
+        "Long Blades": 0.2
+      },
+      "3": {
+        "Stealth": 4.3,
+        "Hexes": 3.1,
+        "Dodging": 3.0,
+        "Spellcasting": 2.4,
+        "Short Blades": 2.0,
+        "Fighting": 0.9
+      },
+      "5": {
+        "Stealth": 4.8,
+        "Hexes": 3.4,
+        "Dodging": 3.0,
+        "Spellcasting": 2.7,
+        "Short Blades": 2.5,
+        "Fighting": 1.0
+      },
+      "7": {
+        "Stealth": 4.8,
+        "Hexes": 3.4,
+        "Dodging": 3.0,
+        "Spellcasting": 2.9,
+        "Short Blades": 2.5,
+        "Fighting": 1.0
+      },
+      "9": {
+        "Stealth": 8.0,
+        "Short Blades": 5.5,
+        "Hexes": 5.2,
+        "Dodging": 4.0,
+        "Spellcasting": 3.7,
+        "Fighting": 2.0
+      },
+      "12": {
+        "Stealth": 12.4,
+        "Short Blades": 9.3,
+        "Hexes": 6.8,
+        "Spellcasting": 5.6,
+        "Dodging": 4.4,
+        "Long Blades": 3.5
+      },
+      "15": {
+        "Stealth": 15.8,
+        "Short Blades": 14.0,
+        "Hexes": 11.0,
+        "Dodging": 9.7,
+        "Spellcasting": 8.2,
+        "Fighting": 8.0
+      },
+      "18": {
+        "Stealth": 20.0,
+        "Short Blades": 16.0,
+        "Hexes": 12.6,
+        "Dodging": 11.9,
+        "Fighting": 10.0,
+        "Spellcasting": 10.0
+      },
+      "21": {
+        "Stealth": 20.0,
+        "Short Blades": 19.2,
+        "Hexes": 15.5,
+        "Dodging": 12.0,
+        "Fighting": 11.5,
+        "Spellcasting": 11.1
+      },
+      "27": {
+        "Short Blades": 20.0,
+        "Stealth": 20.0,
+        "Hexes": 16.0,
+        "Spellcasting": 13.2,
+        "Dodging": 12.0,
+        "Fighting": 11.5
+      }
+    }
+  },
+  "Felid/Summoner": {
+    "n": 5,
+    "milestones": {
+      "1": {
+        "Summonings": 4.0,
+        "Stealth": 2.8,
+        "Dodging": 2.6,
+        "Spellcasting": 2.0,
+        "Fighting": 0.0,
+        "Unarmed Combat": 0.0
+      },
+      "3": {
+        "Summonings": 4.3,
+        "Stealth": 3.1,
+        "Dodging": 2.7,
+        "Spellcasting": 2.0,
+        "Fighting": 0.0,
+        "Unarmed Combat": 0.0
+      },
+      "5": {
+        "Summonings": 5.0,
+        "Stealth": 3.1,
+        "Spellcasting": 2.7,
+        "Dodging": 2.7,
+        "Fighting": 1.3,
+        "Unarmed Combat": 0.0
+      },
+      "7": {
+        "Summonings": 6.0,
+        "Dodging": 4.3,
+        "Spellcasting": 3.3,
+        "Stealth": 3.1,
+        "Fighting": 1.6,
+        "Alchemy": 0.5
+      },
+      "9": {
+        "Summonings": 6.0,
+        "Dodging": 4.3,
+        "Spellcasting": 3.3,
+        "Stealth": 3.1,
+        "Evocations": 2.0,
+        "Fighting": 1.6
+      },
+      "12": {
+        "Hexes": 9.5,
+        "Invocations": 6.5,
+        "Summonings": 6.0,
+        "Dodging": 4.3,
+        "Earth Magic": 4.0,
+        "Spellcasting": 3.3
+      },
+      "15": {
+        "Hexes": 13.0,
+        "Invocations": 6.8,
+        "Summonings": 6.0,
+        "Dodging": 4.3,
+        "Earth Magic": 4.0,
+        "Spellcasting": 3.3
+      },
+      "18": {
+        "Hexes": 13.0,
+        "Invocations": 7.0,
+        "Summonings": 6.0,
+        "Dodging": 4.3,
+        "Earth Magic": 4.0,
+        "Necromancy": 3.5
+      },
+      "21": {
+        "Hexes": 15.1,
+        "Invocations": 7.5,
+        "Summonings": 6.0,
+        "Dodging": 4.3,
+        "Necromancy": 4.0,
+        "Earth Magic": 4.0
+      },
+      "27": {
+        "Hexes": 15.1,
+        "Invocations": 7.5,
+        "Summonings": 6.0,
+        "Dodging": 4.3,
+        "Necromancy": 4.0,
+        "Earth Magic": 4.0
+      }
+    }
+  },
+  "Demonspawn/Alchemist": {
+    "n": 5,
+    "milestones": {
+      "1": {
+        "Alchemy": 3.0,
+        "Spellcasting": 2.0,
+        "Dodging": 1.7,
+        "Stealth": 1.7,
+        "Conjurations": 1.0,
+        "Fighting": 0.0
+      },
+      "3": {
+        "Alchemy": 3.0,
+        "Spellcasting": 2.0,
+        "Dodging": 1.7,
+        "Stealth": 1.7,
+        "Conjurations": 1.0,
+        "Fighting": 0.0
+      },
+      "5": {
+        "Alchemy": 4.0,
+        "Spellcasting": 3.0,
+        "Dodging": 1.7,
+        "Stealth": 1.7,
+        "Conjurations": 1.0,
+        "Fighting": 0.0
+      },
+      "7": {
+        "Alchemy": 6.5,
+        "Spellcasting": 3.0,
+        "Conjurations": 3.0,
+        "Dodging": 1.7,
+        "Stealth": 1.7,
+        "Fighting": 0.0
+      },
+      "9": {
+        "Alchemy": 8.3,
+        "Spellcasting": 5.2,
+        "Fire Magic": 5.2,
+        "Conjurations": 3.0,
+        "Dodging": 2.0,
+        "Stealth": 2.0
+      },
+      "12": {
+        "Polearms": 8.5,
+        "Alchemy": 8.3,
+        "Fire Magic": 7.9,
+        "Spellcasting": 7.3,
+        "Fighting": 3.3,
+        "Conjurations": 3.0
+      },
+      "15": {
+        "Polearms": 10.6,
+        "Alchemy": 8.3,
+        "Fire Magic": 7.9,
+        "Spellcasting": 7.3,
+        "Fighting": 3.3,
+        "Conjurations": 3.0
+      },
+      "18": {
+        "Polearms": 10.6,
+        "Alchemy": 8.3,
+        "Fire Magic": 7.9,
+        "Spellcasting": 7.3,
+        "Fighting": 3.3,
+        "Conjurations": 3.0
+      },
+      "21": {
+        "Polearms": 10.6,
+        "Alchemy": 8.3,
+        "Fire Magic": 7.9,
+        "Spellcasting": 7.3,
+        "Fighting": 3.3,
+        "Conjurations": 3.0
+      },
+      "27": {
+        "Polearms": 10.6,
+        "Alchemy": 8.3,
+        "Fire Magic": 7.9,
+        "Spellcasting": 7.3,
+        "Fighting": 3.3,
+        "Conjurations": 3.0
+      }
+    }
+  },
+  "Gargoyle/Hunter": {
+    "n": 5,
+    "milestones": {
+      "1": {
+        "Ranged Weapons": 4.0,
+        "Fighting": 2.1,
+        "Dodging": 1.5,
+        "Stealth": 1.1,
+        "Spellcasting": 0.0,
+        "Unarmed Combat": 0.0
+      },
+      "3": {
+        "Ranged Weapons": 4.0,
+        "Fighting": 2.1,
+        "Dodging": 1.5,
+        "Stealth": 1.1,
+        "Spellcasting": 0.0,
+        "Unarmed Combat": 0.0
+      },
+      "5": {
+        "Ranged Weapons": 4.3,
+        "Fighting": 3.0,
+        "Dodging": 1.5,
+        "Stealth": 1.1,
+        "Shields": 0.6,
+        "Spellcasting": 0.0
+      },
+      "7": {
+        "Ranged Weapons": 5.9,
+        "Fighting": 3.0,
+        "Dodging": 1.5,
+        "Shields": 1.2,
+        "Stealth": 1.1,
+        "Spellcasting": 0.0
+      },
+      "9": {
+        "Ranged Weapons": 10.8,
+        "Fighting": 4.7,
+        "Invocations": 2.6,
+        "Shields": 1.6,
+        "Dodging": 1.5,
+        "Stealth": 1.1
+      },
+      "12": {
+        "Ranged Weapons": 13.8,
+        "Fighting": 10.5,
+        "Invocations": 6.2,
+        "Shields": 4.3,
+        "Staves": 3.7,
+        "Shapeshifting": 2.5
+      },
+      "15": {
+        "Ranged Weapons": 16.7,
+        "Fighting": 13.3,
+        "Invocations": 8.0,
+        "Armour": 7.1,
+        "Stealth": 7.0,
+        "Dodging": 6.5
+      },
+      "18": {
+        "Ranged Weapons": 18.7,
+        "Fighting": 15.3,
+        "Armour": 10.2,
+        "Dodging": 9.5,
+        "Invocations": 8.0,
+        "Spellcasting": 7.3
+      },
+      "21": {
+        "Ranged Weapons": 18.7,
+        "Fighting": 17.4,
+        "Armour": 12.5,
+        "Dodging": 10.1,
+        "Spellcasting": 10.0,
+        "Stealth": 10.0
+      },
+      "27": {
+        "Ranged Weapons": 19.7,
+        "Fighting": 17.8,
+        "Armour": 15.0,
+        "Dodging": 10.1,
+        "Spellcasting": 10.0,
+        "Stealth": 10.0
+      }
+    }
+  },
+  "Oni/Ice Elementalist": {
+    "n": 5,
+    "milestones": {
+      "1": {
+        "Ice Magic": 3.6,
+        "Spellcasting": 2.4,
+        "Dodging": 1.7,
+        "Stealth": 1.5,
+        "Fighting": 0.0,
+        "Unarmed Combat": 0.0
+      },
+      "3": {
+        "Ice Magic": 4.0,
+        "Spellcasting": 3.0,
+        "Fighting": 2.0,
+        "Stealth": 2.0,
+        "Dodging": 1.7,
+        "Unarmed Combat": 0.0
+      },
+      "5": {
+        "Ice Magic": 5.0,
+        "Fighting": 4.0,
+        "Spellcasting": 3.0,
+        "Stealth": 2.0,
+        "Dodging": 1.7,
+        "Unarmed Combat": 0.0
+      },
+      "7": {
+        "Fighting": 6.3,
+        "Ice Magic": 6.0,
+        "Spellcasting": 4.0,
+        "Stealth": 2.0,
+        "Dodging": 1.7,
+        "Invocations": 1.0
+      },
+      "9": {
+        "Fighting": 8.0,
+        "Ice Magic": 6.0,
+        "Spellcasting": 4.0,
+        "Dodging": 2.0,
+        "Stealth": 2.0,
+        "Invocations": 2.0
+      },
+      "12": {
+        "Fighting": 8.0,
+        "Ice Magic": 6.0,
+        "Spellcasting": 4.0,
+        "Dodging": 2.0,
+        "Stealth": 2.0,
+        "Invocations": 2.0
+      },
+      "15": {
+        "Fighting": 8.0,
+        "Ice Magic": 6.0,
+        "Spellcasting": 4.0,
+        "Dodging": 2.0,
+        "Stealth": 2.0,
+        "Invocations": 2.0
+      },
+      "18": {
+        "Fighting": 8.0,
+        "Ice Magic": 6.0,
+        "Spellcasting": 4.0,
+        "Dodging": 2.0,
+        "Stealth": 2.0,
+        "Invocations": 2.0
+      },
+      "21": {
+        "Fighting": 8.0,
+        "Ice Magic": 6.0,
+        "Spellcasting": 4.0,
+        "Dodging": 2.0,
+        "Stealth": 2.0,
+        "Invocations": 2.0
+      },
+      "27": {
+        "Fighting": 8.0,
+        "Ice Magic": 6.0,
+        "Spellcasting": 4.0,
+        "Dodging": 2.0,
+        "Stealth": 2.0,
+        "Invocations": 2.0
+      }
+    }
+  },
+  "Minotaur/Monk": {
+    "n": 5,
+    "milestones": {
+      "1": {
+        "Fighting": 3.6,
+        "Axes": 3.6,
+        "Dodging": 3.2,
+        "Maces & Flails": 2.1,
+        "Polearms": 2.1,
+        "Staves": 1.1
+      },
+      "3": {
+        "Fighting": 3.6,
+        "Axes": 3.6,
+        "Dodging": 3.2,
+        "Polearms": 2.3,
+        "Maces & Flails": 2.2,
+        "Staves": 1.1
+      },
+      "5": {
+        "Fighting": 4.1,
+        "Axes": 3.6,
+        "Dodging": 3.2,
+        "Polearms": 2.7,
+        "Maces & Flails": 2.4,
+        "Staves": 1.5
+      },
+      "7": {
+        "Axes": 5.8,
+        "Fighting": 5.0,
+        "Maces & Flails": 3.5,
+        "Polearms": 3.5,
+        "Dodging": 3.3,
+        "Armour": 2.6
+      },
+      "9": {
+        "Axes": 6.5,
+        "Fighting": 5.2,
+        "Polearms": 5.0,
+        "Invocations": 4.9,
+        "Maces & Flails": 3.7,
+        "Shields": 3.4
+      },
+      "12": {
+        "Fighting": 10.9,
+        "Polearms": 8.9,
+        "Invocations": 8.3,
+        "Axes": 7.8,
+        "Maces & Flails": 6.5,
+        "Armour": 5.7
+      },
+      "15": {
+        "Shields": 13.4,
+        "Fighting": 10.9,
+        "Invocations": 10.1,
+        "Polearms": 8.9,
+        "Axes": 7.8,
+        "Maces & Flails": 7.6
+      },
+      "18": {
+        "Shields": 20.9,
+        "Fighting": 10.9,
+        "Invocations": 10.1,
+        "Polearms": 8.9,
+        "Dodging": 8.5,
+        "Throwing": 8.0
+      },
+      "21": {
+        "Shields": 20.9,
+        "Fighting": 10.9,
+        "Invocations": 10.1,
+        "Polearms": 8.9,
+        "Dodging": 8.5,
+        "Throwing": 8.0
+      },
+      "27": {
+        "Shields": 23.5,
+        "Fighting": 10.9,
+        "Invocations": 10.1,
+        "Polearms": 8.9,
+        "Dodging": 8.5,
+        "Throwing": 8.0
+      }
+    }
+  },
+  "Oni/Cinder Acolyte": {
+    "n": 5,
+    "milestones": {
+      "1": {
+        "Fighting": 4.0,
+        "Maces & Flails": 3.0,
+        "Fire Magic": 2.6,
+        "Axes": 1.7,
+        "Staves": 1.7,
+        "Spellcasting": 1.2
+      },
+      "3": {
+        "Fighting": 4.0,
+        "Maces & Flails": 3.5,
+        "Fire Magic": 2.6,
+        "Axes": 1.9,
+        "Staves": 1.9,
+        "Polearms": 1.6
+      },
+      "5": {
+        "Fighting": 4.0,
+        "Maces & Flails": 4.0,
+        "Shapeshifting": 4.0,
+        "Fire Magic": 2.6,
+        "Axes": 2.3,
+        "Staves": 2.3
+      },
+      "7": {
+        "Fighting": 6.0,
+        "Maces & Flails": 5.8,
+        "Axes": 3.4,
+        "Staves": 3.4,
+        "Fire Magic": 2.6,
+        "Spellcasting": 1.2
+      },
+      "9": {
+        "Fighting": 8.0,
+        "Maces & Flails": 6.6,
+        "Axes": 4.8,
+        "Staves": 4.8,
+        "Fire Magic": 2.6,
+        "Shields": 2.0
+      },
+      "12": {
+        "Fighting": 8.0,
+        "Maces & Flails": 8.0,
+        "Axes": 4.8,
+        "Staves": 4.8,
+        "Shields": 4.0,
+        "Fire Magic": 2.6
+      },
+      "15": {
+        "Fighting": 10.0,
+        "Maces & Flails": 8.0,
+        "Axes": 4.8,
+        "Staves": 4.8,
+        "Shields": 4.0,
+        "Dodging": 3.0
+      },
+      "18": {
+        "Fighting": 10.0,
+        "Maces & Flails": 8.0,
+        "Axes": 4.8,
+        "Staves": 4.8,
+        "Shields": 4.0,
+        "Dodging": 3.0
+      },
+      "21": {
+        "Fighting": 10.0,
+        "Maces & Flails": 8.0,
+        "Axes": 4.8,
+        "Staves": 4.8,
+        "Shields": 4.0,
+        "Dodging": 3.0
+      },
+      "27": {
+        "Fighting": 10.0,
+        "Maces & Flails": 8.0,
+        "Axes": 4.8,
+        "Staves": 4.8,
+        "Shields": 4.0,
+        "Dodging": 3.0
       }
     }
   },
@@ -1876,6 +3317,1026 @@ export const BUILD_GUIDES: Record<string, BuildGuide> = {
       }
     }
   },
+  "Human/Shapeshifter": {
+    "n": 4,
+    "milestones": {
+      "1": {
+        "Unarmed Combat": 3.0,
+        "Shapeshifting": 3.0,
+        "Fighting": 2.0,
+        "Dodging": 2.0,
+        "Spellcasting": 0.0,
+        "Armour": 0.0
+      },
+      "3": {
+        "Unarmed Combat": 3.0,
+        "Shapeshifting": 3.0,
+        "Fighting": 2.0,
+        "Dodging": 2.0,
+        "Spellcasting": 0.0,
+        "Armour": 0.0
+      },
+      "5": {
+        "Shapeshifting": 5.6,
+        "Unarmed Combat": 3.1,
+        "Fighting": 2.0,
+        "Dodging": 2.0,
+        "Maces & Flails": 1.0,
+        "Staves": 0.6
+      },
+      "7": {
+        "Shapeshifting": 6.1,
+        "Unarmed Combat": 3.9,
+        "Fighting": 2.5,
+        "Dodging": 2.5,
+        "Polearms": 2.2,
+        "Axes": 1.1
+      },
+      "9": {
+        "Shapeshifting": 7.4,
+        "Fighting": 5.0,
+        "Dodging": 5.0,
+        "Unarmed Combat": 4.7,
+        "Axes": 2.8,
+        "Staves": 1.1
+      },
+      "12": {
+        "Shapeshifting": 9.1,
+        "Unarmed Combat": 6.4,
+        "Fighting": 6.2,
+        "Dodging": 6.2,
+        "Axes": 5.0,
+        "Invocations": 2.5
+      },
+      "15": {
+        "Unarmed Combat": 9.7,
+        "Shapeshifting": 9.2,
+        "Fighting": 8.8,
+        "Dodging": 7.7,
+        "Axes": 5.0,
+        "Invocations": 2.5
+      },
+      "18": {
+        "Unarmed Combat": 9.8,
+        "Fighting": 9.4,
+        "Shapeshifting": 9.2,
+        "Dodging": 7.7,
+        "Axes": 5.0,
+        "Invocations": 2.5
+      },
+      "21": {
+        "Unarmed Combat": 9.8,
+        "Fighting": 9.4,
+        "Shapeshifting": 9.2,
+        "Dodging": 7.7,
+        "Axes": 5.0,
+        "Invocations": 2.5
+      },
+      "27": {
+        "Unarmed Combat": 9.8,
+        "Fighting": 9.4,
+        "Shapeshifting": 9.2,
+        "Dodging": 7.7,
+        "Axes": 5.0,
+        "Invocations": 2.5
+      }
+    }
+  },
+  "Oni/Gladiator": {
+    "n": 4,
+    "milestones": {
+      "1": {
+        "Maces & Flails": 3.0,
+        "Fighting": 2.6,
+        "Dodging": 2.6,
+        "Throwing": 2.0,
+        "Axes": 1.7,
+        "Staves": 1.7
+      },
+      "3": {
+        "Maces & Flails": 3.3,
+        "Fighting": 2.6,
+        "Dodging": 2.6,
+        "Axes": 2.1,
+        "Staves": 2.1,
+        "Throwing": 2.0
+      },
+      "5": {
+        "Maces & Flails": 4.3,
+        "Fighting": 3.1,
+        "Axes": 3.0,
+        "Staves": 3.0,
+        "Dodging": 3.0,
+        "Throwing": 2.0
+      },
+      "7": {
+        "Maces & Flails": 4.3,
+        "Fighting": 3.9,
+        "Axes": 3.1,
+        "Staves": 3.0,
+        "Dodging": 3.0,
+        "Throwing": 2.0
+      },
+      "9": {
+        "Maces & Flails": 8.0,
+        "Axes": 6.6,
+        "Staves": 6.4,
+        "Fighting": 6.2,
+        "Dodging": 3.5,
+        "Throwing": 2.5
+      },
+      "12": {
+        "Maces & Flails": 14.5,
+        "Fighting": 12.8,
+        "Axes": 9.4,
+        "Staves": 9.4,
+        "Dodging": 6.0,
+        "Invocations": 4.0
+      },
+      "15": {
+        "Maces & Flails": 17.9,
+        "Fighting": 15.7,
+        "Axes": 13.4,
+        "Staves": 13.0,
+        "Armour": 6.5,
+        "Invocations": 6.5
+      },
+      "18": {
+        "Maces & Flails": 19.0,
+        "Fighting": 16.8,
+        "Staves": 14.4,
+        "Axes": 14.3,
+        "Invocations": 12.2,
+        "Dodging": 8.9
+      },
+      "21": {
+        "Maces & Flails": 19.0,
+        "Fighting": 16.8,
+        "Staves": 14.4,
+        "Axes": 14.3,
+        "Invocations": 13.7,
+        "Armour": 9.5
+      },
+      "27": {
+        "Maces & Flails": 19.0,
+        "Staves": 14.4,
+        "Axes": 14.3,
+        "Invocations": 13.7,
+        "Fighting": 13.0,
+        "Dodging": 9.2
+      }
+    }
+  },
+  "Revenant/Ice Elementalist": {
+    "n": 4,
+    "milestones": {
+      "1": {
+        "Ice Magic": 4.3,
+        "Stealth": 2.1,
+        "Spellcasting": 2.0,
+        "Dodging": 1.7,
+        "Fighting": 0.0,
+        "Unarmed Combat": 0.0
+      },
+      "3": {
+        "Ice Magic": 4.8,
+        "Spellcasting": 2.4,
+        "Stealth": 2.1,
+        "Dodging": 1.7,
+        "Fighting": 0.6,
+        "Conjurations": 0.0
+      },
+      "5": {
+        "Ice Magic": 5.6,
+        "Spellcasting": 2.9,
+        "Stealth": 2.1,
+        "Dodging": 1.7,
+        "Fighting": 1.0,
+        "Conjurations": 0.0
+      },
+      "7": {
+        "Ice Magic": 7.0,
+        "Spellcasting": 3.5,
+        "Fighting": 3.2,
+        "Stealth": 2.1,
+        "Dodging": 1.8,
+        "Staves": 0.8
+      },
+      "9": {
+        "Ice Magic": 9.1,
+        "Fighting": 5.0,
+        "Spellcasting": 4.8,
+        "Stealth": 3.0,
+        "Maces & Flails": 3.0,
+        "Dodging": 2.5
+      },
+      "12": {
+        "Ice Magic": 10.2,
+        "Fighting": 8.8,
+        "Maces & Flails": 7.4,
+        "Spellcasting": 6.2,
+        "Earth Magic": 5.2,
+        "Translocations": 4.2
+      },
+      "15": {
+        "Ice Magic": 12.3,
+        "Fighting": 10.8,
+        "Maces & Flails": 9.2,
+        "Shields": 9.1,
+        "Spellcasting": 7.8,
+        "Earth Magic": 7.7
+      },
+      "18": {
+        "Ice Magic": 12.3,
+        "Fighting": 10.8,
+        "Maces & Flails": 9.2,
+        "Shields": 9.1,
+        "Spellcasting": 7.8,
+        "Earth Magic": 7.7
+      },
+      "21": {
+        "Ice Magic": 12.3,
+        "Fighting": 10.8,
+        "Maces & Flails": 9.2,
+        "Shields": 9.1,
+        "Spellcasting": 7.8,
+        "Earth Magic": 7.7
+      },
+      "27": {
+        "Ice Magic": 12.3,
+        "Fighting": 10.8,
+        "Maces & Flails": 9.2,
+        "Shields": 9.1,
+        "Spellcasting": 7.8,
+        "Earth Magic": 7.7
+      }
+    }
+  },
+  "Poltergeist/Necromancer": {
+    "n": 4,
+    "milestones": {
+      "1": {
+        "Necromancy": 4.3,
+        "Stealth": 3.0,
+        "Dodging": 2.1,
+        "Spellcasting": 2.0,
+        "Fighting": 0.0,
+        "Unarmed Combat": 0.0
+      },
+      "3": {
+        "Necromancy": 4.3,
+        "Stealth": 3.0,
+        "Dodging": 2.1,
+        "Spellcasting": 2.0,
+        "Fighting": 0.0,
+        "Unarmed Combat": 0.0
+      },
+      "5": {
+        "Necromancy": 5.2,
+        "Stealth": 3.0,
+        "Spellcasting": 2.4,
+        "Dodging": 2.1,
+        "Long Blades": 1.6,
+        "Short Blades": 1.1
+      },
+      "7": {
+        "Necromancy": 5.4,
+        "Stealth": 3.5,
+        "Spellcasting": 2.4,
+        "Short Blades": 2.4,
+        "Dodging": 2.1,
+        "Long Blades": 1.3
+      },
+      "9": {
+        "Necromancy": 5.4,
+        "Short Blades": 3.5,
+        "Stealth": 3.5,
+        "Dodging": 2.7,
+        "Long Blades": 2.5,
+        "Spellcasting": 2.4
+      },
+      "12": {
+        "Necromancy": 5.4,
+        "Short Blades": 3.7,
+        "Stealth": 3.5,
+        "Long Blades": 2.8,
+        "Dodging": 2.7,
+        "Spellcasting": 2.4
+      },
+      "15": {
+        "Necromancy": 5.4,
+        "Short Blades": 3.7,
+        "Stealth": 3.5,
+        "Long Blades": 2.8,
+        "Dodging": 2.7,
+        "Spellcasting": 2.4
+      },
+      "18": {
+        "Necromancy": 5.4,
+        "Short Blades": 3.7,
+        "Stealth": 3.5,
+        "Long Blades": 2.8,
+        "Dodging": 2.7,
+        "Shields": 2.6
+      },
+      "21": {
+        "Necromancy": 5.4,
+        "Short Blades": 3.7,
+        "Shields": 3.6,
+        "Stealth": 3.5,
+        "Long Blades": 2.8,
+        "Dodging": 2.7
+      },
+      "27": {
+        "Necromancy": 5.4,
+        "Short Blades": 3.7,
+        "Shields": 3.6,
+        "Stealth": 3.5,
+        "Long Blades": 2.8,
+        "Dodging": 2.7
+      }
+    }
+  },
+  "Demonspawn/Artificer": {
+    "n": 4,
+    "milestones": {
+      "1": {
+        "Evocations": 3.0,
+        "Armour": 1.7,
+        "Fighting": 1.1,
+        "Dodging": 0.8,
+        "Stealth": 0.8,
+        "Spellcasting": 0.0
+      },
+      "3": {
+        "Fighting": 3.0,
+        "Evocations": 3.0,
+        "Armour": 1.9,
+        "Dodging": 1.2,
+        "Stealth": 0.8,
+        "Spellcasting": 0.0
+      },
+      "5": {
+        "Fighting": 4.2,
+        "Evocations": 3.0,
+        "Armour": 2.4,
+        "Dodging": 1.4,
+        "Staves": 0.9,
+        "Stealth": 0.8
+      },
+      "7": {
+        "Fighting": 6.7,
+        "Armour": 4.0,
+        "Evocations": 3.0,
+        "Dodging": 2.0,
+        "Staves": 1.4,
+        "Stealth": 0.8
+      },
+      "9": {
+        "Fighting": 7.9,
+        "Armour": 6.2,
+        "Evocations": 3.0,
+        "Long Blades": 3.0,
+        "Axes": 2.5,
+        "Staves": 2.5
+      },
+      "12": {
+        "Fighting": 10.4,
+        "Invocations": 9.4,
+        "Armour": 7.5,
+        "Dodging": 4.2,
+        "Shields": 4.2,
+        "Axes": 3.8
+      },
+      "15": {
+        "Fighting": 13.3,
+        "Invocations": 12.0,
+        "Armour": 7.5,
+        "Long Blades": 7.0,
+        "Shields": 5.0,
+        "Dodging": 4.5
+      },
+      "18": {
+        "Fighting": 15.8,
+        "Invocations": 12.8,
+        "Armour": 7.5,
+        "Long Blades": 7.0,
+        "Dodging": 6.0,
+        "Shields": 5.0
+      },
+      "21": {
+        "Fighting": 16.1,
+        "Invocations": 9.0,
+        "Armour": 8.8,
+        "Shields": 8.0,
+        "Long Blades": 7.0,
+        "Evocations": 6.0
+      },
+      "27": {
+        "Fighting": 16.1,
+        "Invocations": 9.0,
+        "Armour": 8.8,
+        "Shields": 8.0,
+        "Long Blades": 7.0,
+        "Evocations": 6.0
+      }
+    }
+  },
+  "Troll/Shapeshifter": {
+    "n": 4,
+    "milestones": {
+      "1": {
+        "Unarmed Combat": 3.0,
+        "Shapeshifting": 3.0,
+        "Fighting": 1.5,
+        "Dodging": 1.5,
+        "Spellcasting": 0.0,
+        "Armour": 0.0
+      },
+      "3": {
+        "Unarmed Combat": 3.4,
+        "Shapeshifting": 3.1,
+        "Fighting": 1.5,
+        "Dodging": 1.5,
+        "Spellcasting": 0.0,
+        "Armour": 0.0
+      },
+      "5": {
+        "Unarmed Combat": 3.8,
+        "Shapeshifting": 3.1,
+        "Fighting": 1.5,
+        "Dodging": 1.5,
+        "Spellcasting": 0.0,
+        "Armour": 0.0
+      },
+      "7": {
+        "Unarmed Combat": 5.3,
+        "Shapeshifting": 4.3,
+        "Fighting": 2.1,
+        "Dodging": 1.5,
+        "Spellcasting": 0.0,
+        "Throwing": 0.0
+      },
+      "9": {
+        "Unarmed Combat": 6.7,
+        "Shapeshifting": 6.5,
+        "Fighting": 2.7,
+        "Dodging": 1.5,
+        "Spellcasting": 0.0,
+        "Throwing": 0.0
+      },
+      "12": {
+        "Unarmed Combat": 12.0,
+        "Shapeshifting": 9.9,
+        "Fighting": 3.7,
+        "Dodging": 1.5,
+        "Spellcasting": 0.0,
+        "Throwing": 0.0
+      },
+      "15": {
+        "Shapeshifting": 16.4,
+        "Unarmed Combat": 16.1,
+        "Fighting": 6.4,
+        "Dodging": 1.5,
+        "Spellcasting": 0.0,
+        "Throwing": 0.0
+      },
+      "18": {
+        "Shapeshifting": 19.1,
+        "Unarmed Combat": 17.1,
+        "Fighting": 7.0,
+        "Dodging": 1.5,
+        "Spellcasting": 0.0,
+        "Throwing": 0.0
+      },
+      "21": {
+        "Shapeshifting": 22.1,
+        "Unarmed Combat": 18.1,
+        "Fighting": 7.7,
+        "Dodging": 4.0,
+        "Spellcasting": 0.0,
+        "Throwing": 0.0
+      },
+      "27": {
+        "Shapeshifting": 22.8,
+        "Unarmed Combat": 13.8,
+        "Fighting": 8.6,
+        "Dodging": 6.2,
+        "Spellcasting": 0.0,
+        "Throwing": 0.0
+      }
+    }
+  },
+  "Revenant/Earth Elementalist": {
+    "n": 4,
+    "milestones": {
+      "1": {
+        "Earth Magic": 3.2,
+        "Stealth": 2.1,
+        "Spellcasting": 2.0,
+        "Dodging": 1.7,
+        "Conjurations": 0.8,
+        "Fighting": 0.0
+      },
+      "3": {
+        "Earth Magic": 4.2,
+        "Spellcasting": 2.1,
+        "Stealth": 2.1,
+        "Dodging": 1.7,
+        "Conjurations": 0.8,
+        "Fighting": 0.0
+      },
+      "5": {
+        "Earth Magic": 4.8,
+        "Spellcasting": 3.6,
+        "Stealth": 2.1,
+        "Dodging": 1.7,
+        "Conjurations": 1.1,
+        "Fighting": 0.0
+      },
+      "7": {
+        "Earth Magic": 7.0,
+        "Spellcasting": 3.6,
+        "Stealth": 2.2,
+        "Dodging": 1.8,
+        "Conjurations": 1.1,
+        "Invocations": 1.1
+      },
+      "9": {
+        "Earth Magic": 10.1,
+        "Spellcasting": 7.0,
+        "Invocations": 4.7,
+        "Conjurations": 2.5,
+        "Stealth": 2.2,
+        "Dodging": 1.8
+      },
+      "12": {
+        "Fighting": 11.0,
+        "Earth Magic": 10.1,
+        "Spellcasting": 9.7,
+        "Invocations": 9.0,
+        "Conjurations": 5.7,
+        "Alchemy": 4.0
+      },
+      "15": {
+        "Earth Magic": 12.6,
+        "Fighting": 12.0,
+        "Spellcasting": 10.9,
+        "Invocations": 10.0,
+        "Ice Magic": 6.5,
+        "Armour": 6.5
+      },
+      "18": {
+        "Fighting": 14.1,
+        "Earth Magic": 11.1,
+        "Spellcasting": 11.0,
+        "Invocations": 11.0,
+        "Armour": 10.0,
+        "Dodging": 8.0
+      },
+      "21": {
+        "Fighting": 14.1,
+        "Earth Magic": 12.6,
+        "Staves": 12.0,
+        "Spellcasting": 11.0,
+        "Invocations": 11.0,
+        "Armour": 10.0
+      },
+      "27": {
+        "Fighting": 14.1,
+        "Earth Magic": 12.6,
+        "Staves": 12.0,
+        "Spellcasting": 11.0,
+        "Invocations": 11.0,
+        "Translocations": 10.0
+      }
+    }
+  },
+  "Minotaur/Hunter": {
+    "n": 4,
+    "milestones": {
+      "1": {
+        "Ranged Weapons": 4.3,
+        "Fighting": 2.4,
+        "Dodging": 2.1,
+        "Stealth": 0.7,
+        "Spellcasting": 0.0,
+        "Unarmed Combat": 0.0
+      },
+      "3": {
+        "Ranged Weapons": 4.3,
+        "Fighting": 2.4,
+        "Dodging": 2.1,
+        "Stealth": 0.7,
+        "Spellcasting": 0.0,
+        "Unarmed Combat": 0.0
+      },
+      "5": {
+        "Ranged Weapons": 4.7,
+        "Fighting": 2.4,
+        "Dodging": 2.1,
+        "Stealth": 0.7,
+        "Spellcasting": 0.0,
+        "Unarmed Combat": 0.0
+      },
+      "7": {
+        "Ranged Weapons": 8.1,
+        "Fighting": 5.0,
+        "Dodging": 2.1,
+        "Stealth": 0.7,
+        "Spellcasting": 0.0,
+        "Unarmed Combat": 0.0
+      },
+      "9": {
+        "Ranged Weapons": 12.3,
+        "Fighting": 7.0,
+        "Dodging": 5.5,
+        "Armour": 2.5,
+        "Stealth": 0.7,
+        "Spellcasting": 0.0
+      },
+      "12": {
+        "Ranged Weapons": 14.8,
+        "Fighting": 11.2,
+        "Dodging": 9.9,
+        "Armour": 7.5,
+        "Shields": 3.0,
+        "Maces & Flails": 2.5
+      },
+      "15": {
+        "Ranged Weapons": 17.3,
+        "Fighting": 14.3,
+        "Armour": 12.8,
+        "Dodging": 11.1,
+        "Shields": 7.5,
+        "Polearms": 5.2
+      },
+      "18": {
+        "Ranged Weapons": 18.4,
+        "Fighting": 17.9,
+        "Armour": 13.8,
+        "Dodging": 12.3,
+        "Invocations": 12.1,
+        "Shields": 8.4
+      },
+      "21": {
+        "Ranged Weapons": 21.3,
+        "Fighting": 19.4,
+        "Dodging": 14.4,
+        "Armour": 13.8,
+        "Invocations": 13.1,
+        "Shields": 8.4
+      },
+      "27": {
+        "Ranged Weapons": 21.3,
+        "Fighting": 19.4,
+        "Dodging": 14.4,
+        "Armour": 13.8,
+        "Invocations": 13.1,
+        "Shields": 8.4
+      }
+    }
+  },
+  "Barachi/Summoner": {
+    "n": 4,
+    "milestones": {
+      "1": {
+        "Summonings": 4.9,
+        "Spellcasting": 2.1,
+        "Dodging": 2.1,
+        "Stealth": 1.9,
+        "Fighting": 0.5,
+        "Unarmed Combat": 0.0
+      },
+      "3": {
+        "Summonings": 5.0,
+        "Spellcasting": 3.0,
+        "Dodging": 2.1,
+        "Fighting": 2.0,
+        "Stealth": 1.9,
+        "Unarmed Combat": 0.0
+      },
+      "5": {
+        "Summonings": 6.7,
+        "Fighting": 3.1,
+        "Spellcasting": 3.0,
+        "Dodging": 2.1,
+        "Stealth": 1.9,
+        "Maces & Flails": 0.0
+      },
+      "7": {
+        "Summonings": 7.7,
+        "Fighting": 5.5,
+        "Spellcasting": 3.9,
+        "Dodging": 3.0,
+        "Stealth": 1.9,
+        "Polearms": 0.5
+      },
+      "9": {
+        "Summonings": 8.8,
+        "Fighting": 6.5,
+        "Spellcasting": 5.2,
+        "Polearms": 4.0,
+        "Dodging": 4.0,
+        "Axes": 2.5
+      },
+      "12": {
+        "Summonings": 12.5,
+        "Fighting": 10.0,
+        "Spellcasting": 8.0,
+        "Dodging": 6.2,
+        "Armour": 5.7,
+        "Invocations": 5.0
+      },
+      "15": {
+        "Summonings": 14.5,
+        "Fighting": 11.8,
+        "Spellcasting": 10.1,
+        "Armour": 9.6,
+        "Dodging": 9.2,
+        "Invocations": 6.0
+      },
+      "18": {
+        "Summonings": 15.5,
+        "Fighting": 12.8,
+        "Dodging": 11.0,
+        "Shields": 10.5,
+        "Spellcasting": 10.3,
+        "Armour": 9.8
+      },
+      "21": {
+        "Summonings": 16.0,
+        "Fighting": 13.2,
+        "Dodging": 11.0,
+        "Shields": 11.0,
+        "Spellcasting": 10.3,
+        "Armour": 10.0
+      },
+      "27": {
+        "Summonings": 15.0,
+        "Fighting": 13.2,
+        "Shields": 13.0,
+        "Dodging": 11.0,
+        "Spellcasting": 10.8,
+        "Armour": 10.5
+      }
+    }
+  },
+  "Human/Cinder Acolyte": {
+    "n": 4,
+    "milestones": {
+      "1": {
+        "Fighting": 3.0,
+        "Fire Magic": 3.0,
+        "Unarmed Combat": 1.5,
+        "Long Blades": 1.5,
+        "Spellcasting": 1.0,
+        "Short Blades": 0.8
+      },
+      "3": {
+        "Fighting": 3.1,
+        "Fire Magic": 3.0,
+        "Polearms": 1.5,
+        "Unarmed Combat": 1.5,
+        "Stealth": 1.4,
+        "Spellcasting": 1.1
+      },
+      "5": {
+        "Fighting": 3.5,
+        "Fire Magic": 3.0,
+        "Stealth": 2.5,
+        "Polearms": 1.9,
+        "Long Blades": 1.8,
+        "Unarmed Combat": 1.5
+      },
+      "7": {
+        "Fighting": 3.9,
+        "Fire Magic": 3.0,
+        "Stealth": 2.5,
+        "Long Blades": 1.8,
+        "Spellcasting": 1.6,
+        "Unarmed Combat": 1.5
+      },
+      "9": {
+        "Fighting": 5.8,
+        "Fire Magic": 4.5,
+        "Spellcasting": 2.5,
+        "Stealth": 2.5,
+        "Axes": 2.0,
+        "Long Blades": 1.8
+      },
+      "12": {
+        "Fighting": 9.0,
+        "Polearms": 6.5,
+        "Spellcasting": 5.0,
+        "Fire Magic": 4.5,
+        "Armour": 4.0,
+        "Axes": 3.9
+      },
+      "15": {
+        "Fighting": 12.0,
+        "Polearms": 7.7,
+        "Evocations": 6.0,
+        "Throwing": 6.0,
+        "Spellcasting": 5.5,
+        "Armour": 5.0
+      },
+      "18": {
+        "Fighting": 12.0,
+        "Earth Magic": 9.8,
+        "Polearms": 7.7,
+        "Evocations": 6.0,
+        "Throwing": 6.0,
+        "Spellcasting": 5.5
+      },
+      "21": {
+        "Earth Magic": 17.1,
+        "Polearms": 12.3,
+        "Fighting": 12.0,
+        "Axes": 7.8,
+        "Spellcasting": 6.5,
+        "Fire Magic": 6.5
+      },
+      "27": {
+        "Earth Magic": 20.0,
+        "Polearms": 12.3,
+        "Fighting": 12.0,
+        "Spellcasting": 8.1,
+        "Axes": 7.8,
+        "Fire Magic": 6.5
+      }
+    }
+  },
+  "Octopode/Delver": {
+    "n": 4,
+    "milestones": {
+      "1": {
+        "Stealth": 6.6,
+        "Fighting": 3.0,
+        "Short Blades": 2.0,
+        "Dodging": 2.0,
+        "Long Blades": 1.1,
+        "Spellcasting": 0.0
+      },
+      "3": {
+        "Stealth": 6.6,
+        "Fighting": 3.0,
+        "Short Blades": 2.0,
+        "Dodging": 2.0,
+        "Long Blades": 1.1,
+        "Spellcasting": 0.0
+      },
+      "5": {
+        "Stealth": 6.6,
+        "Fighting": 3.0,
+        "Short Blades": 2.0,
+        "Dodging": 2.0,
+        "Long Blades": 1.1,
+        "Spellcasting": 0.0
+      },
+      "7": {
+        "Stealth": 11.5,
+        "Short Blades": 4.0,
+        "Fighting": 3.9,
+        "Dodging": 2.6,
+        "Long Blades": 2.3,
+        "Evocations": 0.7
+      },
+      "9": {
+        "Stealth": 12.3,
+        "Short Blades": 5.1,
+        "Fighting": 4.0,
+        "Dodging": 3.3,
+        "Long Blades": 3.0,
+        "Evocations": 2.2
+      },
+      "12": {
+        "Stealth": 12.3,
+        "Short Blades": 5.1,
+        "Fighting": 4.0,
+        "Dodging": 3.3,
+        "Long Blades": 3.0,
+        "Evocations": 2.2
+      },
+      "15": {
+        "Stealth": 13.0,
+        "Short Blades": 7.9,
+        "Dodging": 6.0,
+        "Fighting": 5.8,
+        "Long Blades": 4.9,
+        "Throwing": 4.5
+      },
+      "18": {
+        "Stealth": 12.6,
+        "Short Blades": 9.4,
+        "Dodging": 8.3,
+        "Fighting": 7.7,
+        "Long Blades": 5.9,
+        "Shields": 5.2
+      },
+      "21": {
+        "Stealth": 12.6,
+        "Short Blades": 9.5,
+        "Dodging": 8.4,
+        "Fighting": 7.8,
+        "Shields": 6.1,
+        "Long Blades": 6.0
+      },
+      "27": {
+        "Stealth": 12.6,
+        "Short Blades": 10.0,
+        "Dodging": 8.8,
+        "Fighting": 8.2,
+        "Long Blades": 6.3,
+        "Shields": 6.1
+      }
+    }
+  },
+  "Demonspawn/Hunter": {
+    "n": 4,
+    "milestones": {
+      "1": {
+        "Ranged Weapons": 3.6,
+        "Fighting": 2.0,
+        "Dodging": 1.7,
+        "Stealth": 0.8,
+        "Spellcasting": 0.0,
+        "Unarmed Combat": 0.0
+      },
+      "3": {
+        "Ranged Weapons": 3.6,
+        "Fighting": 2.0,
+        "Dodging": 1.7,
+        "Stealth": 0.8,
+        "Spellcasting": 0.0,
+        "Unarmed Combat": 0.0
+      },
+      "5": {
+        "Ranged Weapons": 4.4,
+        "Fighting": 2.2,
+        "Dodging": 2.0,
+        "Stealth": 1.3,
+        "Spellcasting": 0.0,
+        "Unarmed Combat": 0.0
+      },
+      "7": {
+        "Ranged Weapons": 5.7,
+        "Fighting": 2.5,
+        "Dodging": 2.2,
+        "Stealth": 1.5,
+        "Spellcasting": 0.0,
+        "Unarmed Combat": 0.0
+      },
+      "9": {
+        "Ranged Weapons": 7.4,
+        "Fighting": 2.5,
+        "Dodging": 2.2,
+        "Stealth": 1.5,
+        "Armour": 0.8,
+        "Spellcasting": 0.0
+      },
+      "12": {
+        "Ranged Weapons": 12.6,
+        "Invocations": 8.3,
+        "Fighting": 8.2,
+        "Dodging": 6.8,
+        "Armour": 4.2,
+        "Stealth": 3.5
+      },
+      "15": {
+        "Ranged Weapons": 9.2,
+        "Invocations": 8.3,
+        "Fighting": 8.2,
+        "Axes": 8.0,
+        "Dodging": 7.5,
+        "Summonings": 6.8
+      },
+      "18": {
+        "Fighting": 11.3,
+        "Ranged Weapons": 9.2,
+        "Invocations": 8.3,
+        "Axes": 8.0,
+        "Dodging": 7.5,
+        "Summonings": 7.5
+      },
+      "21": {
+        "Fighting": 11.3,
+        "Ranged Weapons": 9.2,
+        "Axes": 9.0,
+        "Invocations": 8.3,
+        "Dodging": 7.5,
+        "Summonings": 7.5
+      },
+      "27": {
+        "Fighting": 11.3,
+        "Ranged Weapons": 9.2,
+        "Axes": 9.0,
+        "Invocations": 8.3,
+        "Dodging": 7.5,
+        "Summonings": 7.5
+      }
+    }
+  },
   "Kobold/Earth Elementalist": {
     "n": 3,
     "milestones": {
@@ -2038,6 +4499,1621 @@ export const BUILD_GUIDES: Record<string, BuildGuide> = {
       }
     }
   },
+  "Minotaur/Cinder Acolyte": {
+    "n": 3,
+    "milestones": {
+      "1": {
+        "Fighting": 3.6,
+        "Axes": 3.6,
+        "Maces & Flails": 2.1,
+        "Fire Magic": 2.1,
+        "Polearms": 2.1,
+        "Spellcasting": 1.0
+      },
+      "3": {
+        "Fighting": 4.1,
+        "Axes": 4.1,
+        "Maces & Flails": 2.4,
+        "Polearms": 2.4,
+        "Fire Magic": 2.1,
+        "Spellcasting": 1.0
+      },
+      "5": {
+        "Fighting": 4.1,
+        "Axes": 4.1,
+        "Maces & Flails": 2.4,
+        "Polearms": 2.4,
+        "Fire Magic": 2.1,
+        "Spellcasting": 1.0
+      },
+      "7": {
+        "Fighting": 4.1,
+        "Axes": 4.1,
+        "Maces & Flails": 2.4,
+        "Polearms": 2.4,
+        "Fire Magic": 2.1,
+        "Spellcasting": 1.0
+      },
+      "9": {
+        "Axes": 10.5,
+        "Fighting": 8.0,
+        "Maces & Flails": 6.5,
+        "Polearms": 6.5,
+        "Armour": 6.5,
+        "Fire Magic": 2.1
+      },
+      "12": {
+        "Axes": 14.7,
+        "Fighting": 12.0,
+        "Armour": 11.4,
+        "Maces & Flails": 9.5,
+        "Polearms": 9.5,
+        "Shields": 4.0
+      },
+      "15": {
+        "Armour": 16.1,
+        "Axes": 14.7,
+        "Fighting": 12.0,
+        "Shields": 11.5,
+        "Maces & Flails": 9.5,
+        "Polearms": 9.5
+      },
+      "18": {
+        "Armour": 20.1,
+        "Axes": 15.4,
+        "Fighting": 14.0,
+        "Polearms": 13.1,
+        "Shields": 11.5,
+        "Maces & Flails": 9.5
+      },
+      "21": {
+        "Armour": 22.9,
+        "Axes": 17.4,
+        "Fighting": 14.0,
+        "Maces & Flails": 13.1,
+        "Polearms": 13.1,
+        "Shields": 12.7
+      },
+      "27": {
+        "Armour": 23.0,
+        "Axes": 20.0,
+        "Fighting": 18.4,
+        "Shields": 18.2,
+        "Maces & Flails": 13.1,
+        "Polearms": 13.1
+      }
+    }
+  },
+  "Coglin/Ice Elementalist": {
+    "n": 3,
+    "milestones": {
+      "1": {
+        "Ice Magic": 3.6,
+        "Spellcasting": 1.7,
+        "Dodging": 1.7,
+        "Stealth": 1.5,
+        "Fighting": 0.0,
+        "Unarmed Combat": 0.0
+      },
+      "3": {
+        "Ice Magic": 4.4,
+        "Spellcasting": 1.7,
+        "Dodging": 1.7,
+        "Stealth": 1.5,
+        "Fighting": 0.4,
+        "Unarmed Combat": 0.0
+      },
+      "5": {
+        "Ice Magic": 6.1,
+        "Spellcasting": 1.7,
+        "Dodging": 1.7,
+        "Stealth": 1.5,
+        "Fighting": 0.4,
+        "Unarmed Combat": 0.0
+      },
+      "7": {
+        "Ice Magic": 7.0,
+        "Spellcasting": 2.6,
+        "Dodging": 1.7,
+        "Stealth": 1.5,
+        "Fighting": 0.4,
+        "Maces & Flails": 0.0
+      },
+      "9": {
+        "Ice Magic": 7.0,
+        "Fighting": 6.0,
+        "Spellcasting": 6.0,
+        "Conjurations": 4.4,
+        "Dodging": 3.0,
+        "Stealth": 1.5
+      },
+      "12": {
+        "Spellcasting": 10.0,
+        "Conjurations": 9.0,
+        "Fighting": 8.0,
+        "Dodging": 8.0,
+        "Ice Magic": 7.0,
+        "Ranged Weapons": 5.9
+      },
+      "15": {
+        "Fighting": 10.0,
+        "Spellcasting": 10.0,
+        "Ice Magic": 10.0,
+        "Conjurations": 10.0,
+        "Dodging": 8.0,
+        "Earth Magic": 6.0
+      },
+      "18": {
+        "Fighting": 10.0,
+        "Spellcasting": 10.0,
+        "Ice Magic": 10.0,
+        "Conjurations": 10.0,
+        "Dodging": 9.1,
+        "Earth Magic": 6.9
+      },
+      "21": {
+        "Fighting": 10.0,
+        "Spellcasting": 10.0,
+        "Ice Magic": 10.0,
+        "Conjurations": 10.0,
+        "Dodging": 9.1,
+        "Earth Magic": 7.5
+      },
+      "27": {
+        "Fighting": 10.0,
+        "Spellcasting": 10.0,
+        "Ice Magic": 10.0,
+        "Conjurations": 10.0,
+        "Dodging": 9.1,
+        "Earth Magic": 7.5
+      }
+    }
+  },
+  "Poltergeist/Summoner": {
+    "n": 3,
+    "milestones": {
+      "1": {
+        "Summonings": 4.0,
+        "Stealth": 3.0,
+        "Dodging": 2.1,
+        "Spellcasting": 2.0,
+        "Fighting": 0.0,
+        "Maces & Flails": 0.0
+      },
+      "3": {
+        "Summonings": 4.0,
+        "Stealth": 3.0,
+        "Dodging": 2.1,
+        "Spellcasting": 2.0,
+        "Fighting": 0.0,
+        "Maces & Flails": 0.0
+      },
+      "5": {
+        "Summonings": 5.0,
+        "Spellcasting": 3.0,
+        "Stealth": 3.0,
+        "Dodging": 2.1,
+        "Fighting": 0.0,
+        "Maces & Flails": 0.0
+      },
+      "7": {
+        "Summonings": 6.0,
+        "Spellcasting": 4.0,
+        "Throwing": 3.0,
+        "Stealth": 3.0,
+        "Dodging": 2.2,
+        "Fighting": 0.1
+      },
+      "9": {
+        "Summonings": 7.3,
+        "Spellcasting": 5.0,
+        "Stealth": 3.0,
+        "Dodging": 2.3,
+        "Fighting": 0.1,
+        "Maces & Flails": 0.0
+      },
+      "12": {
+        "Summonings": 12.0,
+        "Dodging": 7.5,
+        "Fighting": 6.2,
+        "Spellcasting": 6.0,
+        "Earth Magic": 3.6,
+        "Stealth": 3.0
+      },
+      "15": {
+        "Summonings": 12.0,
+        "Spellcasting": 8.8,
+        "Dodging": 7.5,
+        "Fighting": 6.2,
+        "Earth Magic": 3.6,
+        "Stealth": 3.0
+      },
+      "18": {
+        "Summonings": 12.0,
+        "Spellcasting": 8.8,
+        "Dodging": 7.5,
+        "Fighting": 6.2,
+        "Earth Magic": 3.6,
+        "Stealth": 3.0
+      },
+      "21": {
+        "Summonings": 12.0,
+        "Spellcasting": 8.8,
+        "Dodging": 7.5,
+        "Fighting": 6.2,
+        "Earth Magic": 3.6,
+        "Stealth": 3.0
+      },
+      "27": {
+        "Summonings": 12.0,
+        "Spellcasting": 8.8,
+        "Dodging": 7.5,
+        "Fighting": 6.2,
+        "Earth Magic": 3.6,
+        "Stealth": 3.0
+      }
+    }
+  },
+  "Tengu/Alchemist": {
+    "n": 3,
+    "milestones": {
+      "1": {
+        "Alchemy": 2.7,
+        "Dodging": 2.1,
+        "Spellcasting": 2.0,
+        "Stealth": 2.0,
+        "Conjurations": 1.3,
+        "Fighting": 1.0
+      },
+      "3": {
+        "Alchemy": 3.2,
+        "Conjurations": 3.0,
+        "Dodging": 2.1,
+        "Spellcasting": 2.0,
+        "Stealth": 2.0,
+        "Fighting": 1.0
+      },
+      "5": {
+        "Alchemy": 4.4,
+        "Conjurations": 3.0,
+        "Air Magic": 3.0,
+        "Dodging": 2.1,
+        "Fighting": 2.0,
+        "Spellcasting": 2.0
+      },
+      "7": {
+        "Alchemy": 5.2,
+        "Spellcasting": 3.0,
+        "Conjurations": 3.0,
+        "Air Magic": 3.0,
+        "Dodging": 2.1,
+        "Fighting": 2.0
+      },
+      "9": {
+        "Alchemy": 8.0,
+        "Fighting": 6.0,
+        "Spellcasting": 5.0,
+        "Conjurations": 3.0,
+        "Air Magic": 3.0,
+        "Dodging": 2.1
+      },
+      "12": {
+        "Alchemy": 9.2,
+        "Fighting": 6.4,
+        "Spellcasting": 5.9,
+        "Conjurations": 4.0,
+        "Shields": 3.4,
+        "Air Magic": 3.0
+      },
+      "15": {
+        "Alchemy": 9.2,
+        "Fighting": 6.4,
+        "Spellcasting": 5.9,
+        "Conjurations": 4.0,
+        "Shields": 3.4,
+        "Air Magic": 3.0
+      },
+      "18": {
+        "Alchemy": 9.2,
+        "Fighting": 6.4,
+        "Spellcasting": 5.9,
+        "Conjurations": 4.0,
+        "Shields": 3.4,
+        "Air Magic": 3.0
+      },
+      "21": {
+        "Alchemy": 9.2,
+        "Fighting": 6.4,
+        "Spellcasting": 5.9,
+        "Conjurations": 4.0,
+        "Shields": 3.4,
+        "Air Magic": 3.0
+      },
+      "27": {
+        "Alchemy": 9.2,
+        "Fighting": 6.4,
+        "Spellcasting": 5.9,
+        "Conjurations": 4.0,
+        "Shields": 3.4,
+        "Air Magic": 3.0
+      }
+    }
+  },
+  "Demonspawn/Gladiator": {
+    "n": 3,
+    "milestones": {
+      "1": {
+        "Dodging": 2.7,
+        "Long Blades": 2.1,
+        "Fighting": 2.0,
+        "Short Blades": 2.0,
+        "Throwing": 1.8,
+        "Spellcasting": 0.0
+      },
+      "3": {
+        "Dodging": 2.9,
+        "Long Blades": 2.3,
+        "Fighting": 2.2,
+        "Short Blades": 2.2,
+        "Throwing": 2.1,
+        "Polearms": 0.8
+      },
+      "5": {
+        "Dodging": 2.9,
+        "Fighting": 2.6,
+        "Long Blades": 2.3,
+        "Short Blades": 2.2,
+        "Throwing": 2.1,
+        "Polearms": 0.8
+      },
+      "7": {
+        "Short Blades": 4.4,
+        "Long Blades": 3.7,
+        "Dodging": 2.9,
+        "Fighting": 2.6,
+        "Throwing": 2.1,
+        "Polearms": 0.8
+      },
+      "9": {
+        "Fighting": 5.0,
+        "Short Blades": 4.4,
+        "Long Blades": 3.7,
+        "Dodging": 3.1,
+        "Throwing": 2.3,
+        "Polearms": 1.6
+      },
+      "12": {
+        "Fighting": 5.0,
+        "Short Blades": 4.4,
+        "Long Blades": 3.7,
+        "Dodging": 3.1,
+        "Throwing": 2.3,
+        "Polearms": 1.6
+      },
+      "15": {
+        "Fighting": 5.0,
+        "Short Blades": 4.4,
+        "Long Blades": 3.7,
+        "Dodging": 3.1,
+        "Throwing": 2.3,
+        "Polearms": 1.6
+      },
+      "18": {
+        "Fighting": 5.0,
+        "Short Blades": 4.4,
+        "Long Blades": 3.7,
+        "Dodging": 3.1,
+        "Throwing": 2.3,
+        "Polearms": 1.6
+      },
+      "21": {
+        "Fighting": 5.0,
+        "Short Blades": 4.4,
+        "Long Blades": 3.7,
+        "Dodging": 3.1,
+        "Throwing": 2.3,
+        "Polearms": 1.6
+      },
+      "27": {
+        "Fighting": 5.0,
+        "Short Blades": 4.4,
+        "Long Blades": 3.7,
+        "Dodging": 3.1,
+        "Throwing": 2.3,
+        "Polearms": 1.6
+      }
+    }
+  },
+  "Demigod/Conjurer": {
+    "n": 3,
+    "milestones": {
+      "1": {
+        "Conjurations": 3.6,
+        "Spellcasting": 1.8,
+        "Stealth": 1.8,
+        "Dodging": 1.7,
+        "Fighting": 0.0,
+        "Unarmed Combat": 0.0
+      },
+      "3": {
+        "Conjurations": 4.0,
+        "Spellcasting": 2.5,
+        "Dodging": 1.8,
+        "Stealth": 1.8,
+        "Fighting": 1.0,
+        "Unarmed Combat": 0.0
+      },
+      "5": {
+        "Conjurations": 4.8,
+        "Spellcasting": 3.0,
+        "Stealth": 2.0,
+        "Dodging": 1.8,
+        "Fighting": 1.7,
+        "Staves": 0.0
+      },
+      "7": {
+        "Conjurations": 4.8,
+        "Spellcasting": 3.3,
+        "Stealth": 2.0,
+        "Dodging": 1.8,
+        "Fighting": 1.7,
+        "Staves": 0.0
+      },
+      "9": {
+        "Spellcasting": 7.0,
+        "Conjurations": 5.0,
+        "Alchemy": 4.0,
+        "Stealth": 2.0,
+        "Dodging": 1.8,
+        "Fighting": 1.7
+      },
+      "12": {
+        "Spellcasting": 9.0,
+        "Fighting": 6.0,
+        "Alchemy": 6.0,
+        "Conjurations": 5.0,
+        "Dodging": 5.0,
+        "Stealth": 2.0
+      },
+      "15": {
+        "Spellcasting": 9.0,
+        "Fighting": 6.0,
+        "Alchemy": 6.0,
+        "Conjurations": 5.0,
+        "Dodging": 5.0,
+        "Stealth": 2.0
+      },
+      "18": {
+        "Spellcasting": 9.0,
+        "Fighting": 6.0,
+        "Alchemy": 6.0,
+        "Conjurations": 5.0,
+        "Dodging": 5.0,
+        "Stealth": 2.0
+      },
+      "21": {
+        "Spellcasting": 9.0,
+        "Fighting": 6.0,
+        "Alchemy": 6.0,
+        "Conjurations": 5.0,
+        "Dodging": 5.0,
+        "Stealth": 2.0
+      },
+      "27": {
+        "Spellcasting": 9.0,
+        "Fighting": 6.0,
+        "Alchemy": 6.0,
+        "Conjurations": 5.0,
+        "Dodging": 5.0,
+        "Stealth": 2.0
+      }
+    }
+  },
+  "Naga/Alchemist": {
+    "n": 3,
+    "milestones": {
+      "1": {
+        "Alchemy": 3.6,
+        "Stealth": 3.0,
+        "Spellcasting": 2.0,
+        "Dodging": 1.5,
+        "Conjurations": 1.0,
+        "Fighting": 0.0
+      },
+      "3": {
+        "Alchemy": 4.1,
+        "Stealth": 3.0,
+        "Spellcasting": 2.4,
+        "Conjurations": 1.5,
+        "Dodging": 1.5,
+        "Air Magic": 0.8
+      },
+      "5": {
+        "Alchemy": 4.1,
+        "Stealth": 3.0,
+        "Spellcasting": 2.5,
+        "Conjurations": 1.5,
+        "Dodging": 1.5,
+        "Air Magic": 1.4
+      },
+      "7": {
+        "Alchemy": 7.0,
+        "Spellcasting": 4.0,
+        "Air Magic": 4.0,
+        "Conjurations": 3.0,
+        "Stealth": 3.0,
+        "Dodging": 1.5
+      },
+      "9": {
+        "Alchemy": 7.0,
+        "Fighting": 4.4,
+        "Spellcasting": 4.0,
+        "Air Magic": 4.0,
+        "Conjurations": 3.5,
+        "Necromancy": 3.1
+      },
+      "12": {
+        "Alchemy": 8.4,
+        "Spellcasting": 7.6,
+        "Fighting": 6.2,
+        "Forgecraft": 5.0,
+        "Air Magic": 4.5,
+        "Earth Magic": 4.0
+      },
+      "15": {
+        "Alchemy": 9.5,
+        "Spellcasting": 8.0,
+        "Stealth": 6.7,
+        "Fighting": 6.2,
+        "Forgecraft": 6.2,
+        "Necromancy": 6.0
+      },
+      "18": {
+        "Alchemy": 9.5,
+        "Spellcasting": 9.0,
+        "Forgecraft": 8.0,
+        "Stealth": 6.7,
+        "Fighting": 6.2,
+        "Necromancy": 6.0
+      },
+      "21": {
+        "Alchemy": 9.5,
+        "Spellcasting": 9.0,
+        "Forgecraft": 8.0,
+        "Stealth": 6.7,
+        "Fighting": 6.2,
+        "Necromancy": 6.0
+      },
+      "27": {
+        "Alchemy": 9.5,
+        "Spellcasting": 9.0,
+        "Forgecraft": 8.0,
+        "Stealth": 6.7,
+        "Fighting": 6.2,
+        "Necromancy": 6.0
+      }
+    }
+  },
+  "Minotaur/Delver": {
+    "n": 3,
+    "milestones": {
+      "1": {
+        "Stealth": 4.1,
+        "Fighting": 3.6,
+        "Dodging": 2.1,
+        "Maces & Flails": 1.9,
+        "Axes": 1.9,
+        "Staves": 1.3
+      },
+      "3": {
+        "Stealth": 4.1,
+        "Fighting": 3.6,
+        "Axes": 2.4,
+        "Maces & Flails": 2.1,
+        "Dodging": 2.1,
+        "Polearms": 1.7
+      },
+      "5": {
+        "Fighting": 4.3,
+        "Stealth": 4.1,
+        "Axes": 3.6,
+        "Polearms": 2.8,
+        "Maces & Flails": 2.4,
+        "Dodging": 2.1
+      },
+      "7": {
+        "Fighting": 6.0,
+        "Axes": 6.0,
+        "Maces & Flails": 4.3,
+        "Stealth": 4.1,
+        "Polearms": 4.0,
+        "Armour": 3.0
+      },
+      "9": {
+        "Fighting": 8.9,
+        "Axes": 7.7,
+        "Maces & Flails": 7.1,
+        "Armour": 5.7,
+        "Polearms": 5.7,
+        "Stealth": 4.1
+      },
+      "12": {
+        "Axes": 15.5,
+        "Fighting": 11.8,
+        "Armour": 10.9,
+        "Maces & Flails": 10.3,
+        "Polearms": 10.2,
+        "Shields": 8.2
+      },
+      "15": {
+        "Axes": 18.0,
+        "Fighting": 13.6,
+        "Armour": 12.8,
+        "Maces & Flails": 11.7,
+        "Polearms": 11.7,
+        "Shields": 9.4
+      },
+      "18": {
+        "Axes": 18.0,
+        "Fighting": 13.6,
+        "Maces & Flails": 13.6,
+        "Armour": 12.8,
+        "Polearms": 12.6,
+        "Shields": 9.4
+      },
+      "21": {
+        "Axes": 18.0,
+        "Fighting": 13.6,
+        "Maces & Flails": 13.6,
+        "Armour": 12.8,
+        "Polearms": 12.6,
+        "Shields": 9.4
+      },
+      "27": {
+        "Axes": 18.0,
+        "Fighting": 13.6,
+        "Maces & Flails": 13.6,
+        "Armour": 12.8,
+        "Polearms": 12.6,
+        "Shields": 9.4
+      }
+    }
+  },
+  "Demonspawn/Reaver": {
+    "n": 3,
+    "milestones": {
+      "1": {
+        "Conjurations": 3.0,
+        "Long Blades": 2.6,
+        "Fighting": 2.0,
+        "Spellcasting": 2.0,
+        "Dodging": 1.7,
+        "Short Blades": 1.5
+      },
+      "3": {
+        "Conjurations": 3.0,
+        "Long Blades": 2.6,
+        "Fighting": 2.0,
+        "Spellcasting": 2.0,
+        "Dodging": 1.7,
+        "Short Blades": 1.5
+      },
+      "5": {
+        "Conjurations": 3.0,
+        "Long Blades": 2.6,
+        "Fighting": 2.0,
+        "Spellcasting": 2.0,
+        "Dodging": 1.7,
+        "Short Blades": 1.5
+      },
+      "7": {
+        "Long Blades": 7.0,
+        "Short Blades": 4.2,
+        "Fighting": 3.5,
+        "Conjurations": 3.0,
+        "Dodging": 3.0,
+        "Spellcasting": 2.0
+      },
+      "9": {
+        "Long Blades": 7.9,
+        "Short Blades": 4.8,
+        "Fighting": 4.0,
+        "Invocations": 4.0,
+        "Conjurations": 3.0,
+        "Dodging": 3.0
+      },
+      "12": {
+        "Long Blades": 14.0,
+        "Short Blades": 9.0,
+        "Fighting": 4.0,
+        "Invocations": 4.0,
+        "Dodging": 3.2,
+        "Shields": 3.1
+      },
+      "15": {
+        "Long Blades": 14.0,
+        "Short Blades": 9.0,
+        "Fighting": 4.0,
+        "Invocations": 4.0,
+        "Dodging": 3.2,
+        "Shields": 3.1
+      },
+      "18": {
+        "Long Blades": 14.0,
+        "Short Blades": 9.0,
+        "Fighting": 4.0,
+        "Invocations": 4.0,
+        "Dodging": 3.2,
+        "Shields": 3.1
+      },
+      "21": {
+        "Long Blades": 14.0,
+        "Short Blades": 9.0,
+        "Fighting": 4.0,
+        "Invocations": 4.0,
+        "Dodging": 3.2,
+        "Shields": 3.1
+      },
+      "27": {
+        "Long Blades": 14.0,
+        "Short Blades": 9.0,
+        "Fighting": 4.0,
+        "Invocations": 4.0,
+        "Dodging": 3.2,
+        "Shields": 3.1
+      }
+    }
+  },
+  "Demonspawn/Forgewright": {
+    "n": 3,
+    "milestones": {
+      "1": {
+        "Forgecraft": 3.6,
+        "Spellcasting": 2.0,
+        "Dodging": 1.7,
+        "Stealth": 1.7,
+        "Fighting": 0.0,
+        "Maces & Flails": 0.0
+      },
+      "3": {
+        "Forgecraft": 3.6,
+        "Fighting": 2.0,
+        "Spellcasting": 2.0,
+        "Dodging": 1.7,
+        "Stealth": 1.7,
+        "Maces & Flails": 0.0
+      },
+      "5": {
+        "Forgecraft": 4.2,
+        "Fighting": 2.3,
+        "Spellcasting": 2.0,
+        "Dodging": 1.7,
+        "Stealth": 1.7,
+        "Short Blades": 0.6
+      },
+      "7": {
+        "Forgecraft": 4.2,
+        "Fighting": 4.0,
+        "Short Blades": 3.2,
+        "Long Blades": 3.2,
+        "Spellcasting": 2.0,
+        "Dodging": 1.7
+      },
+      "9": {
+        "Forgecraft": 4.2,
+        "Fighting": 4.0,
+        "Short Blades": 3.2,
+        "Long Blades": 3.2,
+        "Axes": 3.0,
+        "Staves": 3.0
+      },
+      "12": {
+        "Fighting": 10.0,
+        "Shields": 4.6,
+        "Forgecraft": 4.2,
+        "Axes": 3.2,
+        "Staves": 3.2,
+        "Short Blades": 3.2
+      },
+      "15": {
+        "Fighting": 12.0,
+        "Shields": 6.5,
+        "Invocations": 5.0,
+        "Axes": 4.8,
+        "Staves": 4.8,
+        "Forgecraft": 4.2
+      },
+      "18": {
+        "Fighting": 13.0,
+        "Dodging": 10.0,
+        "Shields": 6.9,
+        "Axes": 5.2,
+        "Staves": 5.2,
+        "Evocations": 5.0
+      },
+      "21": {
+        "Fighting": 15.0,
+        "Shields": 12.3,
+        "Dodging": 10.0,
+        "Staves": 5.2,
+        "Evocations": 5.0,
+        "Forgecraft": 4.2
+      },
+      "27": {
+        "Fighting": 15.0,
+        "Shields": 12.3,
+        "Dodging": 10.0,
+        "Staves": 5.2,
+        "Evocations": 5.0,
+        "Forgecraft": 4.2
+      }
+    }
+  },
+  "Troll/Monk": {
+    "n": 3,
+    "milestones": {
+      "1": {
+        "Unarmed Combat": 3.0,
+        "Fighting": 2.4,
+        "Dodging": 2.4,
+        "Spellcasting": 0.0,
+        "Armour": 0.0,
+        "Stealth": 0.0
+      },
+      "3": {
+        "Unarmed Combat": 3.0,
+        "Fighting": 2.4,
+        "Dodging": 2.4,
+        "Spellcasting": 0.0,
+        "Armour": 0.0,
+        "Stealth": 0.0
+      },
+      "5": {
+        "Unarmed Combat": 3.0,
+        "Fighting": 2.4,
+        "Dodging": 2.4,
+        "Spellcasting": 0.0,
+        "Armour": 0.0,
+        "Stealth": 0.0
+      },
+      "7": {
+        "Unarmed Combat": 4.6,
+        "Dodging": 2.7,
+        "Throwing": 2.5,
+        "Fighting": 2.4,
+        "Spellcasting": 0.0,
+        "Armour": 0.0
+      },
+      "9": {
+        "Invocations": 8.0,
+        "Unarmed Combat": 7.9,
+        "Fighting": 2.4,
+        "Dodging": 2.4,
+        "Shapeshifting": 1.9,
+        "Evocations": 1.6
+      },
+      "12": {
+        "Unarmed Combat": 13.3,
+        "Invocations": 10.3,
+        "Fighting": 5.0,
+        "Shapeshifting": 4.0,
+        "Evocations": 3.1,
+        "Dodging": 2.4
+      },
+      "15": {
+        "Unarmed Combat": 14.0,
+        "Invocations": 11.4,
+        "Fighting": 9.9,
+        "Shapeshifting": 7.3,
+        "Evocations": 3.1,
+        "Dodging": 2.4
+      },
+      "18": {
+        "Unarmed Combat": 14.0,
+        "Invocations": 12.2,
+        "Fighting": 11.6,
+        "Shapeshifting": 9.3,
+        "Armour": 6.7,
+        "Evocations": 3.1
+      },
+      "21": {
+        "Unarmed Combat": 14.0,
+        "Invocations": 12.2,
+        "Fighting": 11.6,
+        "Shapeshifting": 9.3,
+        "Armour": 6.7,
+        "Evocations": 3.1
+      },
+      "27": {
+        "Unarmed Combat": 14.0,
+        "Invocations": 12.2,
+        "Fighting": 11.6,
+        "Shapeshifting": 9.3,
+        "Armour": 6.7,
+        "Evocations": 3.1
+      }
+    }
+  },
+  "Coglin/Gladiator": {
+    "n": 3,
+    "milestones": {
+      "1": {
+        "Axes": 3.0,
+        "Dodging": 2.6,
+        "Fighting": 2.0,
+        "Throwing": 1.7,
+        "Maces & Flails": 1.5,
+        "Polearms": 1.5
+      },
+      "3": {
+        "Axes": 3.2,
+        "Dodging": 2.6,
+        "Fighting": 2.0,
+        "Throwing": 1.7,
+        "Maces & Flails": 1.6,
+        "Polearms": 1.6
+      },
+      "5": {
+        "Axes": 3.2,
+        "Fighting": 2.7,
+        "Dodging": 2.7,
+        "Throwing": 1.7,
+        "Maces & Flails": 1.6,
+        "Polearms": 1.6
+      },
+      "7": {
+        "Axes": 4.5,
+        "Dodging": 3.6,
+        "Fighting": 3.3,
+        "Maces & Flails": 2.4,
+        "Polearms": 2.4,
+        "Throwing": 1.8
+      },
+      "9": {
+        "Dodging": 7.0,
+        "Axes": 7.0,
+        "Long Blades": 5.7,
+        "Maces & Flails": 3.9,
+        "Polearms": 3.9,
+        "Fighting": 3.8
+      },
+      "12": {
+        "Axes": 8.8,
+        "Long Blades": 8.6,
+        "Fighting": 7.0,
+        "Armour": 7.0,
+        "Dodging": 7.0,
+        "Short Blades": 5.9
+      },
+      "15": {
+        "Axes": 14.4,
+        "Armour": 10.0,
+        "Fighting": 9.0,
+        "Maces & Flails": 8.4,
+        "Polearms": 8.4,
+        "Dodging": 7.0
+      },
+      "18": {
+        "Axes": 17.4,
+        "Armour": 16.0,
+        "Fighting": 12.0,
+        "Maces & Flails": 10.4,
+        "Polearms": 10.4,
+        "Short Blades": 8.0
+      },
+      "21": {
+        "Axes": 17.4,
+        "Armour": 16.0,
+        "Fighting": 12.0,
+        "Maces & Flails": 10.4,
+        "Polearms": 10.4,
+        "Short Blades": 8.0
+      },
+      "27": {
+        "Axes": 17.4,
+        "Armour": 16.0,
+        "Fighting": 12.0,
+        "Maces & Flails": 10.4,
+        "Polearms": 10.4,
+        "Short Blades": 8.0
+      }
+    }
+  },
+  "Naga/Shapeshifter": {
+    "n": 3,
+    "milestones": {
+      "1": {
+        "Unarmed Combat": 3.0,
+        "Shapeshifting": 3.0,
+        "Fighting": 2.0,
+        "Dodging": 1.5,
+        "Spellcasting": 0.0,
+        "Armour": 0.0
+      },
+      "3": {
+        "Unarmed Combat": 3.0,
+        "Shapeshifting": 3.0,
+        "Fighting": 2.0,
+        "Dodging": 1.5,
+        "Spellcasting": 0.0,
+        "Armour": 0.0
+      },
+      "5": {
+        "Shapeshifting": 5.8,
+        "Unarmed Combat": 3.0,
+        "Fighting": 2.0,
+        "Dodging": 1.5,
+        "Spellcasting": 0.0,
+        "Armour": 0.0
+      },
+      "7": {
+        "Shapeshifting": 8.5,
+        "Unarmed Combat": 3.0,
+        "Fighting": 2.0,
+        "Dodging": 1.5,
+        "Spellcasting": 0.0,
+        "Staves": 0.0
+      },
+      "9": {
+        "Shapeshifting": 12.0,
+        "Invocations": 4.8,
+        "Unarmed Combat": 3.0,
+        "Fighting": 2.0,
+        "Dodging": 1.5,
+        "Spellcasting": 0.0
+      },
+      "12": {
+        "Shapeshifting": 12.0,
+        "Fighting": 10.0,
+        "Invocations": 5.0,
+        "Unarmed Combat": 3.0,
+        "Conjurations": 2.5,
+        "Fire Magic": 2.5
+      },
+      "15": {
+        "Shapeshifting": 12.0,
+        "Fighting": 10.0,
+        "Axes": 7.4,
+        "Invocations": 5.0,
+        "Maces & Flails": 4.8,
+        "Polearms": 4.8
+      },
+      "18": {
+        "Shapeshifting": 12.5,
+        "Fighting": 10.0,
+        "Axes": 8.6,
+        "Maces & Flails": 5.6,
+        "Polearms": 5.6,
+        "Invocations": 5.0
+      },
+      "21": {
+        "Shapeshifting": 12.5,
+        "Fighting": 10.0,
+        "Axes": 8.6,
+        "Maces & Flails": 5.6,
+        "Polearms": 5.6,
+        "Invocations": 5.0
+      },
+      "27": {
+        "Shapeshifting": 12.5,
+        "Fighting": 10.0,
+        "Axes": 8.6,
+        "Maces & Flails": 5.6,
+        "Polearms": 5.6,
+        "Invocations": 5.0
+      }
+    }
+  },
+  "Poltergeist/Chaos Knight": {
+    "n": 3,
+    "milestones": {
+      "1": {
+        "Short Blades": 3.2,
+        "Fighting": 2.6,
+        "Dodging": 2.6,
+        "Long Blades": 1.7,
+        "Spellcasting": 0.0,
+        "Unarmed Combat": 0.0
+      },
+      "3": {
+        "Short Blades": 3.2,
+        "Fighting": 2.6,
+        "Dodging": 2.6,
+        "Long Blades": 1.7,
+        "Spellcasting": 0.0,
+        "Unarmed Combat": 0.0
+      },
+      "5": {
+        "Stealth": 4.9,
+        "Short Blades": 4.0,
+        "Fighting": 3.0,
+        "Long Blades": 2.8,
+        "Dodging": 2.6,
+        "Spellcasting": 0.0
+      },
+      "7": {
+        "Stealth": 6.0,
+        "Short Blades": 4.3,
+        "Fighting": 3.0,
+        "Long Blades": 2.8,
+        "Dodging": 2.6,
+        "Spellcasting": 0.0
+      },
+      "9": {
+        "Stealth": 6.0,
+        "Short Blades": 5.2,
+        "Fighting": 4.2,
+        "Long Blades": 3.7,
+        "Dodging": 3.1,
+        "Evocations": 1.1
+      },
+      "12": {
+        "Fighting": 8.1,
+        "Stealth": 6.0,
+        "Short Blades": 5.2,
+        "Long Blades": 3.7,
+        "Dodging": 3.1,
+        "Evocations": 2.5
+      },
+      "15": {
+        "Dodging": 8.6,
+        "Fighting": 8.1,
+        "Stealth": 6.0,
+        "Short Blades": 5.2,
+        "Long Blades": 3.7,
+        "Shields": 2.5
+      },
+      "18": {
+        "Dodging": 9.4,
+        "Fighting": 8.1,
+        "Shields": 7.2,
+        "Stealth": 6.0,
+        "Short Blades": 5.2,
+        "Long Blades": 3.7
+      },
+      "21": {
+        "Dodging": 9.4,
+        "Shields": 9.2,
+        "Fighting": 8.1,
+        "Stealth": 6.0,
+        "Short Blades": 5.2,
+        "Long Blades": 3.7
+      },
+      "27": {
+        "Dodging": 9.4,
+        "Shields": 9.2,
+        "Fighting": 8.1,
+        "Stealth": 6.0,
+        "Short Blades": 5.2,
+        "Long Blades": 3.7
+      }
+    }
+  },
+  "Octopode/Wanderer": {
+    "n": 3,
+    "milestones": {
+      "1": {
+        "Dodging": 2.0,
+        "Stealth": 1.3,
+        "Spellcasting": 1.0,
+        "Invocations": 1.0,
+        "Fighting": 0.0,
+        "Unarmed Combat": 0.0
+      },
+      "3": {
+        "Dodging": 2.0,
+        "Stealth": 1.3,
+        "Spellcasting": 1.0,
+        "Invocations": 1.0,
+        "Fighting": 0.0,
+        "Unarmed Combat": 0.0
+      },
+      "5": {
+        "Stealth": 5.2,
+        "Dodging": 2.2,
+        "Fighting": 2.0,
+        "Short Blades": 1.6,
+        "Spellcasting": 1.0,
+        "Invocations": 1.0
+      },
+      "7": {
+        "Stealth": 5.2,
+        "Dodging": 2.2,
+        "Fighting": 2.0,
+        "Short Blades": 1.6,
+        "Spellcasting": 1.0,
+        "Invocations": 1.0
+      },
+      "9": {
+        "Stealth": 5.2,
+        "Short Blades": 3.3,
+        "Invocations": 3.0,
+        "Dodging": 2.5,
+        "Fighting": 2.0,
+        "Long Blades": 1.9
+      },
+      "12": {
+        "Stealth": 17.7,
+        "Short Blades": 9.9,
+        "Dodging": 6.6,
+        "Long Blades": 6.2,
+        "Invocations": 4.9,
+        "Fighting": 4.4
+      },
+      "15": {
+        "Stealth": 18.8,
+        "Short Blades": 13.3,
+        "Dodging": 9.8,
+        "Long Blades": 8.5,
+        "Shields": 7.9,
+        "Fighting": 6.8
+      },
+      "18": {
+        "Stealth": 18.8,
+        "Short Blades": 13.6,
+        "Dodging": 9.8,
+        "Shields": 9.2,
+        "Long Blades": 8.7,
+        "Fighting": 6.8
+      },
+      "21": {
+        "Stealth": 18.8,
+        "Short Blades": 13.6,
+        "Dodging": 9.8,
+        "Shields": 9.2,
+        "Long Blades": 8.7,
+        "Fighting": 6.8
+      },
+      "27": {
+        "Stealth": 18.8,
+        "Short Blades": 13.6,
+        "Dodging": 9.8,
+        "Shields": 9.2,
+        "Long Blades": 8.7,
+        "Fighting": 6.8
+      }
+    }
+  },
+  "Djinni/Forgewright": {
+    "n": 3,
+    "milestones": {
+      "1": {
+        "Spellcasting": 3.4,
+        "Conjurations": 3.4,
+        "Hexes": 3.4,
+        "Summonings": 3.4,
+        "Necromancy": 3.4,
+        "Forgecraft": 3.4
+      },
+      "3": {
+        "Spellcasting": 3.4,
+        "Conjurations": 3.4,
+        "Hexes": 3.4,
+        "Summonings": 3.4,
+        "Necromancy": 3.4,
+        "Forgecraft": 3.4
+      },
+      "5": {
+        "Spellcasting": 3.4,
+        "Conjurations": 3.4,
+        "Hexes": 3.4,
+        "Summonings": 3.4,
+        "Necromancy": 3.4,
+        "Forgecraft": 3.4
+      },
+      "7": {
+        "Spellcasting": 3.4,
+        "Conjurations": 3.4,
+        "Hexes": 3.4,
+        "Summonings": 3.4,
+        "Necromancy": 3.4,
+        "Forgecraft": 3.4
+      },
+      "9": {
+        "Spellcasting": 9.0,
+        "Conjurations": 9.0,
+        "Hexes": 9.0,
+        "Summonings": 9.0,
+        "Necromancy": 9.0,
+        "Forgecraft": 9.0
+      },
+      "12": {
+        "Fighting": 14.2,
+        "Fire Magic": 13.5,
+        "Ice Magic": 13.5,
+        "Air Magic": 13.5,
+        "Earth Magic": 13.5,
+        "Summonings": 13.4
+      },
+      "15": {
+        "Fighting": 20.6,
+        "Fire Magic": 16.2,
+        "Ice Magic": 16.2,
+        "Air Magic": 16.2,
+        "Earth Magic": 16.2,
+        "Spellcasting": 15.0
+      },
+      "18": {
+        "Fighting": 21.4,
+        "Spellcasting": 17.7,
+        "Summonings": 17.0,
+        "Necromancy": 17.0,
+        "Forgecraft": 17.0,
+        "Fire Magic": 17.0
+      },
+      "21": {
+        "Fighting": 21.4,
+        "Spellcasting": 17.7,
+        "Summonings": 17.0,
+        "Necromancy": 17.0,
+        "Forgecraft": 17.0,
+        "Fire Magic": 17.0
+      },
+      "27": {
+        "Fighting": 21.4,
+        "Spellcasting": 17.7,
+        "Summonings": 17.0,
+        "Necromancy": 17.0,
+        "Forgecraft": 17.0,
+        "Fire Magic": 17.0
+      }
+    }
+  },
+  "Revenant/Wanderer": {
+    "n": 3,
+    "milestones": {
+      "1": {
+        "Axes": 2.1,
+        "Evocations": 1.4,
+        "Maces & Flails": 1.2,
+        "Fighting": 1.1,
+        "Stealth": 1.1,
+        "Spellcasting": 1.0
+      },
+      "3": {
+        "Axes": 2.1,
+        "Evocations": 1.4,
+        "Maces & Flails": 1.2,
+        "Fighting": 1.1,
+        "Stealth": 1.1,
+        "Spellcasting": 1.0
+      },
+      "5": {
+        "Maces & Flails": 2.9,
+        "Fighting": 2.6,
+        "Axes": 2.1,
+        "Dodging": 2.1,
+        "Armour": 1.7,
+        "Evocations": 1.4
+      },
+      "7": {
+        "Fighting": 2.9,
+        "Maces & Flails": 2.3,
+        "Dodging": 2.3,
+        "Axes": 2.1,
+        "Armour": 2.0,
+        "Polearms": 1.4
+      },
+      "9": {
+        "Fighting": 6.5,
+        "Axes": 6.5,
+        "Maces & Flails": 4.8,
+        "Armour": 3.1,
+        "Polearms": 2.6,
+        "Dodging": 2.3
+      },
+      "12": {
+        "Fighting": 11.0,
+        "Maces & Flails": 8.6,
+        "Axes": 8.2,
+        "Polearms": 6.8,
+        "Armour": 6.5,
+        "Shields": 6.0
+      },
+      "15": {
+        "Maces & Flails": 11.7,
+        "Fighting": 11.3,
+        "Axes": 10.3,
+        "Polearms": 8.3,
+        "Armour": 7.6,
+        "Shields": 7.4
+      },
+      "18": {
+        "Fighting": 12.9,
+        "Maces & Flails": 11.7,
+        "Axes": 10.3,
+        "Polearms": 8.3,
+        "Armour": 7.6,
+        "Dodging": 7.4
+      },
+      "21": {
+        "Fighting": 12.9,
+        "Maces & Flails": 11.7,
+        "Axes": 10.3,
+        "Polearms": 8.3,
+        "Armour": 7.6,
+        "Dodging": 7.4
+      },
+      "27": {
+        "Fighting": 12.9,
+        "Maces & Flails": 11.7,
+        "Axes": 10.3,
+        "Polearms": 8.3,
+        "Armour": 7.6,
+        "Dodging": 7.4
+      }
+    }
+  },
+  "Revenant/Necromancer": {
+    "n": 3,
+    "milestones": {
+      "1": {
+        "Necromancy": 4.0,
+        "Stealth": 2.1,
+        "Spellcasting": 2.0,
+        "Dodging": 1.7,
+        "Fighting": 0.0,
+        "Unarmed Combat": 0.0
+      },
+      "3": {
+        "Necromancy": 4.2,
+        "Stealth": 2.9,
+        "Spellcasting": 2.4,
+        "Dodging": 2.0,
+        "Fighting": 0.0,
+        "Unarmed Combat": 0.0
+      },
+      "5": {
+        "Necromancy": 5.0,
+        "Spellcasting": 4.0,
+        "Stealth": 3.0,
+        "Earth Magic": 2.4,
+        "Dodging": 2.0,
+        "Fighting": 0.0
+      },
+      "7": {
+        "Necromancy": 6.0,
+        "Earth Magic": 4.2,
+        "Spellcasting": 4.0,
+        "Stealth": 3.0,
+        "Dodging": 2.0,
+        "Evocations": 1.1
+      },
+      "9": {
+        "Necromancy": 6.0,
+        "Earth Magic": 6.0,
+        "Spellcasting": 5.0,
+        "Fighting": 4.0,
+        "Stealth": 3.0,
+        "Ice Magic": 2.8
+      },
+      "12": {
+        "Spellcasting": 10.0,
+        "Fighting": 9.1,
+        "Necromancy": 9.0,
+        "Ice Magic": 9.0,
+        "Earth Magic": 9.0,
+        "Armour": 5.0
+      },
+      "15": {
+        "Fighting": 12.3,
+        "Conjurations": 12.0,
+        "Necromancy": 12.0,
+        "Spellcasting": 10.0,
+        "Ice Magic": 10.0,
+        "Earth Magic": 10.0
+      },
+      "18": {
+        "Fighting": 14.0,
+        "Spellcasting": 13.6,
+        "Necromancy": 12.0,
+        "Earth Magic": 12.0,
+        "Conjurations": 11.8,
+        "Ice Magic": 10.0
+      },
+      "21": {
+        "Ice Magic": 16.0,
+        "Fighting": 14.0,
+        "Spellcasting": 14.0,
+        "Conjurations": 12.0,
+        "Necromancy": 12.0,
+        "Earth Magic": 12.0
+      },
+      "27": {
+        "Ice Magic": 16.0,
+        "Fighting": 14.0,
+        "Spellcasting": 14.0,
+        "Conjurations": 12.0,
+        "Necromancy": 12.0,
+        "Earth Magic": 12.0
+      }
+    }
+  },
+  "Human/Forgewright": {
+    "n": 3,
+    "milestones": {
+      "1": {
+        "Forgecraft": 4.0,
+        "Spellcasting": 2.0,
+        "Dodging": 2.0,
+        "Stealth": 2.0,
+        "Fighting": 0.0,
+        "Maces & Flails": 0.0
+      },
+      "3": {
+        "Forgecraft": 4.2,
+        "Spellcasting": 2.0,
+        "Dodging": 2.0,
+        "Stealth": 2.0,
+        "Fighting": 0.0,
+        "Maces & Flails": 0.0
+      },
+      "5": {
+        "Forgecraft": 4.7,
+        "Spellcasting": 2.3,
+        "Fighting": 2.1,
+        "Dodging": 2.0,
+        "Stealth": 2.0,
+        "Maces & Flails": 0.0
+      },
+      "7": {
+        "Forgecraft": 8.0,
+        "Fighting": 6.0,
+        "Spellcasting": 2.3,
+        "Dodging": 2.0,
+        "Stealth": 2.0,
+        "Maces & Flails": 0.0
+      },
+      "9": {
+        "Forgecraft": 9.0,
+        "Fighting": 7.0,
+        "Polearms": 4.0,
+        "Spellcasting": 3.0,
+        "Air Magic": 2.0,
+        "Dodging": 2.0
+      },
+      "12": {
+        "Forgecraft": 11.0,
+        "Fighting": 7.0,
+        "Spellcasting": 5.0,
+        "Armour": 5.0,
+        "Alchemy": 4.0,
+        "Air Magic": 4.0
+      },
+      "15": {
+        "Forgecraft": 11.0,
+        "Fighting": 8.8,
+        "Armour": 6.0,
+        "Spellcasting": 5.0,
+        "Invocations": 5.0,
+        "Alchemy": 4.0
+      },
+      "18": {
+        "Forgecraft": 11.0,
+        "Fighting": 8.8,
+        "Armour": 6.0,
+        "Spellcasting": 5.0,
+        "Invocations": 5.0,
+        "Alchemy": 4.0
+      },
+      "21": {
+        "Forgecraft": 11.0,
+        "Fighting": 8.8,
+        "Armour": 6.0,
+        "Spellcasting": 5.0,
+        "Invocations": 5.0,
+        "Alchemy": 4.0
+      },
+      "27": {
+        "Forgecraft": 11.0,
+        "Fighting": 8.8,
+        "Armour": 6.0,
+        "Spellcasting": 5.0,
+        "Invocations": 5.0,
+        "Alchemy": 4.0
+      }
+    }
+  },
   "Naga/Ice Elementalist": {
     "n": 2,
     "milestones": {
@@ -2123,6 +6199,2876 @@ export const BUILD_GUIDES: Record<string, BuildGuide> = {
       }
     }
   },
+  "Gargoyle/Alchemist": {
+    "n": 2,
+    "milestones": {
+      "1": {
+        "Alchemy": 2.4,
+        "Stealth": 2.4,
+        "Spellcasting": 2.0,
+        "Dodging": 1.5,
+        "Conjurations": 1.1,
+        "Fighting": 0.0
+      },
+      "3": {
+        "Stealth": 4.0,
+        "Alchemy": 2.6,
+        "Spellcasting": 2.0,
+        "Conjurations": 2.0,
+        "Dodging": 1.5,
+        "Fighting": 0.0
+      },
+      "5": {
+        "Stealth": 4.0,
+        "Alchemy": 2.6,
+        "Spellcasting": 2.0,
+        "Conjurations": 2.0,
+        "Air Magic": 1.5,
+        "Dodging": 1.5
+      },
+      "7": {
+        "Earth Magic": 4.9,
+        "Alchemy": 4.2,
+        "Stealth": 4.0,
+        "Fire Magic": 3.8,
+        "Spellcasting": 2.0,
+        "Conjurations": 2.0
+      },
+      "9": {
+        "Fire Magic": 6.0,
+        "Alchemy": 5.9,
+        "Earth Magic": 5.0,
+        "Invocations": 4.7,
+        "Conjurations": 4.2,
+        "Fighting": 4.0
+      },
+      "12": {
+        "Fire Magic": 10.1,
+        "Conjurations": 8.3,
+        "Invocations": 7.8,
+        "Alchemy": 6.6,
+        "Fighting": 6.0,
+        "Spellcasting": 5.7
+      },
+      "15": {
+        "Conjurations": 13.6,
+        "Fire Magic": 12.6,
+        "Invocations": 9.1,
+        "Fighting": 8.4,
+        "Alchemy": 7.8,
+        "Spellcasting": 7.3
+      },
+      "18": {
+        "Conjurations": 18.2,
+        "Fire Magic": 16.0,
+        "Fighting": 11.3,
+        "Spellcasting": 9.8,
+        "Invocations": 9.1,
+        "Alchemy": 7.8
+      },
+      "21": {
+        "Conjurations": 20.9,
+        "Fire Magic": 20.2,
+        "Spellcasting": 12.7,
+        "Fighting": 11.3,
+        "Invocations": 9.1,
+        "Alchemy": 7.8
+      },
+      "27": {
+        "Conjurations": 22.3,
+        "Fire Magic": 21.9,
+        "Fighting": 16.8,
+        "Spellcasting": 14.2,
+        "Invocations": 9.1,
+        "Alchemy": 7.8
+      }
+    }
+  },
+  "Coglin/Hexslinger": {
+    "n": 2,
+    "milestones": {
+      "1": {
+        "Hexes": 2.6,
+        "Ranged Weapons": 1.7,
+        "Dodging": 1.7,
+        "Fighting": 1.0,
+        "Spellcasting": 1.0,
+        "Fire Magic": 0.8
+      },
+      "3": {
+        "Hexes": 2.6,
+        "Ranged Weapons": 2.2,
+        "Dodging": 2.0,
+        "Fighting": 1.4,
+        "Spellcasting": 1.0,
+        "Fire Magic": 0.8
+      },
+      "5": {
+        "Hexes": 3.7,
+        "Ranged Weapons": 2.5,
+        "Dodging": 2.1,
+        "Fighting": 1.6,
+        "Spellcasting": 1.0,
+        "Fire Magic": 0.8
+      },
+      "7": {
+        "Ranged Weapons": 5.1,
+        "Hexes": 3.7,
+        "Dodging": 2.1,
+        "Fighting": 1.6,
+        "Spellcasting": 1.0,
+        "Fire Magic": 0.8
+      },
+      "9": {
+        "Ranged Weapons": 8.2,
+        "Fighting": 6.5,
+        "Dodging": 4.1,
+        "Hexes": 3.7,
+        "Invocations": 1.9,
+        "Spellcasting": 1.0
+      },
+      "12": {
+        "Ranged Weapons": 10.9,
+        "Fighting": 8.2,
+        "Dodging": 6.2,
+        "Translocations": 4.8,
+        "Hexes": 4.3,
+        "Invocations": 3.8
+      },
+      "15": {
+        "Ranged Weapons": 11.1,
+        "Fighting": 8.2,
+        "Translocations": 8.0,
+        "Dodging": 6.2,
+        "Hexes": 5.5,
+        "Invocations": 4.8
+      },
+      "18": {
+        "Ranged Weapons": 11.1,
+        "Fighting": 8.2,
+        "Translocations": 8.0,
+        "Dodging": 6.2,
+        "Hexes": 5.5,
+        "Invocations": 4.8
+      },
+      "21": {
+        "Ranged Weapons": 11.1,
+        "Fighting": 8.2,
+        "Translocations": 8.0,
+        "Dodging": 6.2,
+        "Hexes": 5.5,
+        "Invocations": 4.8
+      },
+      "27": {
+        "Ranged Weapons": 11.1,
+        "Fighting": 8.2,
+        "Translocations": 8.0,
+        "Dodging": 6.2,
+        "Hexes": 5.5,
+        "Invocations": 4.8
+      }
+    }
+  },
+  "Oni/Forgewright": {
+    "n": 2,
+    "milestones": {
+      "1": {
+        "Forgecraft": 3.6,
+        "Spellcasting": 2.4,
+        "Dodging": 1.7,
+        "Stealth": 1.4,
+        "Fighting": 1.0,
+        "Maces & Flails": 0.0
+      },
+      "3": {
+        "Forgecraft": 3.6,
+        "Spellcasting": 3.2,
+        "Dodging": 1.7,
+        "Stealth": 1.4,
+        "Fighting": 1.0,
+        "Maces & Flails": 0.0
+      },
+      "5": {
+        "Forgecraft": 4.3,
+        "Spellcasting": 3.3,
+        "Fighting": 2.1,
+        "Dodging": 1.7,
+        "Stealth": 1.4,
+        "Maces & Flails": 0.0
+      },
+      "7": {
+        "Spellcasting": 6.0,
+        "Fighting": 5.7,
+        "Forgecraft": 5.5,
+        "Dodging": 1.7,
+        "Stealth": 1.4,
+        "Maces & Flails": 0.0
+      },
+      "9": {
+        "Fighting": 7.5,
+        "Spellcasting": 7.3,
+        "Fire Magic": 7.0,
+        "Polearms": 6.5,
+        "Forgecraft": 6.0,
+        "Air Magic": 4.9
+      },
+      "12": {
+        "Fighting": 12.0,
+        "Forgecraft": 11.0,
+        "Spellcasting": 9.2,
+        "Air Magic": 8.0,
+        "Invocations": 8.0,
+        "Fire Magic": 7.4
+      },
+      "15": {
+        "Fighting": 13.5,
+        "Forgecraft": 12.0,
+        "Spellcasting": 10.5,
+        "Air Magic": 8.2,
+        "Invocations": 8.0,
+        "Fire Magic": 7.7
+      },
+      "18": {
+        "Fighting": 13.5,
+        "Forgecraft": 12.0,
+        "Spellcasting": 10.5,
+        "Air Magic": 8.2,
+        "Invocations": 8.0,
+        "Fire Magic": 7.7
+      },
+      "21": {
+        "Fighting": 13.5,
+        "Forgecraft": 12.0,
+        "Spellcasting": 10.5,
+        "Air Magic": 8.2,
+        "Invocations": 8.0,
+        "Fire Magic": 7.7
+      },
+      "27": {
+        "Fighting": 13.5,
+        "Forgecraft": 12.0,
+        "Spellcasting": 10.5,
+        "Air Magic": 8.2,
+        "Invocations": 8.0,
+        "Fire Magic": 7.7
+      }
+    }
+  },
+  "Coglin/Berserker": {
+    "n": 2,
+    "milestones": {
+      "1": {
+        "Fighting": 3.0,
+        "Axes": 3.0,
+        "Long Blades": 3.0,
+        "Armour": 1.8,
+        "Dodging": 1.7,
+        "Maces & Flails": 1.5
+      },
+      "3": {
+        "Fighting": 3.0,
+        "Axes": 3.0,
+        "Long Blades": 3.0,
+        "Armour": 1.8,
+        "Dodging": 1.7,
+        "Maces & Flails": 1.5
+      },
+      "5": {
+        "Fighting": 3.0,
+        "Axes": 3.0,
+        "Long Blades": 3.0,
+        "Armour": 1.8,
+        "Dodging": 1.7,
+        "Maces & Flails": 1.5
+      },
+      "7": {
+        "Axes": 5.6,
+        "Long Blades": 5.4,
+        "Fighting": 4.3,
+        "Armour": 3.3,
+        "Maces & Flails": 3.0,
+        "Polearms": 3.0
+      },
+      "9": {
+        "Axes": 9.5,
+        "Long Blades": 9.5,
+        "Fighting": 7.0,
+        "Armour": 5.6,
+        "Maces & Flails": 5.3,
+        "Polearms": 5.3
+      },
+      "12": {
+        "Long Blades": 14.0,
+        "Axes": 9.5,
+        "Fighting": 8.6,
+        "Short Blades": 8.2,
+        "Armour": 5.8,
+        "Maces & Flails": 5.3
+      },
+      "15": {
+        "Axes": 16.0,
+        "Fighting": 14.6,
+        "Long Blades": 14.0,
+        "Maces & Flails": 9.5,
+        "Armour": 8.5,
+        "Short Blades": 8.2
+      },
+      "18": {
+        "Axes": 16.0,
+        "Long Blades": 16.0,
+        "Fighting": 15.1,
+        "Maces & Flails": 9.5,
+        "Short Blades": 9.5,
+        "Armour": 9.4
+      },
+      "21": {
+        "Fighting": 16.2,
+        "Axes": 16.0,
+        "Long Blades": 16.0,
+        "Armour": 11.4,
+        "Maces & Flails": 9.5,
+        "Short Blades": 9.5
+      },
+      "27": {
+        "Fighting": 16.2,
+        "Axes": 16.0,
+        "Long Blades": 16.0,
+        "Armour": 11.4,
+        "Maces & Flails": 9.5,
+        "Short Blades": 9.5
+      }
+    }
+  },
+  "Armataur/Fighter": {
+    "n": 2,
+    "milestones": {
+      "1": {
+        "Armour": 4.0,
+        "Shields": 3.2,
+        "Fighting": 2.6,
+        "Maces & Flails": 1.4,
+        "Axes": 1.1,
+        "Staves": 1.0
+      },
+      "3": {
+        "Armour": 4.1,
+        "Shields": 3.4,
+        "Fighting": 2.7,
+        "Maces & Flails": 2.1,
+        "Axes": 2.0,
+        "Polearms": 1.7
+      },
+      "5": {
+        "Armour": 4.1,
+        "Shields": 3.4,
+        "Axes": 2.8,
+        "Fighting": 2.7,
+        "Polearms": 2.6,
+        "Maces & Flails": 2.5
+      },
+      "7": {
+        "Maces & Flails": 6.0,
+        "Axes": 5.8,
+        "Armour": 4.1,
+        "Staves": 4.1,
+        "Shields": 3.4,
+        "Fighting": 2.7
+      },
+      "9": {
+        "Armour": 7.3,
+        "Maces & Flails": 7.1,
+        "Axes": 6.5,
+        "Shields": 6.0,
+        "Staves": 5.3,
+        "Fighting": 5.1
+      },
+      "12": {
+        "Armour": 14.2,
+        "Shields": 11.2,
+        "Fighting": 9.6,
+        "Maces & Flails": 9.2,
+        "Staves": 8.3,
+        "Axes": 7.8
+      },
+      "15": {
+        "Armour": 16.8,
+        "Shields": 13.7,
+        "Fighting": 13.0,
+        "Maces & Flails": 11.4,
+        "Staves": 10.2,
+        "Axes": 9.9
+      },
+      "18": {
+        "Armour": 17.9,
+        "Shields": 13.7,
+        "Fighting": 13.6,
+        "Maces & Flails": 12.0,
+        "Axes": 10.7,
+        "Staves": 10.2
+      },
+      "21": {
+        "Armour": 17.9,
+        "Shields": 13.7,
+        "Fighting": 13.6,
+        "Maces & Flails": 12.0,
+        "Axes": 10.7,
+        "Staves": 10.2
+      },
+      "27": {
+        "Armour": 17.9,
+        "Shields": 13.7,
+        "Fighting": 13.6,
+        "Maces & Flails": 12.0,
+        "Axes": 10.7,
+        "Staves": 10.2
+      }
+    }
+  },
+  "Naga/Hunter": {
+    "n": 2,
+    "milestones": {
+      "1": {
+        "Ranged Weapons": 3.6,
+        "Fighting": 2.0,
+        "Dodging": 1.5,
+        "Stealth": 1.5,
+        "Spellcasting": 0.0,
+        "Unarmed Combat": 0.0
+      },
+      "3": {
+        "Ranged Weapons": 3.7,
+        "Fighting": 2.1,
+        "Stealth": 1.9,
+        "Dodging": 1.6,
+        "Spellcasting": 0.0,
+        "Unarmed Combat": 0.0
+      },
+      "5": {
+        "Ranged Weapons": 3.9,
+        "Stealth": 3.8,
+        "Dodging": 2.7,
+        "Fighting": 2.4,
+        "Short Blades": 0.7,
+        "Long Blades": 0.7
+      },
+      "7": {
+        "Stealth": 4.8,
+        "Ranged Weapons": 4.3,
+        "Fighting": 3.4,
+        "Dodging": 2.7,
+        "Short Blades": 0.7,
+        "Long Blades": 0.7
+      },
+      "9": {
+        "Invocations": 5.5,
+        "Stealth": 4.8,
+        "Fighting": 4.4,
+        "Ranged Weapons": 4.3,
+        "Dodging": 2.7,
+        "Evocations": 1.5
+      },
+      "12": {
+        "Stealth": 9.0,
+        "Fighting": 8.0,
+        "Long Blades": 6.5,
+        "Evocations": 6.2,
+        "Invocations": 5.5,
+        "Short Blades": 5.2
+      },
+      "15": {
+        "Shapeshifting": 13.7,
+        "Stealth": 9.0,
+        "Fighting": 8.0,
+        "Dodging": 7.0,
+        "Evocations": 6.5,
+        "Long Blades": 6.5
+      },
+      "18": {
+        "Shapeshifting": 13.7,
+        "Shields": 13.5,
+        "Stealth": 9.0,
+        "Fighting": 8.0,
+        "Invocations": 7.9,
+        "Dodging": 7.0
+      },
+      "21": {
+        "Shapeshifting": 18.6,
+        "Shields": 15.0,
+        "Stealth": 9.0,
+        "Fighting": 8.0,
+        "Invocations": 8.0,
+        "Dodging": 7.8
+      },
+      "27": {
+        "Shapeshifting": 25.0,
+        "Shields": 15.0,
+        "Invocations": 11.5,
+        "Long Blades": 11.5,
+        "Translocations": 9.2,
+        "Stealth": 9.0
+      }
+    }
+  },
+  "Merfolk/Fighter": {
+    "n": 2,
+    "milestones": {
+      "1": {
+        "Polearms": 3.4,
+        "Fighting": 3.2,
+        "Shields": 3.0,
+        "Armour": 2.2,
+        "Axes": 0.9,
+        "Staves": 0.9
+      },
+      "3": {
+        "Polearms": 3.4,
+        "Fighting": 3.2,
+        "Shields": 3.0,
+        "Armour": 2.2,
+        "Axes": 0.9,
+        "Staves": 0.9
+      },
+      "5": {
+        "Polearms": 5.2,
+        "Fighting": 3.2,
+        "Shields": 3.0,
+        "Armour": 2.2,
+        "Axes": 1.6,
+        "Staves": 1.6
+      },
+      "7": {
+        "Polearms": 8.8,
+        "Fighting": 3.2,
+        "Axes": 3.0,
+        "Staves": 3.0,
+        "Shields": 3.0,
+        "Armour": 2.2
+      },
+      "9": {
+        "Polearms": 13.1,
+        "Fighting": 5.8,
+        "Axes": 4.8,
+        "Staves": 4.8,
+        "Dodging": 3.8,
+        "Armour": 3.6
+      },
+      "12": {
+        "Polearms": 13.1,
+        "Dodging": 9.5,
+        "Fighting": 9.4,
+        "Armour": 6.1,
+        "Axes": 4.8,
+        "Staves": 4.8
+      },
+      "15": {
+        "Polearms": 13.1,
+        "Dodging": 12.5,
+        "Fighting": 11.9,
+        "Armour": 8.0,
+        "Axes": 4.8,
+        "Staves": 4.8
+      },
+      "18": {
+        "Polearms": 13.1,
+        "Dodging": 12.5,
+        "Fighting": 11.9,
+        "Armour": 8.0,
+        "Axes": 4.8,
+        "Staves": 4.8
+      },
+      "21": {
+        "Polearms": 13.1,
+        "Dodging": 12.5,
+        "Fighting": 11.9,
+        "Armour": 8.0,
+        "Axes": 4.8,
+        "Staves": 4.8
+      },
+      "27": {
+        "Polearms": 13.1,
+        "Dodging": 12.5,
+        "Fighting": 11.9,
+        "Armour": 8.0,
+        "Axes": 4.8,
+        "Staves": 4.8
+      }
+    }
+  },
+  "Tengu/Conjurer": {
+    "n": 2,
+    "milestones": {
+      "1": {
+        "Conjurations": 5.3,
+        "Dodging": 2.1,
+        "Spellcasting": 2.0,
+        "Stealth": 2.0,
+        "Fighting": 0.0,
+        "Unarmed Combat": 0.0
+      },
+      "3": {
+        "Conjurations": 5.3,
+        "Dodging": 2.1,
+        "Spellcasting": 2.0,
+        "Stealth": 2.0,
+        "Fighting": 0.0,
+        "Unarmed Combat": 0.0
+      },
+      "5": {
+        "Conjurations": 6.1,
+        "Spellcasting": 2.8,
+        "Dodging": 2.1,
+        "Stealth": 2.0,
+        "Fighting": 0.0,
+        "Unarmed Combat": 0.0
+      },
+      "7": {
+        "Conjurations": 7.2,
+        "Alchemy": 4.0,
+        "Spellcasting": 3.0,
+        "Dodging": 2.1,
+        "Stealth": 2.0,
+        "Fighting": 0.0
+      },
+      "9": {
+        "Conjurations": 10.8,
+        "Air Magic": 7.0,
+        "Spellcasting": 5.8,
+        "Alchemy": 5.0,
+        "Fighting": 4.2,
+        "Dodging": 3.5
+      },
+      "12": {
+        "Conjurations": 11.8,
+        "Spellcasting": 11.0,
+        "Dodging": 8.5,
+        "Fighting": 7.7,
+        "Air Magic": 6.6,
+        "Forgecraft": 3.0
+      },
+      "15": {
+        "Conjurations": 16.1,
+        "Spellcasting": 12.6,
+        "Fighting": 10.9,
+        "Dodging": 9.3,
+        "Alchemy": 8.6,
+        "Fire Magic": 7.0
+      },
+      "18": {
+        "Conjurations": 16.1,
+        "Spellcasting": 12.6,
+        "Fighting": 10.9,
+        "Dodging": 9.3,
+        "Alchemy": 8.6,
+        "Fire Magic": 7.0
+      },
+      "21": {
+        "Conjurations": 16.1,
+        "Spellcasting": 12.6,
+        "Fighting": 10.9,
+        "Dodging": 9.3,
+        "Alchemy": 8.6,
+        "Fire Magic": 7.0
+      },
+      "27": {
+        "Conjurations": 16.1,
+        "Spellcasting": 12.6,
+        "Fighting": 10.9,
+        "Dodging": 9.3,
+        "Alchemy": 8.6,
+        "Fire Magic": 7.0
+      }
+    }
+  },
+  "Merfolk/Monk": {
+    "n": 2,
+    "milestones": {
+      "1": {
+        "Polearms": 4.4,
+        "Dodging": 4.0,
+        "Fighting": 3.2,
+        "Axes": 1.3,
+        "Staves": 1.3,
+        "Spellcasting": 0.0
+      },
+      "3": {
+        "Polearms": 4.4,
+        "Dodging": 4.0,
+        "Fighting": 3.2,
+        "Axes": 1.3,
+        "Staves": 1.3,
+        "Spellcasting": 0.0
+      },
+      "5": {
+        "Polearms": 5.7,
+        "Dodging": 4.6,
+        "Fighting": 3.8,
+        "Axes": 1.8,
+        "Staves": 1.8,
+        "Invocations": 0.3
+      },
+      "7": {
+        "Polearms": 5.7,
+        "Dodging": 4.6,
+        "Fighting": 3.8,
+        "Axes": 1.8,
+        "Staves": 1.8,
+        "Invocations": 0.3
+      },
+      "9": {
+        "Polearms": 12.2,
+        "Dodging": 8.0,
+        "Shapeshifting": 7.7,
+        "Fighting": 6.7,
+        "Axes": 4.3,
+        "Staves": 4.3
+      },
+      "12": {
+        "Polearms": 16.4,
+        "Shapeshifting": 12.0,
+        "Dodging": 10.8,
+        "Fighting": 8.7,
+        "Axes": 6.2,
+        "Staves": 6.2
+      },
+      "15": {
+        "Polearms": 18.4,
+        "Shapeshifting": 15.4,
+        "Dodging": 13.2,
+        "Fighting": 9.6,
+        "Axes": 7.1,
+        "Staves": 7.1
+      },
+      "18": {
+        "Polearms": 19.8,
+        "Shapeshifting": 16.9,
+        "Dodging": 14.5,
+        "Fighting": 11.8,
+        "Axes": 7.8,
+        "Staves": 7.8
+      },
+      "21": {
+        "Shapeshifting": 18.4,
+        "Dodging": 15.3,
+        "Polearms": 14.1,
+        "Fighting": 12.7,
+        "Axes": 8.1,
+        "Staves": 8.1
+      },
+      "27": {
+        "Shapeshifting": 18.5,
+        "Dodging": 17.1,
+        "Fighting": 14.2,
+        "Polearms": 14.1,
+        "Axes": 8.1,
+        "Staves": 8.1
+      }
+    }
+  },
+  "Revenant/Conjurer": {
+    "n": 2,
+    "milestones": {
+      "1": {
+        "Conjurations": 3.6,
+        "Stealth": 2.5,
+        "Spellcasting": 2.0,
+        "Dodging": 1.7,
+        "Fighting": 0.0,
+        "Unarmed Combat": 0.0
+      },
+      "3": {
+        "Conjurations": 4.1,
+        "Stealth": 3.0,
+        "Spellcasting": 2.0,
+        "Ice Magic": 2.0,
+        "Dodging": 1.7,
+        "Fighting": 1.0
+      },
+      "5": {
+        "Conjurations": 5.0,
+        "Stealth": 3.0,
+        "Spellcasting": 2.5,
+        "Fighting": 2.0,
+        "Ice Magic": 2.0,
+        "Dodging": 1.7
+      },
+      "7": {
+        "Conjurations": 6.2,
+        "Alchemy": 5.8,
+        "Spellcasting": 3.5,
+        "Stealth": 3.0,
+        "Fighting": 2.5,
+        "Ice Magic": 2.0
+      },
+      "9": {
+        "Conjurations": 8.0,
+        "Alchemy": 7.0,
+        "Fighting": 5.5,
+        "Spellcasting": 5.0,
+        "Evocations": 5.0,
+        "Stealth": 3.0
+      },
+      "12": {
+        "Conjurations": 8.7,
+        "Ice Magic": 8.2,
+        "Earth Magic": 8.0,
+        "Alchemy": 7.7,
+        "Spellcasting": 7.6,
+        "Fighting": 7.5
+      },
+      "15": {
+        "Ice Magic": 14.3,
+        "Earth Magic": 14.2,
+        "Conjurations": 10.1,
+        "Spellcasting": 8.8,
+        "Alchemy": 7.7,
+        "Fighting": 7.5
+      },
+      "18": {
+        "Ice Magic": 14.3,
+        "Earth Magic": 14.2,
+        "Conjurations": 10.1,
+        "Spellcasting": 8.8,
+        "Alchemy": 7.7,
+        "Fighting": 7.5
+      },
+      "21": {
+        "Ice Magic": 14.3,
+        "Earth Magic": 14.2,
+        "Conjurations": 10.1,
+        "Spellcasting": 8.8,
+        "Alchemy": 7.7,
+        "Fighting": 7.5
+      },
+      "27": {
+        "Ice Magic": 14.3,
+        "Earth Magic": 14.2,
+        "Conjurations": 10.1,
+        "Spellcasting": 8.8,
+        "Alchemy": 7.7,
+        "Fighting": 7.5
+      }
+    }
+  },
+  "Demigod/Reaver": {
+    "n": 2,
+    "milestones": {
+      "1": {
+        "Conjurations": 2.8,
+        "Axes": 2.6,
+        "Long Blades": 2.6,
+        "Spellcasting": 1.9,
+        "Fighting": 1.7,
+        "Dodging": 1.7
+      },
+      "3": {
+        "Axes": 4.0,
+        "Conjurations": 3.2,
+        "Long Blades": 2.6,
+        "Spellcasting": 2.3,
+        "Maces & Flails": 2.3,
+        "Polearms": 2.3
+      },
+      "5": {
+        "Conjurations": 3.6,
+        "Fighting": 2.9,
+        "Long Blades": 2.6,
+        "Spellcasting": 2.5,
+        "Earth Magic": 2.5,
+        "Maces & Flails": 2.3
+      },
+      "7": {
+        "Fighting": 5.0,
+        "Maces & Flails": 4.1,
+        "Conjurations": 3.8,
+        "Polearms": 3.8,
+        "Spellcasting": 3.7,
+        "Axes": 3.2
+      },
+      "9": {
+        "Fighting": 7.0,
+        "Maces & Flails": 6.0,
+        "Spellcasting": 5.5,
+        "Polearms": 4.8,
+        "Fire Magic": 4.0,
+        "Conjurations": 3.8
+      },
+      "12": {
+        "Fighting": 8.8,
+        "Maces & Flails": 7.9,
+        "Polearms": 7.0,
+        "Spellcasting": 6.0,
+        "Axes": 5.5,
+        "Evocations": 5.0
+      },
+      "15": {
+        "Fighting": 8.8,
+        "Maces & Flails": 7.9,
+        "Polearms": 7.0,
+        "Spellcasting": 6.0,
+        "Axes": 5.5,
+        "Evocations": 5.0
+      },
+      "18": {
+        "Fighting": 8.8,
+        "Maces & Flails": 7.9,
+        "Polearms": 7.0,
+        "Spellcasting": 6.0,
+        "Axes": 5.5,
+        "Evocations": 5.0
+      },
+      "21": {
+        "Fighting": 8.8,
+        "Maces & Flails": 7.9,
+        "Polearms": 7.0,
+        "Spellcasting": 6.0,
+        "Axes": 5.5,
+        "Evocations": 5.0
+      },
+      "27": {
+        "Fighting": 8.8,
+        "Maces & Flails": 7.9,
+        "Polearms": 7.0,
+        "Spellcasting": 6.0,
+        "Axes": 5.5,
+        "Evocations": 5.0
+      }
+    }
+  },
+  "Poltergeist/Alchemist": {
+    "n": 2,
+    "milestones": {
+      "1": {
+        "Alchemy": 3.2,
+        "Stealth": 3.0,
+        "Dodging": 2.2,
+        "Spellcasting": 2.0,
+        "Conjurations": 0.6,
+        "Fighting": 0.0
+      },
+      "3": {
+        "Alchemy": 3.5,
+        "Stealth": 3.2,
+        "Dodging": 2.5,
+        "Spellcasting": 2.2,
+        "Conjurations": 1.1,
+        "Air Magic": 0.5
+      },
+      "5": {
+        "Alchemy": 3.8,
+        "Stealth": 3.2,
+        "Dodging": 3.0,
+        "Spellcasting": 2.6,
+        "Air Magic": 1.4,
+        "Fighting": 1.1
+      },
+      "7": {
+        "Alchemy": 4.7,
+        "Dodging": 3.8,
+        "Spellcasting": 3.6,
+        "Stealth": 3.2,
+        "Fighting": 2.2,
+        "Air Magic": 2.0
+      },
+      "9": {
+        "Alchemy": 5.7,
+        "Dodging": 5.0,
+        "Spellcasting": 4.6,
+        "Fighting": 3.4,
+        "Stealth": 3.2,
+        "Fire Magic": 2.0
+      },
+      "12": {
+        "Alchemy": 6.7,
+        "Dodging": 6.6,
+        "Spellcasting": 6.3,
+        "Invocations": 6.1,
+        "Fighting": 4.3,
+        "Necromancy": 4.2
+      },
+      "15": {
+        "Invocations": 11.0,
+        "Shields": 9.0,
+        "Hexes": 8.3,
+        "Spellcasting": 8.1,
+        "Dodging": 7.5,
+        "Alchemy": 6.7
+      },
+      "18": {
+        "Invocations": 11.0,
+        "Shields": 9.0,
+        "Hexes": 8.3,
+        "Spellcasting": 8.1,
+        "Dodging": 7.5,
+        "Alchemy": 6.7
+      },
+      "21": {
+        "Invocations": 11.0,
+        "Shields": 9.0,
+        "Hexes": 8.3,
+        "Spellcasting": 8.1,
+        "Dodging": 7.5,
+        "Alchemy": 6.7
+      },
+      "27": {
+        "Invocations": 11.0,
+        "Shields": 9.0,
+        "Hexes": 8.3,
+        "Spellcasting": 8.1,
+        "Dodging": 7.5,
+        "Alchemy": 6.7
+      }
+    }
+  },
+  "Oni/Wanderer": {
+    "n": 2,
+    "milestones": {
+      "1": {
+        "Ranged Weapons": 2.9,
+        "Long Blades": 1.8,
+        "Ice Magic": 1.7,
+        "Dodging": 1.4,
+        "Fighting": 1.3,
+        "Spellcasting": 1.2
+      },
+      "3": {
+        "Ranged Weapons": 2.9,
+        "Throwing": 2.0,
+        "Ice Magic": 1.9,
+        "Long Blades": 1.8,
+        "Fighting": 1.6,
+        "Dodging": 1.4
+      },
+      "5": {
+        "Fighting": 3.0,
+        "Ranged Weapons": 2.9,
+        "Throwing": 2.0,
+        "Ice Magic": 1.9,
+        "Long Blades": 1.8,
+        "Dodging": 1.4
+      },
+      "7": {
+        "Fighting": 7.2,
+        "Long Blades": 2.9,
+        "Ranged Weapons": 2.9,
+        "Ice Magic": 1.9,
+        "Short Blades": 1.5,
+        "Dodging": 1.4
+      },
+      "9": {
+        "Fighting": 12.1,
+        "Shields": 6.0,
+        "Long Blades": 5.5,
+        "Short Blades": 3.2,
+        "Ranged Weapons": 2.9,
+        "Dodging": 2.5
+      },
+      "12": {
+        "Fighting": 14.6,
+        "Shields": 11.0,
+        "Invocations": 8.6,
+        "Dodging": 6.5,
+        "Long Blades": 5.5,
+        "Short Blades": 3.2
+      },
+      "15": {
+        "Fighting": 18.4,
+        "Shields": 11.0,
+        "Armour": 10.0,
+        "Throwing": 9.2,
+        "Invocations": 8.6,
+        "Dodging": 8.5
+      },
+      "18": {
+        "Fighting": 18.5,
+        "Invocations": 15.0,
+        "Axes": 13.0,
+        "Shields": 12.5,
+        "Throwing": 10.7,
+        "Armour": 10.5
+      },
+      "21": {
+        "Fighting": 19.9,
+        "Invocations": 15.0,
+        "Armour": 13.8,
+        "Shields": 13.5,
+        "Axes": 13.0,
+        "Throwing": 10.7
+      },
+      "27": {
+        "Fighting": 21.5,
+        "Armour": 17.5,
+        "Invocations": 17.1,
+        "Shields": 15.8,
+        "Axes": 13.0,
+        "Throwing": 10.7
+      }
+    }
+  },
+  "Formicid/Artificer": {
+    "n": 2,
+    "milestones": {
+      "1": {
+        "Evocations": 3.2,
+        "Armour": 2.1,
+        "Stealth": 1.2,
+        "Fighting": 1.1,
+        "Dodging": 0.8,
+        "Spellcasting": 0.0
+      },
+      "3": {
+        "Evocations": 3.4,
+        "Armour": 2.3,
+        "Fighting": 1.4,
+        "Stealth": 1.2,
+        "Axes": 0.9,
+        "Dodging": 0.8
+      },
+      "5": {
+        "Evocations": 4.2,
+        "Fighting": 2.6,
+        "Armour": 2.3,
+        "Stealth": 1.2,
+        "Axes": 0.9,
+        "Dodging": 0.8
+      },
+      "7": {
+        "Evocations": 4.8,
+        "Fighting": 3.4,
+        "Armour": 3.3,
+        "Axes": 1.4,
+        "Stealth": 1.2,
+        "Dodging": 0.8
+      },
+      "9": {
+        "Evocations": 7.3,
+        "Fighting": 6.8,
+        "Armour": 6.5,
+        "Axes": 6.2,
+        "Maces & Flails": 3.7,
+        "Polearms": 3.7
+      },
+      "12": {
+        "Evocations": 10.7,
+        "Fighting": 10.4,
+        "Axes": 10.1,
+        "Armour": 9.2,
+        "Shields": 7.9,
+        "Ranged Weapons": 7.6
+      },
+      "15": {
+        "Evocations": 12.9,
+        "Fighting": 12.7,
+        "Axes": 12.2,
+        "Armour": 11.8,
+        "Ranged Weapons": 8.0,
+        "Maces & Flails": 7.7
+      },
+      "18": {
+        "Evocations": 12.9,
+        "Fighting": 12.7,
+        "Axes": 12.2,
+        "Armour": 11.8,
+        "Ranged Weapons": 8.0,
+        "Maces & Flails": 7.7
+      },
+      "21": {
+        "Evocations": 12.9,
+        "Fighting": 12.7,
+        "Axes": 12.2,
+        "Armour": 11.8,
+        "Ranged Weapons": 8.0,
+        "Maces & Flails": 7.7
+      },
+      "27": {
+        "Evocations": 12.9,
+        "Fighting": 12.7,
+        "Axes": 12.2,
+        "Armour": 11.8,
+        "Ranged Weapons": 8.0,
+        "Maces & Flails": 7.7
+      }
+    }
+  },
+  "Barachi/Ice Elementalist": {
+    "n": 2,
+    "milestones": {
+      "1": {
+        "Ice Magic": 4.8,
+        "Spellcasting": 2.1,
+        "Dodging": 2.1,
+        "Stealth": 1.7,
+        "Fighting": 0.0,
+        "Unarmed Combat": 0.0
+      },
+      "3": {
+        "Ice Magic": 5.5,
+        "Spellcasting": 2.8,
+        "Dodging": 2.1,
+        "Stealth": 1.7,
+        "Fighting": 0.0,
+        "Unarmed Combat": 0.0
+      },
+      "5": {
+        "Ice Magic": 5.9,
+        "Spellcasting": 3.3,
+        "Dodging": 2.1,
+        "Stealth": 1.7,
+        "Fighting": 0.0,
+        "Unarmed Combat": 0.0
+      },
+      "7": {
+        "Ice Magic": 5.9,
+        "Spellcasting": 3.3,
+        "Dodging": 2.1,
+        "Stealth": 1.7,
+        "Fighting": 0.0,
+        "Unarmed Combat": 0.0
+      },
+      "9": {
+        "Ice Magic": 8.2,
+        "Spellcasting": 5.6,
+        "Dodging": 2.1,
+        "Stealth": 1.7,
+        "Fighting": 0.0,
+        "Unarmed Combat": 0.0
+      },
+      "12": {
+        "Ice Magic": 9.4,
+        "Spellcasting": 7.3,
+        "Hexes": 6.2,
+        "Conjurations": 5.2,
+        "Alchemy": 5.2,
+        "Fighting": 5.0
+      },
+      "15": {
+        "Summonings": 10.5,
+        "Ice Magic": 10.2,
+        "Hexes": 8.7,
+        "Spellcasting": 7.8,
+        "Conjurations": 7.7,
+        "Alchemy": 7.7
+      },
+      "18": {
+        "Summonings": 14.5,
+        "Axes": 12.4,
+        "Translocations": 11.1,
+        "Ice Magic": 10.8,
+        "Hexes": 9.3,
+        "Spellcasting": 7.8
+      },
+      "21": {
+        "Summonings": 19.0,
+        "Axes": 13.0,
+        "Ice Magic": 11.4,
+        "Translocations": 11.1,
+        "Hexes": 10.3,
+        "Armour": 8.8
+      },
+      "27": {
+        "Summonings": 23.0,
+        "Shields": 14.5,
+        "Axes": 13.0,
+        "Ice Magic": 12.4,
+        "Armour": 11.1,
+        "Translocations": 11.1
+      }
+    }
+  },
+  "Troll/Artificer": {
+    "n": 2,
+    "milestones": {
+      "1": {
+        "Evocations": 2.1,
+        "Dodging": 1.9,
+        "Fighting": 0.8,
+        "Unarmed Combat": 0.3,
+        "Stealth": 0.3,
+        "Spellcasting": 0.0
+      },
+      "3": {
+        "Evocations": 2.1,
+        "Dodging": 1.9,
+        "Fighting": 1.4,
+        "Unarmed Combat": 1.1,
+        "Stealth": 0.3,
+        "Shapeshifting": 0.1
+      },
+      "5": {
+        "Evocations": 2.1,
+        "Unarmed Combat": 2.0,
+        "Fighting": 1.9,
+        "Dodging": 1.9,
+        "Shapeshifting": 0.5,
+        "Stealth": 0.3
+      },
+      "7": {
+        "Unarmed Combat": 5.1,
+        "Fighting": 4.2,
+        "Evocations": 2.5,
+        "Dodging": 1.9,
+        "Shapeshifting": 1.0,
+        "Throwing": 0.5
+      },
+      "9": {
+        "Unarmed Combat": 5.8,
+        "Fighting": 5.7,
+        "Maces & Flails": 3.5,
+        "Dodging": 3.0,
+        "Evocations": 2.5,
+        "Axes": 1.9
+      },
+      "12": {
+        "Fighting": 6.5,
+        "Unarmed Combat": 5.8,
+        "Maces & Flails": 4.7,
+        "Dodging": 4.2,
+        "Axes": 2.6,
+        "Staves": 2.6
+      },
+      "15": {
+        "Fighting": 7.5,
+        "Maces & Flails": 6.5,
+        "Unarmed Combat": 5.8,
+        "Dodging": 5.0,
+        "Necromancy": 4.0,
+        "Axes": 3.8
+      },
+      "18": {
+        "Fighting": 7.5,
+        "Maces & Flails": 6.5,
+        "Unarmed Combat": 5.8,
+        "Dodging": 5.0,
+        "Necromancy": 4.0,
+        "Axes": 3.8
+      },
+      "21": {
+        "Fighting": 7.5,
+        "Maces & Flails": 6.5,
+        "Unarmed Combat": 5.8,
+        "Dodging": 5.0,
+        "Necromancy": 4.0,
+        "Axes": 3.8
+      },
+      "27": {
+        "Fighting": 7.5,
+        "Maces & Flails": 6.5,
+        "Unarmed Combat": 5.8,
+        "Dodging": 5.0,
+        "Necromancy": 4.0,
+        "Axes": 3.8
+      }
+    }
+  },
+  "Demonspawn/Berserker": {
+    "n": 2,
+    "milestones": {
+      "1": {
+        "Fighting": 3.0,
+        "Armour": 1.7,
+        "Dodging": 1.7,
+        "Axes": 1.3,
+        "Unarmed Combat": 1.3,
+        "Maces & Flails": 0.8
+      },
+      "3": {
+        "Shapeshifting": 5.4,
+        "Fighting": 3.2,
+        "Axes": 2.6,
+        "Unarmed Combat": 1.9,
+        "Armour": 1.7,
+        "Dodging": 1.7
+      },
+      "5": {
+        "Shapeshifting": 5.4,
+        "Fighting": 3.5,
+        "Unarmed Combat": 2.1,
+        "Armour": 1.7,
+        "Dodging": 1.7,
+        "Axes": 1.5
+      },
+      "7": {
+        "Shapeshifting": 5.4,
+        "Fighting": 3.5,
+        "Unarmed Combat": 2.1,
+        "Armour": 1.7,
+        "Dodging": 1.7,
+        "Axes": 1.5
+      },
+      "9": {
+        "Shapeshifting": 9.4,
+        "Fighting": 4.8,
+        "Unarmed Combat": 4.2,
+        "Dodging": 2.5,
+        "Armour": 1.7,
+        "Axes": 1.5
+      },
+      "12": {
+        "Fighting": 9.8,
+        "Unarmed Combat": 8.7,
+        "Dodging": 6.8,
+        "Axes": 5.8,
+        "Shapeshifting": 5.8,
+        "Armour": 5.8
+      },
+      "15": {
+        "Fighting": 13.1,
+        "Dodging": 11.4,
+        "Unarmed Combat": 9.0,
+        "Axes": 8.8,
+        "Shields": 7.9,
+        "Armour": 7.6
+      },
+      "18": {
+        "Fighting": 13.9,
+        "Dodging": 13.1,
+        "Axes": 10.1,
+        "Unarmed Combat": 9.0,
+        "Armour": 8.9,
+        "Polearms": 8.1
+      },
+      "21": {
+        "Fighting": 16.5,
+        "Dodging": 14.2,
+        "Axes": 12.2,
+        "Armour": 11.5,
+        "Shapeshifting": 9.5,
+        "Polearms": 9.4
+      },
+      "27": {
+        "Dodging": 14.2,
+        "Fighting": 14.0,
+        "Armour": 12.6,
+        "Polearms": 11.8,
+        "Shields": 11.3,
+        "Maces & Flails": 10.6
+      }
+    }
+  },
+  "Formicid/Necromancer": {
+    "n": 2,
+    "milestones": {
+      "1": {
+        "Necromancy": 4.0,
+        "Stealth": 2.4,
+        "Spellcasting": 2.1,
+        "Dodging": 1.7,
+        "Fighting": 0.0,
+        "Unarmed Combat": 0.0
+      },
+      "3": {
+        "Necromancy": 4.5,
+        "Stealth": 2.8,
+        "Spellcasting": 2.1,
+        "Dodging": 1.7,
+        "Fighting": 1.5,
+        "Maces & Flails": 0.0
+      },
+      "5": {
+        "Necromancy": 4.8,
+        "Stealth": 2.8,
+        "Spellcasting": 2.5,
+        "Fighting": 2.1,
+        "Dodging": 1.7,
+        "Ranged Weapons": 0.8
+      },
+      "7": {
+        "Necromancy": 5.6,
+        "Ranged Weapons": 4.4,
+        "Stealth": 2.8,
+        "Spellcasting": 2.5,
+        "Polearms": 2.2,
+        "Fighting": 2.1
+      },
+      "9": {
+        "Ranged Weapons": 9.0,
+        "Necromancy": 6.3,
+        "Shields": 6.0,
+        "Fighting": 5.0,
+        "Evocations": 2.9,
+        "Dodging": 2.9
+      },
+      "12": {
+        "Ranged Weapons": 16.0,
+        "Axes": 12.6,
+        "Fighting": 10.6,
+        "Maces & Flails": 7.9,
+        "Necromancy": 6.5,
+        "Armour": 6.5
+      },
+      "15": {
+        "Ranged Weapons": 19.0,
+        "Axes": 18.4,
+        "Invocations": 12.6,
+        "Maces & Flails": 12.0,
+        "Fighting": 11.9,
+        "Armour": 10.2
+      },
+      "18": {
+        "Axes": 20.4,
+        "Ranged Weapons": 20.0,
+        "Polearms": 13.6,
+        "Maces & Flails": 13.4,
+        "Fighting": 13.2,
+        "Invocations": 12.6
+      },
+      "21": {
+        "Axes": 20.4,
+        "Invocations": 15.9,
+        "Armour": 14.8,
+        "Fighting": 14.5,
+        "Polearms": 13.6,
+        "Maces & Flails": 13.4
+      },
+      "27": {
+        "Axes": 20.4,
+        "Ranged Weapons": 20.0,
+        "Invocations": 15.9,
+        "Fighting": 14.8,
+        "Armour": 14.8,
+        "Polearms": 13.6
+      }
+    }
+  },
+  "Mummy/Artificer": {
+    "n": 2,
+    "milestones": {
+      "1": {
+        "Evocations": 2.4,
+        "Armour": 1.5,
+        "Fighting": 1.0,
+        "Dodging": 0.7,
+        "Stealth": 0.7,
+        "Spellcasting": 0.0
+      },
+      "3": {
+        "Evocations": 2.4,
+        "Stealth": 2.0,
+        "Armour": 1.5,
+        "Fighting": 1.0,
+        "Spellcasting": 1.0,
+        "Dodging": 0.7
+      },
+      "5": {
+        "Evocations": 3.2,
+        "Stealth": 2.5,
+        "Fighting": 2.0,
+        "Armour": 1.5,
+        "Spellcasting": 1.0,
+        "Short Blades": 1.0
+      },
+      "7": {
+        "Necromancy": 5.0,
+        "Evocations": 4.0,
+        "Fighting": 3.8,
+        "Conjurations": 3.0,
+        "Stealth": 3.0,
+        "Long Blades": 2.3
+      },
+      "9": {
+        "Fighting": 5.0,
+        "Necromancy": 5.0,
+        "Evocations": 5.0,
+        "Alchemy": 5.0,
+        "Spellcasting": 4.5,
+        "Conjurations": 4.5
+      },
+      "12": {
+        "Alchemy": 9.4,
+        "Evocations": 8.2,
+        "Fighting": 7.8,
+        "Conjurations": 6.8,
+        "Spellcasting": 6.5,
+        "Stealth": 6.5
+      },
+      "15": {
+        "Alchemy": 9.4,
+        "Evocations": 8.2,
+        "Fighting": 7.8,
+        "Conjurations": 6.8,
+        "Spellcasting": 6.5,
+        "Stealth": 6.5
+      },
+      "18": {
+        "Alchemy": 9.4,
+        "Evocations": 8.2,
+        "Fighting": 7.8,
+        "Conjurations": 6.8,
+        "Spellcasting": 6.5,
+        "Stealth": 6.5
+      },
+      "21": {
+        "Alchemy": 9.4,
+        "Evocations": 8.2,
+        "Fighting": 7.8,
+        "Conjurations": 6.8,
+        "Spellcasting": 6.5,
+        "Stealth": 6.5
+      },
+      "27": {
+        "Alchemy": 9.4,
+        "Evocations": 8.2,
+        "Fighting": 7.8,
+        "Conjurations": 6.8,
+        "Spellcasting": 6.5,
+        "Stealth": 6.5
+      }
+    }
+  },
+  "Kobold/Alchemist": {
+    "n": 2,
+    "milestones": {
+      "1": {
+        "Alchemy": 3.1,
+        "Stealth": 2.6,
+        "Dodging": 2.4,
+        "Spellcasting": 2.1,
+        "Conjurations": 1.0,
+        "Fighting": 0.0
+      },
+      "3": {
+        "Alchemy": 3.4,
+        "Stealth": 2.6,
+        "Dodging": 2.4,
+        "Spellcasting": 2.1,
+        "Fighting": 1.0,
+        "Conjurations": 1.0
+      },
+      "5": {
+        "Alchemy": 3.4,
+        "Stealth": 2.6,
+        "Dodging": 2.4,
+        "Spellcasting": 2.1,
+        "Fighting": 1.0,
+        "Conjurations": 1.0
+      },
+      "7": {
+        "Alchemy": 5.0,
+        "Fighting": 3.5,
+        "Stealth": 2.6,
+        "Dodging": 2.4,
+        "Spellcasting": 2.1,
+        "Conjurations": 1.0
+      },
+      "9": {
+        "Alchemy": 5.0,
+        "Dodging": 4.2,
+        "Fighting": 4.0,
+        "Spellcasting": 4.0,
+        "Stealth": 2.6,
+        "Conjurations": 1.0
+      },
+      "12": {
+        "Earth Magic": 15.0,
+        "Spellcasting": 6.0,
+        "Alchemy": 5.0,
+        "Dodging": 4.2,
+        "Fighting": 4.0,
+        "Stealth": 2.6
+      },
+      "15": {
+        "Earth Magic": 21.3,
+        "Spellcasting": 7.5,
+        "Alchemy": 5.0,
+        "Dodging": 4.2,
+        "Fighting": 4.0,
+        "Stealth": 2.6
+      },
+      "18": {
+        "Earth Magic": 21.3,
+        "Ice Magic": 10.0,
+        "Spellcasting": 8.6,
+        "Dodging": 7.5,
+        "Fighting": 6.0,
+        "Alchemy": 5.0
+      },
+      "21": {
+        "Earth Magic": 21.3,
+        "Dodging": 10.5,
+        "Spellcasting": 10.1,
+        "Ice Magic": 10.0,
+        "Fighting": 8.5,
+        "Shields": 8.0
+      },
+      "27": {
+        "Earth Magic": 22.0,
+        "Dodging": 14.5,
+        "Fighting": 11.0,
+        "Spellcasting": 10.1,
+        "Ice Magic": 10.0,
+        "Shields": 8.0
+      }
+    }
+  },
+  "Minotaur/Wanderer": {
+    "n": 2,
+    "milestones": {
+      "1": {
+        "Shields": 2.5,
+        "Short Blades": 2.1,
+        "Maces & Flails": 1.9,
+        "Axes": 1.9,
+        "Armour": 1.9,
+        "Staves": 1.4
+      },
+      "3": {
+        "Shields": 3.0,
+        "Armour": 2.5,
+        "Axes": 2.2,
+        "Maces & Flails": 2.1,
+        "Short Blades": 2.1,
+        "Fighting": 2.0
+      },
+      "5": {
+        "Shields": 4.1,
+        "Armour": 3.5,
+        "Fighting": 3.4,
+        "Axes": 2.9,
+        "Polearms": 2.6,
+        "Maces & Flails": 2.5
+      },
+      "7": {
+        "Shields": 4.7,
+        "Fighting": 4.3,
+        "Armour": 4.3,
+        "Axes": 4.1,
+        "Polearms": 4.1,
+        "Maces & Flails": 3.3
+      },
+      "9": {
+        "Shields": 4.7,
+        "Fighting": 4.3,
+        "Armour": 4.3,
+        "Axes": 4.1,
+        "Polearms": 4.1,
+        "Maces & Flails": 3.3
+      },
+      "12": {
+        "Shields": 4.7,
+        "Fighting": 4.3,
+        "Armour": 4.3,
+        "Axes": 4.1,
+        "Polearms": 4.1,
+        "Maces & Flails": 3.3
+      },
+      "15": {
+        "Shields": 4.7,
+        "Fighting": 4.3,
+        "Armour": 4.3,
+        "Axes": 4.1,
+        "Polearms": 4.1,
+        "Maces & Flails": 3.3
+      },
+      "18": {
+        "Shields": 4.7,
+        "Fighting": 4.3,
+        "Armour": 4.3,
+        "Axes": 4.1,
+        "Polearms": 4.1,
+        "Maces & Flails": 3.3
+      },
+      "21": {
+        "Shields": 4.7,
+        "Fighting": 4.3,
+        "Armour": 4.3,
+        "Axes": 4.1,
+        "Polearms": 4.1,
+        "Maces & Flails": 3.3
+      },
+      "27": {
+        "Shields": 4.7,
+        "Fighting": 4.3,
+        "Armour": 4.3,
+        "Axes": 4.1,
+        "Polearms": 4.1,
+        "Maces & Flails": 3.3
+      }
+    }
+  },
+  "Formicid/Reaver": {
+    "n": 2,
+    "milestones": {
+      "1": {
+        "Maces & Flails": 3.0,
+        "Polearms": 3.0,
+        "Conjurations": 2.6,
+        "Fighting": 2.1,
+        "Spellcasting": 2.1,
+        "Axes": 1.7
+      },
+      "3": {
+        "Fighting": 3.0,
+        "Polearms": 3.0,
+        "Conjurations": 2.6,
+        "Spellcasting": 2.1,
+        "Axes": 1.7,
+        "Staves": 1.7
+      },
+      "5": {
+        "Fighting": 4.0,
+        "Polearms": 3.0,
+        "Conjurations": 2.6,
+        "Air Magic": 2.4,
+        "Spellcasting": 2.1,
+        "Stealth": 2.1
+      },
+      "7": {
+        "Fighting": 4.0,
+        "Conjurations": 3.8,
+        "Maces & Flails": 2.4,
+        "Axes": 2.2,
+        "Staves": 2.2,
+        "Spellcasting": 2.1
+      },
+      "9": {
+        "Ranged Weapons": 9.0,
+        "Alchemy": 7.0,
+        "Fire Magic": 6.1,
+        "Fighting": 5.0,
+        "Maces & Flails": 4.7,
+        "Ice Magic": 4.6
+      },
+      "12": {
+        "Shields": 10.0,
+        "Alchemy": 7.6,
+        "Armour": 7.0,
+        "Translocations": 6.3,
+        "Fire Magic": 6.1,
+        "Fighting": 6.0
+      },
+      "15": {
+        "Ranged Weapons": 16.0,
+        "Fighting": 10.4,
+        "Invocations": 10.0,
+        "Stealth": 7.2,
+        "Conjurations": 7.0,
+        "Armour": 7.0
+      },
+      "18": {
+        "Fire Magic": 12.0,
+        "Fighting": 11.6,
+        "Shields": 11.1,
+        "Earth Magic": 9.0,
+        "Alchemy": 8.4,
+        "Ranged Weapons": 8.0
+      },
+      "21": {
+        "Fire Magic": 12.0,
+        "Fighting": 11.6,
+        "Shields": 11.1,
+        "Earth Magic": 9.0,
+        "Alchemy": 8.4,
+        "Ranged Weapons": 8.0
+      },
+      "27": {
+        "Fire Magic": 12.0,
+        "Fighting": 11.6,
+        "Shields": 11.1,
+        "Earth Magic": 9.0,
+        "Alchemy": 8.4,
+        "Ranged Weapons": 8.0
+      }
+    }
+  },
+  "Merfolk/Brigand": {
+    "n": 2,
+    "milestones": {
+      "3": {
+        "Stealth": 4.8,
+        "Short Blades": 3.9,
+        "Fighting": 2.2,
+        "Throwing": 2.0,
+        "Long Blades": 2.0,
+        "Dodging": 1.4
+      },
+      "5": {
+        "Stealth": 5.1,
+        "Short Blades": 4.8,
+        "Long Blades": 2.5,
+        "Fighting": 2.2,
+        "Throwing": 2.0,
+        "Dodging": 1.6
+      },
+      "7": {
+        "Stealth": 6.0,
+        "Short Blades": 5.2,
+        "Fighting": 4.4,
+        "Dodging": 4.3,
+        "Long Blades": 3.0,
+        "Throwing": 2.2
+      },
+      "9": {
+        "Stealth": 8.8,
+        "Dodging": 6.1,
+        "Short Blades": 5.2,
+        "Fighting": 4.4,
+        "Long Blades": 3.0,
+        "Throwing": 2.2
+      },
+      "12": {
+        "Short Blades": 9.2,
+        "Stealth": 8.8,
+        "Dodging": 8.1,
+        "Invocations": 8.0,
+        "Fighting": 6.4,
+        "Long Blades": 5.3
+      },
+      "15": {
+        "Dodging": 12.1,
+        "Invocations": 10.0,
+        "Short Blades": 9.2,
+        "Stealth": 8.8,
+        "Fighting": 7.4,
+        "Throwing": 6.2
+      },
+      "18": {
+        "Dodging": 13.9,
+        "Invocations": 12.0,
+        "Stealth": 11.3,
+        "Short Blades": 9.2,
+        "Fighting": 8.9,
+        "Throwing": 7.2
+      },
+      "21": {
+        "Invocations": 15.0,
+        "Dodging": 14.1,
+        "Shapeshifting": 14.0,
+        "Stealth": 11.3,
+        "Short Blades": 9.2,
+        "Fighting": 8.9
+      },
+      "27": {
+        "Shapeshifting": 25.0,
+        "Invocations": 15.0,
+        "Short Blades": 12.2,
+        "Fighting": 11.4,
+        "Stealth": 11.3,
+        "Shields": 10.0
+      }
+    }
+  },
+  "Octopode/Gladiator": {
+    "n": 2,
+    "milestones": {
+      "1": {
+        "Dodging": 3.0,
+        "Short Blades": 3.0,
+        "Fighting": 2.0,
+        "Throwing": 2.0,
+        "Long Blades": 1.7,
+        "Unarmed Combat": 1.5
+      },
+      "3": {
+        "Short Blades": 3.3,
+        "Dodging": 3.1,
+        "Fighting": 2.0,
+        "Throwing": 2.0,
+        "Long Blades": 1.9,
+        "Unarmed Combat": 1.5
+      },
+      "5": {
+        "Short Blades": 3.3,
+        "Dodging": 3.1,
+        "Fighting": 2.0,
+        "Throwing": 2.0,
+        "Long Blades": 1.9,
+        "Unarmed Combat": 1.5
+      },
+      "7": {
+        "Short Blades": 3.3,
+        "Dodging": 3.1,
+        "Fighting": 2.0,
+        "Throwing": 2.0,
+        "Long Blades": 1.9,
+        "Unarmed Combat": 1.5
+      },
+      "9": {
+        "Stealth": 10.4,
+        "Throwing": 4.8,
+        "Dodging": 4.5,
+        "Fighting": 3.6,
+        "Unarmed Combat": 3.6,
+        "Short Blades": 2.8
+      },
+      "12": {
+        "Stealth": 17.3,
+        "Short Blades": 6.5,
+        "Fighting": 6.3,
+        "Throwing": 6.0,
+        "Dodging": 5.7,
+        "Unarmed Combat": 4.7
+      },
+      "15": {
+        "Stealth": 17.8,
+        "Short Blades": 6.7,
+        "Fighting": 6.5,
+        "Throwing": 6.0,
+        "Dodging": 6.0,
+        "Unarmed Combat": 4.7
+      },
+      "18": {
+        "Stealth": 17.8,
+        "Short Blades": 6.7,
+        "Fighting": 6.5,
+        "Throwing": 6.0,
+        "Dodging": 6.0,
+        "Unarmed Combat": 4.7
+      },
+      "21": {
+        "Stealth": 17.8,
+        "Short Blades": 6.7,
+        "Fighting": 6.5,
+        "Throwing": 6.0,
+        "Dodging": 6.0,
+        "Unarmed Combat": 4.7
+      },
+      "27": {
+        "Stealth": 17.8,
+        "Short Blades": 6.7,
+        "Fighting": 6.5,
+        "Throwing": 6.0,
+        "Dodging": 6.0,
+        "Unarmed Combat": 4.7
+      }
+    }
+  },
+  "Kobold/Artificer": {
+    "n": 2,
+    "milestones": {
+      "1": {
+        "Evocations": 3.7,
+        "Dodging": 2.5,
+        "Fighting": 1.6,
+        "Stealth": 1.4,
+        "Armour": 0.7,
+        "Spellcasting": 0.0
+      },
+      "3": {
+        "Evocations": 3.7,
+        "Dodging": 2.5,
+        "Fighting": 1.6,
+        "Stealth": 1.4,
+        "Armour": 0.7,
+        "Short Blades": 0.5
+      },
+      "5": {
+        "Evocations": 4.0,
+        "Dodging": 2.9,
+        "Fighting": 2.2,
+        "Short Blades": 2.1,
+        "Stealth": 2.1,
+        "Armour": 0.7
+      },
+      "7": {
+        "Short Blades": 5.5,
+        "Evocations": 4.2,
+        "Dodging": 3.7,
+        "Stealth": 3.5,
+        "Fighting": 3.1,
+        "Long Blades": 2.0
+      },
+      "9": {
+        "Short Blades": 10.6,
+        "Evocations": 5.6,
+        "Stealth": 5.6,
+        "Dodging": 5.4,
+        "Fighting": 4.8,
+        "Long Blades": 4.0
+      },
+      "12": {
+        "Short Blades": 12.8,
+        "Stealth": 8.4,
+        "Dodging": 7.6,
+        "Invocations": 7.6,
+        "Fighting": 6.8,
+        "Evocations": 5.6
+      },
+      "15": {
+        "Short Blades": 17.4,
+        "Stealth": 12.8,
+        "Dodging": 11.6,
+        "Fighting": 10.6,
+        "Invocations": 10.0,
+        "Shapeshifting": 9.5
+      },
+      "18": {
+        "Short Blades": 17.6,
+        "Shapeshifting": 17.2,
+        "Stealth": 13.7,
+        "Dodging": 12.2,
+        "Fighting": 11.2,
+        "Invocations": 10.0
+      },
+      "21": {
+        "Short Blades": 18.9,
+        "Shapeshifting": 18.0,
+        "Stealth": 15.8,
+        "Dodging": 14.1,
+        "Fighting": 12.6,
+        "Invocations": 10.0
+      },
+      "27": {
+        "Short Blades": 18.9,
+        "Shapeshifting": 18.7,
+        "Stealth": 16.7,
+        "Dodging": 14.8,
+        "Fighting": 13.9,
+        "Invocations": 11.9
+      }
+    }
+  },
+  "Oni/Berserker": {
+    "n": 2,
+    "milestones": {
+      "1": {
+        "Fighting": 4.0,
+        "Maces & Flails": 3.0,
+        "Dodging": 2.6,
+        "Axes": 1.7,
+        "Staves": 1.7,
+        "Unarmed Combat": 0.0
+      },
+      "3": {
+        "Fighting": 4.0,
+        "Maces & Flails": 3.8,
+        "Dodging": 2.6,
+        "Axes": 2.2,
+        "Staves": 2.2,
+        "Unarmed Combat": 0.0
+      },
+      "5": {
+        "Fighting": 4.0,
+        "Maces & Flails": 3.9,
+        "Dodging": 2.6,
+        "Staves": 2.4,
+        "Axes": 2.2,
+        "Polearms": 0.3
+      },
+      "7": {
+        "Maces & Flails": 5.5,
+        "Fighting": 5.2,
+        "Staves": 5.0,
+        "Polearms": 3.7,
+        "Dodging": 3.2,
+        "Axes": 2.9
+      },
+      "9": {
+        "Staves": 7.7,
+        "Polearms": 7.5,
+        "Maces & Flails": 7.0,
+        "Fighting": 5.2,
+        "Dodging": 3.2,
+        "Axes": 2.9
+      },
+      "12": {
+        "Fighting": 10.7,
+        "Polearms": 8.7,
+        "Staves": 8.5,
+        "Shapeshifting": 8.1,
+        "Maces & Flails": 7.5,
+        "Throwing": 6.8
+      },
+      "15": {
+        "Shapeshifting": 15.8,
+        "Fighting": 12.4,
+        "Polearms": 8.7,
+        "Staves": 8.5,
+        "Maces & Flails": 7.5,
+        "Throwing": 6.8
+      },
+      "18": {
+        "Shapeshifting": 15.8,
+        "Fighting": 12.4,
+        "Polearms": 8.7,
+        "Staves": 8.5,
+        "Maces & Flails": 7.5,
+        "Throwing": 6.8
+      },
+      "21": {
+        "Shapeshifting": 15.8,
+        "Fighting": 12.4,
+        "Polearms": 8.7,
+        "Staves": 8.5,
+        "Maces & Flails": 7.5,
+        "Throwing": 6.8
+      },
+      "27": {
+        "Shapeshifting": 15.8,
+        "Fighting": 12.4,
+        "Polearms": 8.7,
+        "Staves": 8.5,
+        "Maces & Flails": 7.5,
+        "Throwing": 6.8
+      }
+    }
+  },
+  "Minotaur/Forgewright": {
+    "n": 2,
+    "milestones": {
+      "1": {
+        "Forgecraft": 3.2,
+        "Dodging": 2.1,
+        "Stealth": 1.5,
+        "Spellcasting": 1.3,
+        "Fighting": 0.0,
+        "Maces & Flails": 0.0
+      },
+      "3": {
+        "Forgecraft": 3.2,
+        "Dodging": 2.1,
+        "Stealth": 1.5,
+        "Spellcasting": 1.3,
+        "Fighting": 1.2,
+        "Armour": 1.2
+      },
+      "5": {
+        "Forgecraft": 3.2,
+        "Fighting": 3.1,
+        "Armour": 3.1,
+        "Axes": 2.6,
+        "Shields": 2.2,
+        "Dodging": 2.1
+      },
+      "7": {
+        "Armour": 5.1,
+        "Fighting": 4.8,
+        "Axes": 4.2,
+        "Shields": 4.0,
+        "Forgecraft": 3.2,
+        "Dodging": 2.1
+      },
+      "9": {
+        "Armour": 7.9,
+        "Shields": 7.6,
+        "Fighting": 7.4,
+        "Axes": 6.2,
+        "Polearms": 6.1,
+        "Staves": 4.6
+      },
+      "12": {
+        "Armour": 13.3,
+        "Fighting": 12.4,
+        "Axes": 12.1,
+        "Polearms": 11.8,
+        "Shields": 11.0,
+        "Staves": 9.0
+      },
+      "15": {
+        "Armour": 17.8,
+        "Fighting": 16.8,
+        "Axes": 13.7,
+        "Shields": 13.7,
+        "Polearms": 13.1,
+        "Maces & Flails": 11.7
+      },
+      "18": {
+        "Armour": 19.8,
+        "Fighting": 19.4,
+        "Shields": 16.6,
+        "Axes": 14.3,
+        "Polearms": 14.0,
+        "Maces & Flails": 11.7
+      },
+      "21": {
+        "Armour": 19.8,
+        "Fighting": 19.4,
+        "Shields": 16.6,
+        "Axes": 14.3,
+        "Polearms": 14.0,
+        "Maces & Flails": 11.7
+      },
+      "27": {
+        "Armour": 19.8,
+        "Fighting": 19.4,
+        "Shields": 16.6,
+        "Axes": 14.3,
+        "Polearms": 14.0,
+        "Maces & Flails": 11.7
+      }
+    }
+  },
+  "Revenant/Monk": {
+    "n": 2,
+    "milestones": {
+      "3": {
+        "Fighting": 3.8,
+        "Unarmed Combat": 3.8,
+        "Dodging": 3.0,
+        "Spellcasting": 0.0,
+        "Armour": 0.0,
+        "Stealth": 0.0
+      },
+      "5": {
+        "Fighting": 3.8,
+        "Unarmed Combat": 3.8,
+        "Dodging": 3.0,
+        "Armour": 1.5,
+        "Stealth": 1.5,
+        "Spellcasting": 0.0
+      },
+      "7": {
+        "Fighting": 4.2,
+        "Staves": 4.0,
+        "Invocations": 4.0,
+        "Unarmed Combat": 3.8,
+        "Dodging": 3.5,
+        "Maces & Flails": 2.3
+      },
+      "9": {
+        "Staves": 8.0,
+        "Fighting": 4.8,
+        "Maces & Flails": 4.8,
+        "Polearms": 4.8,
+        "Invocations": 4.0,
+        "Unarmed Combat": 3.8
+      },
+      "12": {
+        "Polearms": 12.0,
+        "Staves": 10.5,
+        "Invocations": 9.0,
+        "Axes": 6.8,
+        "Fighting": 5.8,
+        "Maces & Flails": 4.8
+      },
+      "15": {
+        "Polearms": 13.8,
+        "Staves": 13.6,
+        "Invocations": 11.7,
+        "Axes": 7.4,
+        "Maces & Flails": 7.2,
+        "Fighting": 6.8
+      },
+      "18": {
+        "Polearms": 16.0,
+        "Axes": 14.9,
+        "Staves": 14.0,
+        "Invocations": 12.0,
+        "Maces & Flails": 11.2,
+        "Fighting": 7.8
+      },
+      "21": {
+        "Polearms": 16.0,
+        "Axes": 14.9,
+        "Staves": 14.0,
+        "Invocations": 12.0,
+        "Maces & Flails": 11.2,
+        "Fighting": 7.8
+      },
+      "27": {
+        "Polearms": 16.0,
+        "Axes": 14.9,
+        "Staves": 14.0,
+        "Invocations": 12.0,
+        "Maces & Flails": 11.2,
+        "Fighting": 7.8
+      }
+    }
+  },
+  "Merfolk/Ice Elementalist": {
+    "n": 2,
+    "milestones": {
+      "1": {
+        "Ice Magic": 4.3,
+        "Dodging": 2.6,
+        "Stealth": 2.1,
+        "Spellcasting": 2.0,
+        "Fighting": 0.0,
+        "Unarmed Combat": 0.0
+      },
+      "3": {
+        "Ice Magic": 5.2,
+        "Dodging": 3.0,
+        "Stealth": 2.1,
+        "Spellcasting": 2.0,
+        "Fighting": 0.8,
+        "Unarmed Combat": 0.0
+      },
+      "5": {
+        "Ice Magic": 6.0,
+        "Dodging": 3.5,
+        "Stealth": 2.1,
+        "Spellcasting": 2.0,
+        "Fighting": 1.4,
+        "Armour": 1.0
+      },
+      "7": {
+        "Ice Magic": 6.6,
+        "Dodging": 4.3,
+        "Polearms": 3.0,
+        "Fighting": 2.2,
+        "Stealth": 2.1,
+        "Spellcasting": 2.0
+      },
+      "9": {
+        "Ice Magic": 7.4,
+        "Polearms": 6.6,
+        "Dodging": 5.5,
+        "Fighting": 3.2,
+        "Axes": 2.2,
+        "Staves": 2.2
+      },
+      "12": {
+        "Polearms": 13.7,
+        "Ice Magic": 9.2,
+        "Dodging": 7.1,
+        "Fighting": 5.7,
+        "Shields": 5.5,
+        "Axes": 5.0
+      },
+      "15": {
+        "Polearms": 19.3,
+        "Ice Magic": 9.2,
+        "Dodging": 8.2,
+        "Shields": 8.1,
+        "Fighting": 7.8,
+        "Axes": 7.5
+      },
+      "18": {
+        "Polearms": 20.1,
+        "Shields": 10.3,
+        "Invocations": 9.3,
+        "Ice Magic": 9.2,
+        "Fighting": 9.0,
+        "Dodging": 8.2
+      },
+      "21": {
+        "Polearms": 20.1,
+        "Shields": 10.3,
+        "Invocations": 9.3,
+        "Ice Magic": 9.2,
+        "Fighting": 9.0,
+        "Dodging": 8.2
+      },
+      "27": {
+        "Polearms": 20.1,
+        "Shields": 10.3,
+        "Invocations": 9.3,
+        "Ice Magic": 9.2,
+        "Fighting": 9.0,
+        "Dodging": 8.2
+      }
+    }
+  },
+  "Octopode/Alchemist": {
+    "n": 2,
+    "milestones": {
+      "1": {
+        "Alchemy": 3.2,
+        "Stealth": 2.6,
+        "Spellcasting": 2.0,
+        "Dodging": 2.0,
+        "Conjurations": 1.0,
+        "Fighting": 0.0
+      },
+      "3": {
+        "Stealth": 5.0,
+        "Alchemy": 3.6,
+        "Spellcasting": 2.0,
+        "Dodging": 2.0,
+        "Conjurations": 1.0,
+        "Fighting": 0.0
+      },
+      "5": {
+        "Stealth": 5.0,
+        "Conjurations": 4.0,
+        "Alchemy": 4.0,
+        "Spellcasting": 2.0,
+        "Dodging": 2.0,
+        "Fighting": 0.0
+      },
+      "7": {
+        "Alchemy": 5.0,
+        "Stealth": 5.0,
+        "Conjurations": 4.0,
+        "Air Magic": 4.0,
+        "Spellcasting": 2.0,
+        "Dodging": 2.0
+      },
+      "9": {
+        "Alchemy": 7.0,
+        "Stealth": 5.0,
+        "Conjurations": 4.0,
+        "Air Magic": 4.0,
+        "Shapeshifting": 4.0,
+        "Spellcasting": 3.5
+      },
+      "12": {
+        "Alchemy": 7.0,
+        "Stealth": 5.0,
+        "Conjurations": 4.0,
+        "Air Magic": 4.0,
+        "Shapeshifting": 4.0,
+        "Spellcasting": 3.5
+      },
+      "15": {
+        "Alchemy": 7.0,
+        "Stealth": 5.0,
+        "Conjurations": 4.0,
+        "Air Magic": 4.0,
+        "Shapeshifting": 4.0,
+        "Spellcasting": 3.5
+      },
+      "18": {
+        "Alchemy": 7.0,
+        "Stealth": 5.0,
+        "Conjurations": 4.0,
+        "Air Magic": 4.0,
+        "Shapeshifting": 4.0,
+        "Spellcasting": 3.5
+      },
+      "21": {
+        "Alchemy": 7.0,
+        "Stealth": 5.0,
+        "Conjurations": 4.0,
+        "Air Magic": 4.0,
+        "Shapeshifting": 4.0,
+        "Spellcasting": 3.5
+      },
+      "27": {
+        "Alchemy": 7.0,
+        "Stealth": 5.0,
+        "Conjurations": 4.0,
+        "Air Magic": 4.0,
+        "Shapeshifting": 4.0,
+        "Spellcasting": 3.5
+      }
+    }
+  },
+  "Felid/Berserker": {
+    "n": 2,
+    "milestones": {
+      "1": {
+        "Dodging": 4.0,
+        "Fighting": 3.0,
+        "Unarmed Combat": 3.0,
+        "Stealth": 0.8
+      },
+      "3": {
+        "Dodging": 4.0,
+        "Stealth": 4.0,
+        "Unarmed Combat": 3.4,
+        "Fighting": 3.0,
+        "Shapeshifting": 0.0
+      },
+      "5": {
+        "Stealth": 5.0,
+        "Unarmed Combat": 4.5,
+        "Dodging": 4.0,
+        "Fighting": 3.7,
+        "Shapeshifting": 0.0
+      },
+      "7": {
+        "Stealth": 6.0,
+        "Unarmed Combat": 5.7,
+        "Fighting": 5.5,
+        "Dodging": 4.0,
+        "Shapeshifting": 0.0,
+        "Evocations": 0.0
+      },
+      "9": {
+        "Unarmed Combat": 8.5,
+        "Dodging": 7.5,
+        "Fighting": 7.0,
+        "Stealth": 6.0,
+        "Shapeshifting": 1.1,
+        "Evocations": 0.0
+      },
+      "12": {
+        "Unarmed Combat": 9.3,
+        "Dodging": 8.8,
+        "Fighting": 8.3,
+        "Stealth": 6.0,
+        "Shapeshifting": 3.5,
+        "Evocations": 1.0
+      },
+      "15": {
+        "Unarmed Combat": 9.3,
+        "Dodging": 8.8,
+        "Fighting": 8.3,
+        "Stealth": 6.0,
+        "Shapeshifting": 3.5,
+        "Evocations": 1.0
+      },
+      "18": {
+        "Unarmed Combat": 9.3,
+        "Dodging": 8.8,
+        "Fighting": 8.3,
+        "Stealth": 6.0,
+        "Shapeshifting": 3.5,
+        "Evocations": 1.0
+      },
+      "21": {
+        "Unarmed Combat": 9.3,
+        "Dodging": 8.8,
+        "Fighting": 8.3,
+        "Stealth": 6.0,
+        "Shapeshifting": 3.5,
+        "Evocations": 1.0
+      },
+      "27": {
+        "Unarmed Combat": 9.3,
+        "Dodging": 8.8,
+        "Fighting": 8.3,
+        "Stealth": 6.0,
+        "Shapeshifting": 3.5,
+        "Evocations": 1.0
+      }
+    }
+  },
+  "Kobold/Delver": {
+    "n": 2,
+    "milestones": {
+      "1": {
+        "Stealth": 6.6,
+        "Fighting": 3.2,
+        "Short Blades": 2.6,
+        "Dodging": 2.4,
+        "Long Blades": 0.8,
+        "Spellcasting": 0.0
+      },
+      "3": {
+        "Stealth": 6.6,
+        "Short Blades": 6.0,
+        "Fighting": 3.2,
+        "Dodging": 2.4,
+        "Long Blades": 2.1,
+        "Spellcasting": 0.0
+      },
+      "5": {
+        "Stealth": 6.6,
+        "Short Blades": 6.0,
+        "Fighting": 4.1,
+        "Dodging": 2.4,
+        "Long Blades": 2.1,
+        "Spellcasting": 0.0
+      },
+      "7": {
+        "Stealth": 7.3,
+        "Short Blades": 6.0,
+        "Dodging": 6.0,
+        "Fighting": 5.5,
+        "Long Blades": 2.1,
+        "Spellcasting": 0.0
+      },
+      "9": {
+        "Dodging": 10.0,
+        "Short Blades": 9.0,
+        "Stealth": 7.3,
+        "Fighting": 5.5,
+        "Long Blades": 3.4,
+        "Invocations": 3.0
+      },
+      "12": {
+        "Summonings": 12.0,
+        "Dodging": 10.6,
+        "Short Blades": 9.0,
+        "Stealth": 7.3,
+        "Invocations": 7.0,
+        "Fighting": 6.5
+      },
+      "15": {
+        "Summonings": 18.1,
+        "Dodging": 11.1,
+        "Short Blades": 9.0,
+        "Stealth": 7.3,
+        "Fighting": 7.2,
+        "Invocations": 7.0
+      },
+      "18": {
+        "Summonings": 18.1,
+        "Dodging": 11.1,
+        "Short Blades": 9.0,
+        "Stealth": 7.3,
+        "Fighting": 7.2,
+        "Invocations": 7.0
+      },
+      "21": {
+        "Summonings": 18.1,
+        "Dodging": 11.1,
+        "Short Blades": 9.0,
+        "Stealth": 7.3,
+        "Fighting": 7.2,
+        "Invocations": 7.0
+      },
+      "27": {
+        "Summonings": 18.1,
+        "Dodging": 11.1,
+        "Short Blades": 9.0,
+        "Stealth": 7.3,
+        "Fighting": 7.2,
+        "Invocations": 7.0
+      }
+    }
+  },
+  "Demonspawn/Chaos Knight": {
+    "n": 2,
+    "milestones": {
+      "1": {
+        "Fighting": 3.0,
+        "Maces & Flails": 2.6,
+        "Armour": 1.7,
+        "Axes": 1.5,
+        "Staves": 1.5,
+        "Dodging": 0.8
+      },
+      "3": {
+        "Fighting": 3.0,
+        "Maces & Flails": 2.6,
+        "Armour": 1.7,
+        "Axes": 1.5,
+        "Staves": 1.5,
+        "Dodging": 0.8
+      },
+      "5": {
+        "Maces & Flails": 4.3,
+        "Fighting": 3.0,
+        "Axes": 2.5,
+        "Staves": 2.5,
+        "Armour": 1.7,
+        "Dodging": 0.8
+      },
+      "7": {
+        "Fighting": 4.5,
+        "Maces & Flails": 4.3,
+        "Armour": 2.9,
+        "Axes": 2.5,
+        "Staves": 2.5,
+        "Dodging": 0.8
+      },
+      "9": {
+        "Maces & Flails": 6.3,
+        "Fighting": 4.5,
+        "Evocations": 4.0,
+        "Axes": 3.8,
+        "Staves": 3.8,
+        "Armour": 2.9
+      },
+      "12": {
+        "Maces & Flails": 6.3,
+        "Fighting": 4.5,
+        "Evocations": 4.0,
+        "Axes": 3.8,
+        "Staves": 3.8,
+        "Armour": 2.9
+      },
+      "15": {
+        "Maces & Flails": 6.3,
+        "Fighting": 4.5,
+        "Evocations": 4.0,
+        "Axes": 3.8,
+        "Staves": 3.8,
+        "Armour": 2.9
+      },
+      "18": {
+        "Maces & Flails": 6.3,
+        "Fighting": 4.5,
+        "Evocations": 4.0,
+        "Axes": 3.8,
+        "Staves": 3.8,
+        "Armour": 2.9
+      },
+      "21": {
+        "Maces & Flails": 6.3,
+        "Fighting": 4.5,
+        "Evocations": 4.0,
+        "Axes": 3.8,
+        "Staves": 3.8,
+        "Armour": 2.9
+      },
+      "27": {
+        "Maces & Flails": 6.3,
+        "Fighting": 4.5,
+        "Evocations": 4.0,
+        "Axes": 3.8,
+        "Staves": 3.8,
+        "Armour": 2.9
+      }
+    }
+  },
+  "Tengu/Hunter": {
+    "n": 2,
+    "milestones": {
+      "1": {
+        "Ranged Weapons": 4.3,
+        "Dodging": 2.1,
+        "Fighting": 2.0,
+        "Stealth": 1.0,
+        "Spellcasting": 0.0,
+        "Unarmed Combat": 0.0
+      },
+      "3": {
+        "Ranged Weapons": 4.3,
+        "Dodging": 2.1,
+        "Fighting": 2.0,
+        "Stealth": 1.0,
+        "Spellcasting": 0.0,
+        "Unarmed Combat": 0.0
+      },
+      "5": {
+        "Ranged Weapons": 4.3,
+        "Dodging": 2.1,
+        "Fighting": 2.0,
+        "Stealth": 1.0,
+        "Spellcasting": 0.0,
+        "Unarmed Combat": 0.0
+      },
+      "7": {
+        "Ranged Weapons": 7.1,
+        "Dodging": 2.1,
+        "Fighting": 2.0,
+        "Stealth": 1.0,
+        "Spellcasting": 0.0,
+        "Unarmed Combat": 0.0
+      },
+      "9": {
+        "Ranged Weapons": 11.3,
+        "Dodging": 3.8,
+        "Fighting": 3.6,
+        "Stealth": 1.0,
+        "Spellcasting": 0.0,
+        "Unarmed Combat": 0.0
+      },
+      "12": {
+        "Ranged Weapons": 14.4,
+        "Dodging": 10.2,
+        "Fighting": 9.5,
+        "Invocations": 5.8,
+        "Shields": 2.8,
+        "Stealth": 1.1
+      },
+      "15": {
+        "Ranged Weapons": 18.7,
+        "Fighting": 15.2,
+        "Dodging": 11.9,
+        "Shields": 7.0,
+        "Invocations": 6.8,
+        "Armour": 3.5
+      },
+      "18": {
+        "Ranged Weapons": 18.7,
+        "Fighting": 16.5,
+        "Dodging": 14.1,
+        "Shields": 8.1,
+        "Air Magic": 8.0,
+        "Invocations": 7.9
+      },
+      "21": {
+        "Ranged Weapons": 18.7,
+        "Fighting": 16.5,
+        "Dodging": 15.1,
+        "Shields": 12.3,
+        "Ice Magic": 12.2,
+        "Air Magic": 10.7
+      },
+      "27": {
+        "Ranged Weapons": 18.7,
+        "Fighting": 18.6,
+        "Dodging": 18.3,
+        "Shields": 13.6,
+        "Ice Magic": 13.2,
+        "Air Magic": 11.2
+      }
+    }
+  },
   "Oni/Shapeshifter": {
     "n": 1,
     "milestones": {}
@@ -2139,7 +9085,323 @@ export const BUILD_GUIDES: Record<string, BuildGuide> = {
     "n": 1,
     "milestones": {}
   },
-  "Gargoyle/Alchemist": {
+  "Gargoyle/Gladiator": {
+    "n": 1,
+    "milestones": {}
+  },
+  "Armataur/Air Elementalist": {
+    "n": 1,
+    "milestones": {}
+  },
+  "Revenant/Hedge Wizard": {
+    "n": 1,
+    "milestones": {}
+  },
+  "Kobold/Fighter": {
+    "n": 1,
+    "milestones": {}
+  },
+  "Gargoyle/Reaver": {
+    "n": 1,
+    "milestones": {}
+  },
+  "Minotaur/Artificer": {
+    "n": 1,
+    "milestones": {}
+  },
+  "Naga/Forgewright": {
+    "n": 1,
+    "milestones": {}
+  },
+  "Minotaur/Warper": {
+    "n": 1,
+    "milestones": {}
+  },
+  "Merfolk/Warper": {
+    "n": 1,
+    "milestones": {}
+  },
+  "Barachi/Enchanter": {
+    "n": 1,
+    "milestones": {}
+  },
+  "Spriggan/Hexslinger": {
+    "n": 1,
+    "milestones": {}
+  },
+  "Armataur/Ice Elementalist": {
+    "n": 1,
+    "milestones": {}
+  },
+  "Oni/Hunter": {
+    "n": 1,
+    "milestones": {}
+  },
+  "Merfolk/Wanderer": {
+    "n": 1,
+    "milestones": {}
+  },
+  "Merfolk/Reaver": {
+    "n": 1,
+    "milestones": {}
+  },
+  "Djinni/Brigand": {
+    "n": 1,
+    "milestones": {}
+  },
+  "Minotaur/Conjurer": {
+    "n": 1,
+    "milestones": {}
+  },
+  "Troll/Cinder Acolyte": {
+    "n": 1,
+    "milestones": {}
+  },
+  "Minotaur/Enchanter": {
+    "n": 1,
+    "milestones": {}
+  },
+  "Barachi/Alchemist": {
+    "n": 1,
+    "milestones": {}
+  },
+  "Human/Fire Elementalist": {
+    "n": 1,
+    "milestones": {}
+  },
+  "Merfolk/Artificer": {
+    "n": 1,
+    "milestones": {}
+  },
+  "Poltergeist/Fighter": {
+    "n": 1,
+    "milestones": {}
+  },
+  "Barachi/Air Elementalist": {
+    "n": 1,
+    "milestones": {}
+  },
+  "Armataur/Chaos Knight": {
+    "n": 1,
+    "milestones": {}
+  },
+  "Spriggan/Shapeshifter": {
+    "n": 1,
+    "milestones": {}
+  },
+  "Coglin/Fighter": {
+    "n": 1,
+    "milestones": {}
+  },
+  "Djinni/Hexslinger": {
+    "n": 1,
+    "milestones": {}
+  },
+  "Gargoyle/Fire Elementalist": {
+    "n": 1,
+    "milestones": {}
+  },
+  "Coglin/Forgewright": {
+    "n": 1,
+    "milestones": {}
+  },
+  "Djinni/Air Elementalist": {
+    "n": 1,
+    "milestones": {}
+  },
+  "Gargoyle/Artificer": {
+    "n": 1,
+    "milestones": {}
+  },
+  "Octopode/Reaver": {
+    "n": 1,
+    "milestones": {}
+  },
+  "Oni/Fighter": {
+    "n": 1,
+    "milestones": {}
+  },
+  "Djinni/Alchemist": {
+    "n": 1,
+    "milestones": {}
+  },
+  "Human/Chaos Knight": {
+    "n": 1,
+    "milestones": {}
+  },
+  "Armataur/Artificer": {
+    "n": 1,
+    "milestones": {}
+  },
+  "Coglin/Warper": {
+    "n": 1,
+    "milestones": {}
+  },
+  "Barachi/Gladiator": {
+    "n": 1,
+    "milestones": {}
+  },
+  "Oni/Conjurer": {
+    "n": 1,
+    "milestones": {}
+  },
+  "Merfolk/Alchemist": {
+    "n": 1,
+    "milestones": {}
+  },
+  "Minotaur/Reaver": {
+    "n": 1,
+    "milestones": {}
+  },
+  "Minotaur/Earth Elementalist": {
+    "n": 1,
+    "milestones": {}
+  },
+  "Troll/Hedge Wizard": {
+    "n": 1,
+    "milestones": {}
+  },
+  "Djinni/Hedge Wizard": {
+    "n": 1,
+    "milestones": {}
+  },
+  "Troll/Forgewright": {
+    "n": 1,
+    "milestones": {}
+  },
+  "Minotaur/Necromancer": {
+    "n": 1,
+    "milestones": {}
+  },
+  "Minotaur/Hedge Wizard": {
+    "n": 1,
+    "milestones": {}
+  },
+  "Formicid/Brigand": {
+    "n": 1,
+    "milestones": {}
+  },
+  "Demonspawn/Delver": {
+    "n": 1,
+    "milestones": {}
+  },
+  "Minotaur/Summoner": {
+    "n": 1,
+    "milestones": {}
+  },
+  "Barachi/Hexslinger": {
+    "n": 1,
+    "milestones": {}
+  },
+  "Oni/Hedge Wizard": {
+    "n": 1,
+    "milestones": {}
+  },
+  "Troll/Gladiator": {
+    "n": 1,
+    "milestones": {}
+  },
+  "Djinni/Fire Elementalist": {
+    "n": 1,
+    "milestones": {}
+  },
+  "Tengu/Summoner": {
+    "n": 1,
+    "milestones": {}
+  },
+  "Tengu/Gladiator": {
+    "n": 1,
+    "milestones": {}
+  },
+  "Coglin/Artificer": {
+    "n": 1,
+    "milestones": {}
+  },
+  "Mummy/Conjurer": {
+    "n": 1,
+    "milestones": {}
+  },
+  "Felid/Enchanter": {
+    "n": 1,
+    "milestones": {}
+  },
+  "Armataur/Earth Elementalist": {
+    "n": 1,
+    "milestones": {}
+  },
+  "Gargoyle/Monk": {
+    "n": 1,
+    "milestones": {}
+  },
+  "Octopode/Chaos Knight": {
+    "n": 1,
+    "milestones": {}
+  },
+  "Merfolk/Berserker": {
+    "n": 1,
+    "milestones": {}
+  },
+  "Demonspawn/Ice Elementalist": {
+    "n": 1,
+    "milestones": {}
+  },
+  "Demonspawn/Air Elementalist": {
+    "n": 1,
+    "milestones": {}
+  },
+  "Demonspawn/Monk": {
+    "n": 1,
+    "milestones": {}
+  },
+  "Human/Alchemist": {
+    "n": 1,
+    "milestones": {}
+  },
+  "Spriggan/Hunter": {
+    "n": 1,
+    "milestones": {}
+  },
+  "Human/Gladiator": {
+    "n": 1,
+    "milestones": {}
+  },
+  "Octopode/Summoner": {
+    "n": 1,
+    "milestones": {}
+  },
+  "Gnoll/Brigand": {
+    "n": 1,
+    "milestones": {}
+  },
+  "Barachi/Wanderer": {
+    "n": 1,
+    "milestones": {}
+  },
+  "Mummy/Fighter": {
+    "n": 1,
+    "milestones": {}
+  },
+  "Formicid/Monk": {
+    "n": 1,
+    "milestones": {}
+  },
+  "Human/Fighter": {
+    "n": 1,
+    "milestones": {}
+  },
+  "Barachi/Forgewright": {
+    "n": 1,
+    "milestones": {}
+  },
+  "Kobold/Hunter": {
+    "n": 1,
+    "milestones": {}
+  },
+  "Formicid/Earth Elementalist": {
+    "n": 1,
+    "milestones": {}
+  },
+  "Spriggan/Alchemist": {
     "n": 1,
     "milestones": {}
   }
