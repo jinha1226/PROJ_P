@@ -46,6 +46,6 @@ describe('build-guides', () => {
     // Gargoyle appears in GrFi and GrEE — take the larger n.
     expect(guideStrength('Gargoyle')).toBeGreaterThan(0)
     expect(guideStrength('Fighter')).toBeGreaterThan(0)
-    expect(guideStrength('Felid')).toBe(0)
+    expect(guideStrength('Nonexistent Species')).toBe(0)
   })
 })
