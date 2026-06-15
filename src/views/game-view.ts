@@ -3,6 +3,7 @@ import type { ClientMsg, ServerMsg, GameExit } from '../ws/types'
 import { getCurrentGameId } from '../game/current-game'
 import { getRcOption, setRcOption, type RcControls } from '../game/rc/rc-options'
 import { initTranslationFromRc, teardownTranslation } from '../game/i18n/translation'
+import { clearBuild } from '../game/coach/build-detect'
 import { fitToWidth } from './fit-terminal'
 import { MapStore } from '../game/map/map-store'
 import { MapView } from '../game/map/map-view'
@@ -1485,11 +1486,13 @@ export function buildGameView(
         autoHarvestedThisGame = false  // re-harvest for the next game
         spellsDirty = false  // no pending re-harvest carries into the next game
         teardownTranslation()  // translation is per-game; the next game re-arms from its RC
+        clearBuild()
         onLobby()
         break
 
       case 'game_ended':
         teardownTranslation()
+        clearBuild()
         // Forward exit details so the lobby renders the exit dialog after the
         // layer switch. The trailing go_lobby + lobby list (often batched with
         // this) land on the lobby's message handler, not ours.
