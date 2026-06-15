@@ -3,7 +3,7 @@ import type { ClientMsg, ServerMsg, GameExit } from '../ws/types'
 import { getCurrentGameId } from '../game/current-game'
 import { getRcOption, setRcOption, type RcControls } from '../game/rc/rc-options'
 import { initTranslationFromRc, teardownTranslation } from '../game/i18n/translation'
-import { clearBuild, getCurrentBuild } from '../game/coach/build-detect'
+import { clearBuild, getCurrentBuild, newgameChoiceName } from '../game/coach/build-detect'
 import { recommend, guideStrength } from '../game/coach/build-guides'
 import { fitToWidth } from './fit-terminal'
 import { MapStore } from '../game/map/map-store'
@@ -2143,11 +2143,16 @@ export function buildGameView(
         const suffix = labels.length >= 2 ? String(labels[1]).trim() : ''
         const btnEl = document.createElement('button')
         btnEl.className = 'ngc-btn'
-        // Outline species/backgrounds that have a build guide (label is
-        // "hotkey - Name"; still English this early, before translation arms).
-        const plainName = stripDcss(main)
-        const dashAt = plainName.indexOf(' - ')
-        const choiceName = (dashAt >= 0 ? plainName.slice(dashAt + 3) : plainName).trim()
+        // Outline species/backgrounds that have a build guide. Prefer the
+        // English name captured pre-translation (build-detect); fall back to
+        // parsing the label ("hotkey - Name") when translation is off.
+        const hk = typeof btn.hotkey === 'number' ? String.fromCharCode(btn.hotkey) : String(btn.hotkey ?? '')
+        let choiceName = (hk && newgameChoiceName(hk)) || ''
+        if (!choiceName) {
+          const plainName = stripDcss(main)
+          const dashAt = plainName.indexOf(' - ')
+          choiceName = (dashAt >= 0 ? plainName.slice(dashAt + 3) : plainName).trim()
+        }
         const strength = choiceName ? guideStrength(choiceName) : 0
         if (strength > 0) {
           btnEl.classList.add('ngc-guided')

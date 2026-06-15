@@ -1,6 +1,6 @@
 import type { ClientMsg, ServerMsg } from './types'
 import { translateIncoming } from '../game/i18n/translation'
-import { observeBuildMessage } from '../game/coach/build-detect'
+import { observeBuildMessage, observeNewgameChoice } from '../game/coach/build-detect'
 
 export type MessageHandler = (msg: ServerMsg) => void
 export type StateHandler = () => void
@@ -111,9 +111,10 @@ export class WsConnection {
       this.onLoginCookie(msg.cookie, msg.expires)
       return
     }
-    // Detect the player's build from the (still-English) welcome line BEFORE
-    // translation rewrites it to Korean.
+    // Detect build + capture new-game choice names from the (still-English)
+    // message BEFORE translation rewrites them to Korean.
     observeBuildMessage(msg)
+    observeNewgameChoice(msg)
     // Rewrite translatable text fields in place (no-op unless translation is
     // armed) before any handler reads the message.
     translateIncoming(msg)

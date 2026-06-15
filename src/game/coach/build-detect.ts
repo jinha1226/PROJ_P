@@ -56,4 +56,45 @@ export function getCurrentBuild(): Build | null {
 
 export function clearBuild(): void {
   current = null
+  newgameNames.clear()
+}
+
+// --- New-game choice capture (English names, pre-translation) ---
+// The character-creation grid (species/background/...) arrives as a
+// ui-push newgame-choice whose button labels get translated to Korean before
+// game-view renders them. Capture the ENGLISH names here (keyed by hotkey)
+// from the still-English message so the char-select outline can match guide
+// keys regardless of whether translation is armed.
+const newgameNames = new Map<string, string>()
+
+function hotkeyStr(hk: unknown): string {
+  return typeof hk === 'number' ? String.fromCharCode(hk) : String(hk ?? '')
+}
+function choiceName(label: string): string {
+  const plain = label.replace(/<[^>]*>/g, '')
+  const dash = plain.indexOf(' - ')
+  return (dash >= 0 ? plain.slice(dash + 3) : plain).trim()
+}
+
+export function observeNewgameChoice(msg: ServerMsg): void {
+  const m = msg as unknown as {
+    msg: string; type?: string
+    'main-items'?: { buttons?: Array<{ hotkey?: unknown; label?: string; labels?: string[] }> }
+    'sub-items'?: { buttons?: Array<{ hotkey?: unknown; label?: string; labels?: string[] }> }
+  }
+  if (m.msg !== 'ui-push' || m.type !== 'newgame-choice') return
+  newgameNames.clear()
+  for (const items of [m['main-items'], m['sub-items']]) {
+    for (const btn of items?.buttons ?? []) {
+      const label = String(btn.labels?.[0] ?? btn.label ?? '')
+      const hk = hotkeyStr(btn.hotkey)
+      const name = choiceName(label)
+      if (hk && name) newgameNames.set(hk, name)
+    }
+  }
+}
+
+// English name of a new-game choice button by hotkey, if captured.
+export function newgameChoiceName(hotkey: string): string | undefined {
+  return newgameNames.get(hotkey)
 }

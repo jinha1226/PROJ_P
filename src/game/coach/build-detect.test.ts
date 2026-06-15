@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest'
-import { parseBuild, observeBuildMessage, getCurrentBuild, clearBuild } from './build-detect'
+import { parseBuild, observeBuildMessage, getCurrentBuild, clearBuild, observeNewgameChoice, newgameChoiceName } from './build-detect'
 
 describe('parseBuild', () => {
   it('parses single-word species and background', () => {
@@ -31,5 +31,21 @@ describe('observeBuildMessage', () => {
   it('ignores non-msgs messages', () => {
     observeBuildMessage({ msg: 'player', species: 'Minotaur' } as never)
     expect(getCurrentBuild()).toBeNull()
+  })
+})
+
+describe('observeNewgameChoice', () => {
+  beforeEach(() => clearBuild())
+  it('captures English choice names by hotkey from a newgame-choice ui-push', () => {
+    observeNewgameChoice({
+      msg: 'ui-push', type: 'newgame-choice',
+      'main-items': { buttons: [
+        { hotkey: 'a'.charCodeAt(0), labels: ['a - Minotaur'] },
+        { hotkey: 'b'.charCodeAt(0), labels: ['<white>b - Gargoyle</white>'] },
+      ] },
+    } as never)
+    expect(newgameChoiceName('a')).toBe('Minotaur')
+    expect(newgameChoiceName('b')).toBe('Gargoyle')
+    expect(newgameChoiceName('z')).toBeUndefined()
   })
 })
