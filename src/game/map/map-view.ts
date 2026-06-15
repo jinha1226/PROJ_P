@@ -2,13 +2,12 @@ import type { MapStore } from './map-store'
 import { parseCellKey } from './map-store'
 import { decodeColor, DEFAULT_BG, flashColor } from './colors'
 import { cellFromPoint } from './cell-hit'
+import {
+  ZOOM_DEFAULT, clampZoom, zoomSpec, zoomModeToLevel, levelIsZoomed,
+} from './zoom'
 
 const NORMAL_W = 33
 const NORMAL_H = 21
-// Zoom mode shrinks the binding-axis minimum so the font has to grow to fit
-// fewer cells. 17 keeps LOS (radius 7 ⇒ 15 cells) plus a one-cell border.
-const ZOOM_MIN_AXIS = 17
-const ZOOM_REDUCTION = 8
 
 // Renders a dynamic viewport window of the map as a grid of <span> elements.
 // Each span holds one character and a CSS color. Only dirty cells are updated on redraw.
@@ -25,7 +24,7 @@ export class MapView {
   // the log. See the reserve > 0 branch in fitToContainer.
   private centerRow = Math.floor(NORMAL_H / 2)
   private fontScale = 1.0
-  private zoomMode = false
+  private zoomLevel = ZOOM_DEFAULT
   // Cell dimensions computed by fitToContainer, used by cellAtClient.
   private cellCharW = 0
   private cellLineH = 0
@@ -68,17 +67,27 @@ export class MapView {
     this.fontScale = scale
   }
 
-  // User-toggled zoom. When true and fontScale === 1, fitToContainer shrinks
-  // both axis minimums (to ZOOM_MIN_AXIS) and raises the font-size cap so
-  // glyphs scale up. X-mode sets fontScale ≠ 1 and bypasses zoom so its
-  // sizing is unchanged. Caller is expected to invoke fitToContainer() next,
-  // matching setFontScale().
+  // Discrete user zoom. The level picks a minimum viewport + font cap (see
+  // zoom.ts); when fontScale === 1, fitToContainer uses it to shrink the
+  // minimum viewport and raise the font cap so glyphs scale up. X-mode sets
+  // fontScale ≠ 1 and bypasses zoom so its sizing is unchanged. Caller is
+  // expected to invoke fitToContainer() next, matching setFontScale().
+  setZoomLevel(level: number): void {
+    this.zoomLevel = clampZoom(level)
+  }
+
+  getZoomLevel(): number {
+    return this.zoomLevel
+  }
+
+  // Binary-zoom compatibility for the double-tap / view-swap callers: maps the
+  // old on/off toggle onto the two fixed levels.
   setZoomMode(on: boolean): void {
-    this.zoomMode = on
+    this.zoomLevel = zoomModeToLevel(on)
   }
 
   isZoomMode(): boolean {
-    return this.zoomMode
+    return levelIsZoomed(this.zoomLevel)
   }
 
   // Pick font size + viewport dimensions together to fill the container.
@@ -132,21 +141,22 @@ export class MapView {
     // centered whole-row fit (e.g. X-mode, where the log is hidden).
     const reserve = Math.abs(padBottom - padTop)
 
-    // Font size that fits the minimum viewport (binding dimension wins).
-    // In zoom mode (and only when no X-mode scale override is in effect),
-    // shrink BOTH axis minimums to ZOOM_MIN_AXIS and raise the font-size cap.
+    // Font size that fits the minimum viewport (binding dimension wins). The
+    // zoom level shrinks BOTH axis minimums and raises the font-size cap so
+    // glyphs scale up (a smaller minimum viewport forces a larger font).
     // Reducing only the binding axis is insufficient on compact layouts (e.g.
-    // the in-game numpad + HUD + log squeeze the map so heightFsBase exceeds
-    // the normal 36px cap, leaving font and viewport unchanged across modes);
-    // we also need a higher cap so the font can actually grow past 36.
-    // ZOOM_MIN_AXIS=17 still fits LOS (radius 7 ⇒ 15 cells) plus a one-cell
-    // border on both axes.
-    const isZoom = this.zoomMode && this.fontScale === 1.0
-    const minW = isZoom ? Math.max(ZOOM_MIN_AXIS, NORMAL_W - ZOOM_REDUCTION) : NORMAL_W
-    const minH = isZoom ? Math.max(ZOOM_MIN_AXIS, NORMAL_H - ZOOM_REDUCTION) : NORMAL_H
+    // the in-game numpad + HUD + log squeeze the map so heightFs exceeds the
+    // normal 36px cap, leaving font and viewport unchanged across levels); we
+    // also need a higher cap so the font can actually grow past 36. X-mode
+    // (fontScale ≠ 1) bypasses the level entirely — its scale override drives
+    // sizing instead, so the minimum viewport stays at NORMAL.
+    const xMode = this.fontScale !== 1.0
+    const spec = zoomSpec(this.zoomLevel).ascii
+    const minW = xMode ? NORMAL_W : spec.minW
+    const minH = xMode ? NORMAL_H : spec.minH
     const widthFs = availW / (minW * charWPerFs)
     const heightFs = availH / (minH * lineHPerFs)
-    const maxFs = isZoom ? 64 : 36
+    const maxFs = xMode ? 36 : spec.maxFs
     const fontSize = Math.max(10, Math.min(maxFs, Math.min(widthFs, heightFs))) * this.fontScale
     this.container.style.fontSize = fontSize + 'px'
 

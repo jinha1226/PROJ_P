@@ -11,6 +11,9 @@ export interface Prefs {
   uiLang: UiLang
   dpadEnabled: boolean
   coachEnabled: boolean
+  // User map-zoom level (index into ZOOM_LEVELS). null = never set, so each
+  // renderer falls back to its mode default (ASCII normal, tiles zoomed-in).
+  mapZoomLevel: number | null
 }
 
 const DEFAULTS: Prefs = {
@@ -20,6 +23,7 @@ const DEFAULTS: Prefs = {
   uiLang: 'ko',
   dpadEnabled: false,
   coachEnabled: true,
+  mapZoomLevel: null,
 }
 
 function load(): Prefs {

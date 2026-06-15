@@ -6,6 +6,7 @@ import { fitToWidth } from './fit-terminal'
 import { MapStore } from '../game/map/map-store'
 import { MapView } from '../game/map/map-view'
 import { TileMapView } from '../game/map/tile-map-view'
+import { ZOOM_MIN, ZOOM_MAX, ZOOM_DEFAULT, ZOOM_TOGGLE, clampZoom } from '../game/map/zoom'
 import { StatsView } from '../game/hud/stats-view'
 import { StatusView } from '../game/hud/status-view'
 import { MonsterListView } from '../game/hud/monster-list'
@@ -389,6 +390,58 @@ export function buildGameView(
   mapWrap.id = 'map-wrap'
   mapWrap.appendChild(mapView.element)
 
+  // --- Map zoom (floating +/- controls + double-tap; persisted) ---
+  // Both renderers share a discrete zoom level (see zoom.ts). The level is
+  // persisted across sessions; until the user touches it, each mode falls back
+  // to its default — ASCII normal, tiles zoomed-in (21 cells are ~10px on a
+  // phone). renderMode is mutable, so resolve the default lazily.
+  const modeDefaultZoom = (): number => (renderMode === 'tiles' ? ZOOM_TOGGLE : ZOOM_DEFAULT)
+  const currentZoomLevel = (): number => {
+    const p = getPref('mapZoomLevel')
+    return p === null ? modeDefaultZoom() : clampZoom(p)
+  }
+
+  const zoomControls = document.createElement('div')
+  zoomControls.id = 'zoom-controls'
+  const zoomOutBtn = document.createElement('button')
+  zoomOutBtn.className = 'zoom-btn'
+  zoomOutBtn.textContent = '−' // minus sign (wider than hyphen)
+  zoomOutBtn.title = 'Zoom out / 축소'
+  const zoomInBtn = document.createElement('button')
+  zoomInBtn.className = 'zoom-btn'
+  zoomInBtn.textContent = '+'
+  zoomInBtn.title = 'Zoom in / 확대'
+  zoomControls.append(zoomInBtn, zoomOutBtn)
+  mapWrap.appendChild(zoomControls)
+
+  function updateZoomButtons(level: number): void {
+    zoomOutBtn.disabled = level <= ZOOM_MIN
+    zoomInBtn.disabled = level >= ZOOM_MAX
+  }
+  function applyZoom(level: number): void {
+    const next = clampZoom(level)
+    mapView.setZoomLevel(next)
+    mapView.fitToContainer()
+    setPref('mapZoomLevel', next)
+    updateZoomButtons(next)
+  }
+  // preventDefault on touchstart suppresses the synthesized click (so the step
+  // fires once on touch); stopPropagation keeps the tap off the map's
+  // travel/double-tap handlers underneath. Desktop uses the click path.
+  const zoomTap = (delta: number) => (e: Event): void => {
+    e.preventDefault()
+    e.stopPropagation()
+    applyZoom(currentZoomLevel() + delta)
+  }
+  zoomOutBtn.addEventListener('touchstart', zoomTap(-1), { passive: false })
+  zoomOutBtn.addEventListener('click', zoomTap(-1))
+  zoomInBtn.addEventListener('touchstart', zoomTap(1), { passive: false })
+  zoomInBtn.addEventListener('click', zoomTap(1))
+
+  // Seed the initial (ASCII) view + button states from the persisted level.
+  mapView.setZoomLevel(currentZoomLevel())
+  updateZoomButtons(currentZoomLevel())
+
   // Double-tap the map to toggle zoom. Bypassed while X-mode is active
   // (font scale is overridden there).
   // Bound to mapWrap (not mapView.element) so it survives the in-place swap
@@ -398,7 +451,7 @@ export function buildGameView(
   // until the window expires with no second tap. Kept short so movement feels
   // responsive (the whole window is the felt input delay per step) while still
   // catching a fast double-tap (which cancels the pending travel and zooms).
-  const TAP_WINDOW_MS = 180
+  const TAP_WINDOW_MS = 120
   let lastTap = { t: 0, x: 0, y: 0 }
   let pendingTravel: { timer: number; clientX: number; clientY: number } | null = null
   const cancelPendingTravel = (): void => {
@@ -417,9 +470,10 @@ export function buildGameView(
     const dy = e.clientY - lastTap.y
     if (dt < TAP_WINDOW_MS && dx * dx + dy * dy < 30 * 30) {
       // Double-tap confirmed → zoom. Cancel any pending single-tap travel.
+      // Jumps between the two preset levels (normal ↔ zoomed); the +/- buttons
+      // do fine-grained stepping. Shares the persisted level via applyZoom.
       cancelPendingTravel()
-      mapView.setZoomMode(!mapView.isZoomMode())
-      mapView.fitToContainer()
+      applyZoom(mapView.isZoomMode() ? ZOOM_DEFAULT : ZOOM_TOGGLE)
       lastTap = { t: 0, x: 0, y: 0 }
       return
     }
@@ -623,7 +677,7 @@ export function buildGameView(
       const id = getCurrentGameId()
       // Never edit before the real RC has loaded — otherwise we'd send a file
       // containing ONLY this one line and wipe the player's other settings
-      // (e.g. language = ko). No-op until the real RC has loaded.
+      // (e.g. translation_language = ko). No-op until the real RC has loaded.
       if (!id || rcText === null) return
       rcText = setRcOption(rcText, key, value)
       conn.send({ msg: 'set_rc', game_id: id, contents: rcText })
@@ -759,9 +813,11 @@ export function buildGameView(
     const oldEl = mapView.element
     const next: MapView | TileMapView = mode === 'tiles' ? new TileMapView(store) : new MapView(store)
     next.setViewCenter(center)
-    // Default tile mode to zoom-on. Apply unconditionally — tile X-mode 
-    // uses the zoom-on (17-floor) base shrunk by X_MODE_SCALE.
-    if (mode === 'tiles') next.setZoomMode(true)
+    // Restore the user's zoom level on the new view (persisted, or each mode's
+    // default — tiles default to zoomed-in since 21 cells are ~10px on a phone).
+    // renderMode is already the new mode here, so currentZoomLevel() resolves
+    // the right default; tile X-mode then shrinks each cell by X_MODE_SCALE.
+    next.setZoomLevel(currentZoomLevel())
     // Carry the X-mode scale across the swap: the new view starts at 1.0
     // by default, which would visibly un-zoom the map mid-X-mode. inXMode
     // is the source of truth (global flag), so re-apply directly.
@@ -770,6 +826,7 @@ export function buildGameView(
     next.setPlayerStats(playerStats)
     oldEl.replaceWith(next.element)
     mapView = next
+    updateZoomButtons(currentZoomLevel())
     fontScaleObserver.observe(mapView.element)
     // Only preload once we hold this game's loader. If we're switching to tiles
     // before that — e.g. the persisted-pref application at build, or a gesture
@@ -1449,6 +1506,7 @@ export function buildGameView(
   function enterXMode(): void {
     inXMode = true
     view.classList.add('x-mode')  // drops the map's log-strip padding (style.css)
+    zoomControls.style.display = 'none'  // examine map drives its own sizing
     msgLog.style.display = 'none'
     hud.style.display = 'none'
     renderSpellRail()  // drop the rail row (and the log's map overlay) for the examine map
@@ -1474,6 +1532,7 @@ export function buildGameView(
   function exitXMode(): void {
     inXMode = false
     view.classList.remove('x-mode')
+    zoomControls.style.display = ''
     touchControls.exitXMode()
     mapView.setFontScale(1.0)
     requestAnimationFrame(() => mapView.fitToContainer())

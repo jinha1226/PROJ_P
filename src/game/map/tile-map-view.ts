@@ -9,6 +9,9 @@ import type { Cell, MapStore } from './map-store'
 import { parseCellKey } from './map-store'
 import { cellFromPoint } from './cell-hit'
 import { decodeColor, DEFAULT_FG, flashColor } from './colors'
+import {
+  ZOOM_DEFAULT, clampZoom, zoomSpec, zoomModeToLevel, levelIsZoomed,
+} from './zoom'
 import { TEX, type TileLoader, type TileSprite } from '../tiles/tile-loader'
 import {
   FG_TILE_ID_MASK,
@@ -35,10 +38,6 @@ import { buildStatusOverlays, fgHaloDngnName, fgThreatDngnName, resolveOverlayId
 // edge cells clip at the viewport boundary, the natural tile-game look —
 // with centerCol/centerRow pinning the player.
 const NORMAL_AXIS = 21
-// Square zoom viewport. DCSS LOS radius is 7, so 15×15 covers all visible
-// cells; 17×17 adds a one-cell border. The same full-bleed fill applies on
-// top, so zoom still uses freed space — just with a smaller floor.
-const ZOOM_AXIS = 17
 
 // Authored cell size of every DCSS sprite atlas. Per-tile {ox,oy,w,h} positions
 // the sprite inside this 32×32 logical box; we scale the whole box to cellPx.
@@ -200,7 +199,7 @@ export class TileMapView {
   // Last CSS display width applied to the canvas, kept as a number for the
   // setViewportSize early-exit (see the comment there).
   private lastCssW = 0
-  private zoomMode = false
+  private zoomLevel = ZOOM_DEFAULT
   // Multiplier on cellPx — mirrors MapView.fontScale. X-mode sets this to
   // <1 to shrink cells and let the full-bleed fill add more of them.
   // Named `renderScale` internally; setFontScale() stores into it for API
@@ -359,8 +358,10 @@ export class TileMapView {
   // ⇒ more of them fit, courtesy of the full-bleed fill); back to 1.0
   // on exit. Caller is expected to invoke fitToContainer() next.
   setFontScale(scale: number): void { this.renderScale = scale }
-  setZoomMode(on: boolean): void { this.zoomMode = on }
-  isZoomMode(): boolean { return this.zoomMode }
+  setZoomLevel(level: number): void { this.zoomLevel = clampZoom(level) }
+  getZoomLevel(): number { return this.zoomLevel }
+  setZoomMode(on: boolean): void { this.zoomLevel = zoomModeToLevel(on) }
+  isZoomMode(): boolean { return levelIsZoomed(this.zoomLevel) }
 
   fitToContainer(): void {
     const rect = this.container.getBoundingClientRect()
@@ -381,7 +382,7 @@ export class TileMapView {
     // the same code: HUD/log are hidden by game-view, availH grows, and the
     // renderScale<1 (set via setFontScale) shrinks each cell so the
     // full-bleed fill turns the freed area into still more cells.
-    const baseAxis = this.zoomMode ? ZOOM_AXIS : NORMAL_AXIS
+    const baseAxis = zoomSpec(this.zoomLevel).tileAxis
 
     // Float cell size — fills the binding axis exactly. The backing canvas
     // renders at ATLAS_CELL per cell and CSS scales to this size, so we don't
@@ -452,7 +453,7 @@ export class TileMapView {
   }
 
   resetViewportSize(): void {
-    const axis = this.zoomMode ? ZOOM_AXIS : NORMAL_AXIS
+    const axis = zoomSpec(this.zoomLevel).tileAxis
     this.centerCol = Math.floor(axis / 2)
     this.centerRow = Math.floor(axis / 2)
     this.setViewportSize(axis, axis)
