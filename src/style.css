@@ -2157,7 +2157,10 @@ html, body {
 .ngc-btn.ngc-selected { background: rgba(245, 158, 11, 0.18); border-color: rgba(245, 158, 11, 0.4); }
 /* Species/background that has a build guide — outlined so beginners can spot
    a coached choice at character creation. */
-.ngc-btn.ngc-guided { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }
+.ngc-btn.ngc-guided {
+  border-color: var(--guide-color, var(--accent));
+  box-shadow: inset 0 0 0 1px var(--guide-color, var(--accent));
+}
 
 .ngc-desc {
   font-size: 0.75rem;

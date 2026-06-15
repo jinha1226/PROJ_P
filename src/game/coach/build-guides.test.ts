@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { recommend, skillKo, buildKey } from './build-guides'
+import { recommend, skillKo, buildKey, guideStrength } from './build-guides'
 
 describe('build-guides', () => {
   it('targets a milestone ABOVE the current XL (a goal, not the current level)', () => {
@@ -40,5 +40,12 @@ describe('build-guides', () => {
 
   it('buildKey joins species and background', () => {
     expect(buildKey('Gargoyle', 'Fighter')).toBe('Gargoyle/Fighter')
+  })
+
+  it('guideStrength returns the best sample size for a name, 0 when unguided', () => {
+    // Gargoyle appears in GrFi and GrEE — take the larger n.
+    expect(guideStrength('Gargoyle')).toBeGreaterThan(0)
+    expect(guideStrength('Fighter')).toBeGreaterThan(0)
+    expect(guideStrength('Felid')).toBe(0)
   })
 })

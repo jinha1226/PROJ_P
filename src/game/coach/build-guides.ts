@@ -475,6 +475,18 @@ export function buildKey(species: string, background: string): string { return `
 const GUIDED_NAMES = new Set<string>(Object.keys(BUILD_GUIDES).flatMap(k => k.split('/')))
 export function isGuidedName(name: string): boolean { return GUIDED_NAMES.has(name.trim()) }
 
+// Largest sample size (n) among guides that include this species/background —
+// a proxy for how statistically solid the guide is. 0 = no guide. Drives the
+// outline colour on the character-creation screen (more data → redder).
+export function guideStrength(name: string): number {
+  const nm = name.trim()
+  let best = 0
+  for (const [k, g] of Object.entries(BUILD_GUIDES)) {
+    if (k.split('/').includes(nm)) best = Math.max(best, g.n)
+  }
+  return best
+}
+
 export interface RecItem { skill: string; ko: string; level: number }
 export interface Rec { key: string; xl: number; items: RecItem[] }
 

@@ -4,7 +4,7 @@ import { getCurrentGameId } from '../game/current-game'
 import { getRcOption, setRcOption, type RcControls } from '../game/rc/rc-options'
 import { initTranslationFromRc, teardownTranslation } from '../game/i18n/translation'
 import { clearBuild, getCurrentBuild } from '../game/coach/build-detect'
-import { recommend, isGuidedName } from '../game/coach/build-guides'
+import { recommend, guideStrength } from '../game/coach/build-guides'
 import { fitToWidth } from './fit-terminal'
 import { MapStore } from '../game/map/map-store'
 import { MapView } from '../game/map/map-view'
@@ -2148,7 +2148,14 @@ export function buildGameView(
         const plainName = stripDcss(main)
         const dashAt = plainName.indexOf(' - ')
         const choiceName = (dashAt >= 0 ? plainName.slice(dashAt + 3) : plainName).trim()
-        if (choiceName && isGuidedName(choiceName)) btnEl.classList.add('ngc-guided')
+        const strength = choiceName ? guideStrength(choiceName) : 0
+        if (strength > 0) {
+          btnEl.classList.add('ngc-guided')
+          // More samples → redder; fewer → whiter. Map n∈[4,25] to t∈[0,1].
+          const t = Math.max(0, Math.min(1, (strength - 4) / (25 - 4)))
+          const c = Math.round(255 * (1 - t))
+          btnEl.style.setProperty('--guide-color', `rgb(255, ${c}, ${c})`)
+        }
         if (suffix) {
           // Weapon menu: main label + apt suffix as right-aligned column
           const mainSpan = document.createElement('span')
