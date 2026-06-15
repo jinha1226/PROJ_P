@@ -469,6 +469,12 @@ const SKILL_KO: Record<string, string> = {
 export function skillKo(en: string): string { return SKILL_KO[en] ?? en }
 export function buildKey(species: string, background: string): string { return `${species}/${background}` }
 
+// Species and backgrounds that appear in at least one guide — used to outline
+// guided choices on the new-game selection screen. English names (the screen's
+// labels are still English that early, before translation arms).
+const GUIDED_NAMES = new Set<string>(Object.keys(BUILD_GUIDES).flatMap(k => k.split('/')))
+export function isGuidedName(name: string): boolean { return GUIDED_NAMES.has(name.trim()) }
+
 export interface RecItem { skill: string; ko: string; level: number }
 export interface Rec { key: string; xl: number; items: RecItem[] }
 

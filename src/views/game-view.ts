@@ -4,7 +4,7 @@ import { getCurrentGameId } from '../game/current-game'
 import { getRcOption, setRcOption, type RcControls } from '../game/rc/rc-options'
 import { initTranslationFromRc, teardownTranslation } from '../game/i18n/translation'
 import { clearBuild, getCurrentBuild } from '../game/coach/build-detect'
-import { recommend } from '../game/coach/build-guides'
+import { recommend, isGuidedName } from '../game/coach/build-guides'
 import { fitToWidth } from './fit-terminal'
 import { MapStore } from '../game/map/map-store'
 import { MapView } from '../game/map/map-view'
@@ -2143,6 +2143,12 @@ export function buildGameView(
         const suffix = labels.length >= 2 ? String(labels[1]).trim() : ''
         const btnEl = document.createElement('button')
         btnEl.className = 'ngc-btn'
+        // Outline species/backgrounds that have a build guide (label is
+        // "hotkey - Name"; still English this early, before translation arms).
+        const plainName = stripDcss(main)
+        const dashAt = plainName.indexOf(' - ')
+        const choiceName = (dashAt >= 0 ? plainName.slice(dashAt + 3) : plainName).trim()
+        if (choiceName && isGuidedName(choiceName)) btnEl.classList.add('ngc-guided')
         if (suffix) {
           // Weapon menu: main label + apt suffix as right-aligned column
           const mainSpan = document.createElement('span')
