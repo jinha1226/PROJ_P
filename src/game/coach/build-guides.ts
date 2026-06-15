@@ -432,7 +432,7 @@ export const BUILD_GUIDES: Record<string, BuildGuide> = {
     }
   },
   "Troll/Fighter": {
-    "n": 18,
+    "n": 19,
     "milestones": {
       "1": {
         "Shields": 2.6,
@@ -454,65 +454,65 @@ export const BUILD_GUIDES: Record<string, BuildGuide> = {
         "Shields": 2.6,
         "Fighting": 2.4,
         "Dodging": 2.4,
-        "Unarmed Combat": 2.2,
+        "Unarmed Combat": 2.3,
         "Spellcasting": 0.0,
         "Armour": 0.0
       },
       "7": {
         "Shields": 2.8,
-        "Unarmed Combat": 2.7,
-        "Fighting": 2.6,
+        "Fighting": 2.5,
         "Dodging": 2.4,
+        "Unarmed Combat": 2.3,
         "Spellcasting": 0.0,
         "Armour": 0.0
       },
       "9": {
-        "Unarmed Combat": 5.5,
+        "Unarmed Combat": 5.9,
         "Fighting": 5.0,
-        "Shields": 3.4,
+        "Shields": 3.6,
         "Dodging": 2.5,
         "Spellcasting": 0.0,
         "Armour": 0.0
       },
       "12": {
-        "Unarmed Combat": 10.1,
-        "Fighting": 7.0,
-        "Throwing": 5.2,
-        "Shields": 4.0,
-        "Dodging": 2.8,
+        "Unarmed Combat": 10.2,
+        "Fighting": 7.2,
+        "Throwing": 5.4,
+        "Shields": 4.1,
+        "Dodging": 3.0,
         "Spellcasting": 0.0
       },
       "15": {
-        "Unarmed Combat": 10.3,
-        "Fighting": 7.4,
+        "Unarmed Combat": 10.7,
+        "Fighting": 8.1,
         "Throwing": 6.0,
-        "Shields": 4.9,
-        "Dodging": 2.8,
-        "Spellcasting": 0.0
+        "Shields": 5.8,
+        "Dodging": 3.0,
+        "Invocations": 2.5
       },
       "18": {
-        "Unarmed Combat": 10.3,
-        "Fighting": 7.4,
+        "Unarmed Combat": 10.7,
+        "Fighting": 8.1,
+        "Shields": 7.0,
         "Throwing": 6.0,
-        "Shields": 5.7,
-        "Dodging": 2.8,
-        "Spellcasting": 0.0
+        "Dodging": 3.0,
+        "Invocations": 2.5
       },
       "21": {
-        "Unarmed Combat": 10.3,
-        "Fighting": 7.4,
+        "Unarmed Combat": 10.7,
+        "Fighting": 8.1,
+        "Shields": 7.0,
         "Throwing": 6.0,
-        "Shields": 5.7,
-        "Dodging": 2.8,
-        "Spellcasting": 0.0
+        "Dodging": 3.0,
+        "Invocations": 2.5
       },
       "27": {
-        "Unarmed Combat": 10.3,
-        "Fighting": 7.4,
+        "Unarmed Combat": 10.7,
+        "Fighting": 8.1,
+        "Shields": 7.0,
         "Throwing": 6.0,
-        "Shields": 5.7,
-        "Dodging": 2.8,
-        "Spellcasting": 0.0
+        "Dodging": 3.0,
+        "Invocations": 2.5
       }
     }
   },
@@ -598,6 +598,91 @@ export const BUILD_GUIDES: Record<string, BuildGuide> = {
         "Fighting": 13.6,
         "Invocations": 10.2,
         "Dodging": 10.0
+      }
+    }
+  },
+  "Human/Conjurer": {
+    "n": 9,
+    "milestones": {
+      "1": {
+        "Conjurations": 4.0,
+        "Spellcasting": 2.0,
+        "Dodging": 2.0,
+        "Stealth": 2.0,
+        "Fighting": 0.0,
+        "Unarmed Combat": 0.0
+      },
+      "3": {
+        "Conjurations": 4.0,
+        "Spellcasting": 2.0,
+        "Dodging": 2.0,
+        "Stealth": 2.0,
+        "Fighting": 0.0,
+        "Unarmed Combat": 0.0
+      },
+      "5": {
+        "Conjurations": 5.2,
+        "Spellcasting": 4.0,
+        "Dodging": 2.0,
+        "Stealth": 2.0,
+        "Fighting": 0.0,
+        "Unarmed Combat": 0.0
+      },
+      "7": {
+        "Conjurations": 7.3,
+        "Spellcasting": 4.0,
+        "Translocations": 2.0,
+        "Dodging": 2.0,
+        "Stealth": 2.0,
+        "Alchemy": 1.9
+      },
+      "9": {
+        "Conjurations": 9.0,
+        "Alchemy": 5.5,
+        "Spellcasting": 5.0,
+        "Translocations": 4.0,
+        "Invocations": 4.0,
+        "Dodging": 2.0
+      },
+      "12": {
+        "Conjurations": 10.0,
+        "Spellcasting": 6.0,
+        "Alchemy": 6.0,
+        "Invocations": 6.0,
+        "Translocations": 5.0,
+        "Dodging": 2.0
+      },
+      "15": {
+        "Conjurations": 10.0,
+        "Invocations": 9.0,
+        "Spellcasting": 6.0,
+        "Translocations": 5.0,
+        "Alchemy": 5.0,
+        "Dodging": 2.0
+      },
+      "18": {
+        "Conjurations": 10.0,
+        "Invocations": 9.0,
+        "Spellcasting": 6.0,
+        "Translocations": 5.0,
+        "Alchemy": 5.0,
+        "Dodging": 2.0
+      },
+      "21": {
+        "Conjurations": 10.0,
+        "Invocations": 9.0,
+        "Spellcasting": 6.0,
+        "Translocations": 5.0,
+        "Alchemy": 5.0,
+        "Dodging": 2.0
+      },
+      "27": {
+        "Conjurations": 10.0,
+        "Invocations": 9.0,
+        "Spellcasting": 6.0,
+        "Translocations": 5.0,
+        "Alchemy": 5.0,
+        "Dodging": 2.0
       }
     }
   },
@@ -1026,88 +1111,88 @@ export const BUILD_GUIDES: Record<string, BuildGuide> = {
       }
     }
   },
-  "Human/Conjurer": {
-    "n": 6,
+  "Octopode/Conjurer": {
+    "n": 5,
     "milestones": {
       "1": {
         "Conjurations": 4.0,
+        "Stealth": 2.6,
         "Spellcasting": 2.0,
         "Dodging": 2.0,
-        "Stealth": 2.0,
         "Fighting": 0.0,
         "Unarmed Combat": 0.0
       },
       "3": {
         "Conjurations": 4.0,
+        "Stealth": 2.6,
         "Spellcasting": 2.0,
         "Dodging": 2.0,
-        "Stealth": 2.0,
         "Fighting": 0.0,
         "Unarmed Combat": 0.0
       },
       "5": {
-        "Conjurations": 5.8,
-        "Spellcasting": 4.0,
+        "Conjurations": 5.4,
+        "Stealth": 2.6,
+        "Shapeshifting": 2.5,
+        "Spellcasting": 2.0,
         "Dodging": 2.0,
-        "Stealth": 2.0,
-        "Translocations": 1.7,
-        "Fighting": 0.0
+        "Alchemy": 1.9
       },
       "7": {
-        "Conjurations": 8.3,
-        "Spellcasting": 4.0,
+        "Conjurations": 6.2,
+        "Stealth": 2.6,
+        "Spellcasting": 2.0,
         "Dodging": 2.0,
-        "Stealth": 2.0,
-        "Translocations": 1.9,
-        "Fire Magic": 1.7
+        "Alchemy": 1.9,
+        "Fire Magic": 1.5
       },
       "9": {
-        "Conjurations": 9.1,
-        "Spellcasting": 5.2,
-        "Alchemy": 5.0,
-        "Invocations": 4.5,
-        "Translocations": 4.2,
-        "Dodging": 2.0
+        "Conjurations": 9.4,
+        "Spellcasting": 3.0,
+        "Stealth": 2.6,
+        "Dodging": 2.0,
+        "Shields": 1.2,
+        "Alchemy": 0.5
       },
       "12": {
-        "Conjurations": 9.5,
-        "Invocations": 7.0,
-        "Alchemy": 6.0,
-        "Spellcasting": 5.7,
-        "Translocations": 4.2,
-        "Dodging": 2.0
+        "Conjurations": 13.0,
+        "Spellcasting": 7.2,
+        "Dodging": 7.1,
+        "Shields": 4.9,
+        "Stealth": 2.6,
+        "Fighting": 0.0
       },
       "15": {
-        "Conjurations": 9.5,
-        "Invocations": 7.0,
-        "Alchemy": 6.0,
-        "Spellcasting": 5.7,
-        "Translocations": 4.2,
-        "Dodging": 2.0
+        "Conjurations": 13.9,
+        "Dodging": 7.6,
+        "Spellcasting": 7.2,
+        "Shields": 3.1,
+        "Stealth": 2.6,
+        "Translocations": 2.0
       },
       "18": {
-        "Conjurations": 9.5,
-        "Invocations": 7.0,
-        "Alchemy": 6.0,
-        "Spellcasting": 5.7,
-        "Translocations": 4.2,
-        "Dodging": 2.0
+        "Conjurations": 13.9,
+        "Dodging": 7.6,
+        "Spellcasting": 7.2,
+        "Shields": 6.3,
+        "Earth Magic": 5.3,
+        "Stealth": 2.6
       },
       "21": {
-        "Conjurations": 9.5,
-        "Invocations": 7.0,
-        "Alchemy": 6.0,
-        "Spellcasting": 5.7,
-        "Translocations": 4.2,
-        "Dodging": 2.0
+        "Conjurations": 13.9,
+        "Dodging": 7.6,
+        "Spellcasting": 7.2,
+        "Shields": 6.3,
+        "Earth Magic": 6.3,
+        "Stealth": 2.6
       },
       "27": {
-        "Conjurations": 9.5,
-        "Invocations": 7.0,
-        "Alchemy": 6.0,
-        "Spellcasting": 5.7,
-        "Translocations": 4.2,
-        "Dodging": 2.0
+        "Conjurations": 13.9,
+        "Dodging": 7.6,
+        "Spellcasting": 7.2,
+        "Shields": 6.3,
+        "Earth Magic": 6.3,
+        "Stealth": 2.6
       }
     }
   },
@@ -1281,88 +1366,173 @@ export const BUILD_GUIDES: Record<string, BuildGuide> = {
       }
     }
   },
-  "Octopode/Conjurer": {
+  "Kobold/Brigand": {
     "n": 4,
     "milestones": {
       "1": {
-        "Conjurations": 4.0,
-        "Stealth": 2.6,
-        "Spellcasting": 2.0,
-        "Dodging": 2.0,
-        "Fighting": 0.0,
-        "Unarmed Combat": 0.0
+        "Stealth": 5.3,
+        "Short Blades": 2.6,
+        "Fighting": 2.1,
+        "Throwing": 2.1,
+        "Dodging": 1.2,
+        "Long Blades": 0.8
       },
       "3": {
-        "Conjurations": 4.0,
-        "Stealth": 2.6,
-        "Spellcasting": 2.0,
-        "Dodging": 2.0,
-        "Fighting": 0.0,
-        "Unarmed Combat": 0.0
+        "Stealth": 5.3,
+        "Short Blades": 2.8,
+        "Fighting": 2.1,
+        "Throwing": 2.1,
+        "Dodging": 1.2,
+        "Long Blades": 0.9
       },
       "5": {
-        "Conjurations": 4.7,
-        "Stealth": 2.6,
-        "Spellcasting": 2.0,
-        "Dodging": 2.0,
-        "Alchemy": 1.9,
-        "Fighting": 0.0
+        "Stealth": 6.0,
+        "Short Blades": 4.2,
+        "Fighting": 2.9,
+        "Throwing": 2.5,
+        "Dodging": 2.2,
+        "Long Blades": 1.4
       },
       "7": {
-        "Conjurations": 7.4,
-        "Stealth": 2.6,
-        "Shapeshifting": 2.5,
-        "Spellcasting": 2.2,
-        "Dodging": 2.0,
-        "Alchemy": 1.9
+        "Stealth": 7.8,
+        "Short Blades": 5.5,
+        "Fighting": 3.5,
+        "Dodging": 2.9,
+        "Throwing": 2.5,
+        "Long Blades": 1.9
       },
       "9": {
-        "Conjurations": 7.4,
-        "Spellcasting": 2.8,
-        "Stealth": 2.6,
-        "Dodging": 2.0,
-        "Shields": 1.2,
-        "Alchemy": 0.5
+        "Stealth": 9.9,
+        "Short Blades": 8.0,
+        "Fighting": 5.0,
+        "Dodging": 3.6,
+        "Long Blades": 3.0,
+        "Throwing": 2.5
       },
       "12": {
-        "Conjurations": 9.2,
-        "Spellcasting": 5.1,
-        "Shields": 4.9,
-        "Dodging": 4.5,
-        "Stealth": 2.6,
-        "Ice Magic": 0.5
+        "Stealth": 14.2,
+        "Short Blades": 10.3,
+        "Dodging": 8.2,
+        "Fighting": 7.5,
+        "Long Blades": 5.4,
+        "Evocations": 2.9
       },
       "15": {
-        "Conjurations": 9.7,
-        "Spellcasting": 5.1,
-        "Shields": 4.9,
-        "Dodging": 4.8,
-        "Stealth": 2.6,
-        "Translocations": 1.0
+        "Stealth": 15.6,
+        "Short Blades": 14.2,
+        "Dodging": 11.3,
+        "Fighting": 10.5,
+        "Long Blades": 5.7,
+        "Evocations": 2.9
       },
       "18": {
-        "Conjurations": 9.7,
-        "Spellcasting": 5.1,
-        "Shields": 4.9,
-        "Dodging": 4.8,
-        "Stealth": 2.6,
-        "Translocations": 1.0
+        "Stealth": 15.6,
+        "Short Blades": 14.2,
+        "Dodging": 11.3,
+        "Fighting": 11.2,
+        "Long Blades": 5.7,
+        "Evocations": 2.9
       },
       "21": {
-        "Conjurations": 9.7,
-        "Spellcasting": 5.1,
-        "Shields": 4.9,
-        "Dodging": 4.8,
-        "Stealth": 2.6,
-        "Translocations": 1.0
+        "Stealth": 18.9,
+        "Short Blades": 14.2,
+        "Dodging": 11.3,
+        "Fighting": 11.2,
+        "Long Blades": 5.7,
+        "Evocations": 2.9
       },
       "27": {
-        "Conjurations": 9.7,
-        "Spellcasting": 5.1,
-        "Shields": 4.9,
-        "Dodging": 4.8,
-        "Stealth": 2.6,
-        "Translocations": 1.0
+        "Stealth": 19.6,
+        "Short Blades": 14.2,
+        "Dodging": 11.3,
+        "Fighting": 11.2,
+        "Translocations": 6.8,
+        "Long Blades": 5.7
+      }
+    }
+  },
+  "Demonspawn/Brigand": {
+    "n": 4,
+    "milestones": {
+      "1": {
+        "Stealth": 3.6,
+        "Fighting": 2.0,
+        "Throwing": 1.7,
+        "Short Blades": 1.7,
+        "Long Blades": 1.0,
+        "Dodging": 0.9
+      },
+      "3": {
+        "Stealth": 3.6,
+        "Fighting": 2.0,
+        "Throwing": 1.8,
+        "Short Blades": 1.8,
+        "Long Blades": 1.0,
+        "Dodging": 1.0
+      },
+      "5": {
+        "Stealth": 3.6,
+        "Fighting": 2.3,
+        "Short Blades": 2.3,
+        "Throwing": 2.0,
+        "Dodging": 1.9,
+        "Armour": 1.4
+      },
+      "7": {
+        "Stealth": 3.6,
+        "Short Blades": 2.8,
+        "Fighting": 2.5,
+        "Dodging": 2.5,
+        "Throwing": 2.2,
+        "Armour": 2.0
+      },
+      "9": {
+        "Short Blades": 6.5,
+        "Dodging": 6.3,
+        "Armour": 5.2,
+        "Fighting": 4.2,
+        "Long Blades": 3.9,
+        "Throwing": 3.7
+      },
+      "12": {
+        "Dodging": 9.4,
+        "Short Blades": 8.2,
+        "Armour": 7.2,
+        "Invocations": 6.0,
+        "Fighting": 5.8,
+        "Throwing": 5.1
+      },
+      "15": {
+        "Dodging": 9.8,
+        "Short Blades": 8.2,
+        "Armour": 7.2,
+        "Invocations": 6.0,
+        "Fighting": 5.8,
+        "Throwing": 5.5
+      },
+      "18": {
+        "Dodging": 9.8,
+        "Short Blades": 8.2,
+        "Armour": 7.2,
+        "Invocations": 6.0,
+        "Fighting": 5.8,
+        "Throwing": 5.5
+      },
+      "21": {
+        "Dodging": 9.8,
+        "Short Blades": 8.2,
+        "Armour": 7.2,
+        "Invocations": 6.0,
+        "Fighting": 5.8,
+        "Throwing": 5.5
+      },
+      "27": {
+        "Dodging": 9.8,
+        "Short Blades": 8.2,
+        "Armour": 7.2,
+        "Invocations": 6.0,
+        "Fighting": 5.8,
+        "Throwing": 5.5
       }
     }
   },
@@ -1528,91 +1698,6 @@ export const BUILD_GUIDES: Record<string, BuildGuide> = {
       }
     }
   },
-  "Kobold/Brigand": {
-    "n": 3,
-    "milestones": {
-      "1": {
-        "Stealth": 5.3,
-        "Short Blades": 2.6,
-        "Fighting": 2.1,
-        "Throwing": 2.1,
-        "Dodging": 1.2,
-        "Long Blades": 0.8
-      },
-      "3": {
-        "Stealth": 5.4,
-        "Short Blades": 3.0,
-        "Fighting": 2.1,
-        "Throwing": 2.1,
-        "Dodging": 1.2,
-        "Long Blades": 1.0
-      },
-      "5": {
-        "Stealth": 6.0,
-        "Short Blades": 3.3,
-        "Fighting": 3.0,
-        "Throwing": 2.8,
-        "Dodging": 2.5,
-        "Long Blades": 1.1
-      },
-      "7": {
-        "Stealth": 8.5,
-        "Short Blades": 5.0,
-        "Fighting": 3.9,
-        "Throwing": 3.0,
-        "Dodging": 3.0,
-        "Long Blades": 1.7
-      },
-      "9": {
-        "Stealth": 10.9,
-        "Short Blades": 7.0,
-        "Fighting": 5.0,
-        "Dodging": 4.1,
-        "Throwing": 3.0,
-        "Long Blades": 2.5
-      },
-      "12": {
-        "Stealth": 15.1,
-        "Fighting": 8.2,
-        "Short Blades": 7.6,
-        "Dodging": 6.3,
-        "Long Blades": 5.6,
-        "Throwing": 3.0
-      },
-      "15": {
-        "Stealth": 17.7,
-        "Short Blades": 14.0,
-        "Dodging": 10.6,
-        "Fighting": 10.4,
-        "Long Blades": 5.6,
-        "Throwing": 3.0
-      },
-      "18": {
-        "Stealth": 17.7,
-        "Short Blades": 14.0,
-        "Dodging": 10.6,
-        "Fighting": 10.4,
-        "Long Blades": 5.6,
-        "Throwing": 3.0
-      },
-      "21": {
-        "Stealth": 17.7,
-        "Short Blades": 14.0,
-        "Dodging": 10.6,
-        "Fighting": 10.4,
-        "Long Blades": 5.6,
-        "Throwing": 3.0
-      },
-      "27": {
-        "Stealth": 17.7,
-        "Short Blades": 14.0,
-        "Dodging": 10.6,
-        "Fighting": 10.4,
-        "Long Blades": 5.6,
-        "Throwing": 3.0
-      }
-    }
-  },
   "Naga/Ice Elementalist": {
     "n": 2,
     "milestones": {
@@ -1703,6 +1788,10 @@ export const BUILD_GUIDES: Record<string, BuildGuide> = {
     "milestones": {}
   },
   "Mummy/Gladiator": {
+    "n": 1,
+    "milestones": {}
+  },
+  "Gargoyle/Berserker": {
     "n": 1,
     "milestones": {}
   }
