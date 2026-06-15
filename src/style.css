@@ -2726,6 +2726,19 @@ html, body {
   overflow-x: hidden;
 }
 
+/* Build coach line injected at the top of the skill screen (game-view). */
+.crt-skill-rec {
+  white-space: normal;
+  margin: 0 0 0.4rem;
+  padding: 0.3rem 0.45rem;
+  border: 1px solid var(--accent);
+  border-radius: 0.35rem;
+  background: rgba(245, 158, 11, 0.12);
+  color: var(--text);
+  font-size: 0.95em;
+}
+.crt-skill-rec b { color: var(--accent); }
+
 .crt-line { min-height: 1em; }
 /* DCSS assumes a black terminal, so it tags ordinary CRT text with bg0
    (#000000) as the "no background" colour. On our warm near-black overlay

@@ -3,7 +3,8 @@ import type { ClientMsg, ServerMsg, GameExit } from '../ws/types'
 import { getCurrentGameId } from '../game/current-game'
 import { getRcOption, setRcOption, type RcControls } from '../game/rc/rc-options'
 import { initTranslationFromRc, teardownTranslation } from '../game/i18n/translation'
-import { clearBuild } from '../game/coach/build-detect'
+import { clearBuild, getCurrentBuild } from '../game/coach/build-detect'
+import { recommend } from '../game/coach/build-guides'
 import { fitToWidth } from './fit-terminal'
 import { MapStore } from '../game/map/map-store'
 import { MapView } from '../game/map/map-view'
@@ -212,6 +213,8 @@ export function buildGameView(
   // under-tile mini-bars. Kept here so a render-mode swap can seed the freshly
   // created view, which otherwise starts at zero until the next player message.
   const playerStats: { hp?: number; hp_max?: number; mp?: number; mp_max?: number } = {}
+  // Latest experience level, for the skill-menu build coach (recommend()).
+  let currentXL = 1
   // Latest player fields needed for coach evaluation (accumulated across deltas).
   const coachPlayerState: {
     hp?: number; hp_max?: number; ac?: number; ev?: number; depth?: number
@@ -1024,6 +1027,7 @@ export function buildGameView(
         if (msg.hp_max !== undefined) playerStats.hp_max = msg.hp_max
         if (msg.mp !== undefined) playerStats.mp = msg.mp
         if (msg.mp_max !== undefined) playerStats.mp_max = msg.mp_max
+        if (msg.xl !== undefined) currentXL = msg.xl  // for the skill-menu build coach
         mapView.setPlayerStats(playerStats)
         inventoryStore.update(msg.inv)
         statsView.update(msg)
@@ -2223,7 +2227,21 @@ export function buildGameView(
     for (let i = 0; i <= maxKey; i++) rows.push(crtLines.get(i) ?? '')
     // The skills menu (`m`) ships a fixed two-column terminal grid; reflow it
     // into a single column so it fits a phone without horizontal panning.
-    if (crtTag === 'skills') rows = reflowSkillCrt(rows)
+    if (crtTag === 'skills') {
+      rows = reflowSkillCrt(rows)
+      // Build coach: median skill levels of competent players for this build at
+      // the player's XL, surfaced at the top of the skill screen. Build comes
+      // from the welcome line (build-detect); null when unknown or unguided.
+      const b = getCurrentBuild()
+      const rec = b ? recommend(b.species, b.background, currentXL) : null
+      if (rec) {
+        const recEl = document.createElement('div')
+        recEl.className = 'crt-skill-rec'
+        recEl.innerHTML = `<b>추천</b> · XL${rec.xl} 승자평균: `
+          + rec.items.map(i => `${escHtml(i.ko)} ${i.level}`).join(' · ')
+        el.appendChild(recEl)
+      }
+    }
     for (const html of rows) {
       const line = document.createElement('div')
       line.className = 'crt-line'
