@@ -472,17 +472,30 @@ export function buildKey(species: string, background: string): string { return `
 export interface RecItem { skill: string; ko: string; level: number }
 export interface Rec { key: string; xl: number; items: RecItem[] }
 
-// Recommendation for a build at the player's XL: nearest milestone <= xl (or the
-// earliest if below the first), top skills by median level. null if no guide.
+// Recommendation is a forward TARGET: the skill levels a competent player has
+// at a milestone ABOVE the player's current XL — what to train toward, not
+// where they already are. Early milestones are nearly identical to the start
+// skills, so we skip ahead to the first milestone whose top skill is
+// meaningfully higher than the current level (and fall back to the furthest
+// known milestone). null if no guide for this build.
 export function recommend(species: string, background: string, xl: number, top = 4): Rec | null {
   const g = BUILD_GUIDES[buildKey(species, background)]
   if (!g) return null
   const keys = Object.keys(g.milestones).map(Number).sort((a, b) => a - b)
   if (keys.length === 0) return null
-  const le = keys.filter(m => m <= xl)
-  const mk = le.length ? le[le.length - 1] : keys[0]
+  const topLevel = (k: number): number => Math.max(...Object.values(g.milestones[String(k)]))
+
+  const atOrBelow = keys.filter(m => m <= xl)
+  const curTop = atOrBelow.length ? topLevel(atOrBelow[atOrBelow.length - 1]) : 0
+  const above = keys.filter(m => m > xl)
+  // Default to the furthest known milestone (the eventual goal); prefer the
+  // nearest one that's a real step up from where the player is now.
+  let mk = above.length ? above[above.length - 1] : keys[keys.length - 1]
+  for (const m of above) {
+    if (topLevel(m) > curTop + 1) { mk = m; break }
+  }
+
   const at = g.milestones[String(mk)]
-  if (!at) return null
   const items = Object.entries(at).sort((a, b) => b[1] - a[1]).slice(0, top)
     .map(([skill, level]) => ({ skill, ko: skillKo(skill), level }))
   return { key: buildKey(species, background), xl: mk, items }

@@ -2237,7 +2237,7 @@ export function buildGameView(
       if (rec) {
         const recEl = document.createElement('div')
         recEl.className = 'crt-skill-rec'
-        recEl.innerHTML = `<b>추천</b> · XL${rec.xl}: `
+        recEl.innerHTML = `<b>목표</b> XL${rec.xl}: `
           + rec.items.map(i => `${escHtml(i.ko)} ${i.level}`).join(' · ')
         el.appendChild(recEl)
       }
