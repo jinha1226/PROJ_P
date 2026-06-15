@@ -25,15 +25,17 @@ describe('RC options in settings', () => {
     expect(tc.element.querySelectorAll('.tc-set-rc').length).toBeGreaterThanOrEqual(3)
   })
 
-  it('toggling language writes ko then null', () => {
+  it('toggling language writes translation_language=ko then null', () => {
     const rc = fakeRc()
     const tc = buildTouchControls(() => {}, { rc })
     ;(tc.element.querySelector('.tc-settings') as HTMLButtonElement).click()
-    const langBtn = tc.element.querySelector('.tc-set-rc[data-rc-key="language"]') as HTMLButtonElement
+    // DCSS's Korean translation build (CNC/Nemelex) reads `translation_language`,
+    // not the mainline `language` option (which only selects joke fake-languages).
+    const langBtn = tc.element.querySelector('.tc-set-rc[data-rc-key="translation_language"]') as HTMLButtonElement
     langBtn.click()
-    expect(rc.store['language']).toBe('ko')
+    expect(rc.store['translation_language']).toBe('ko')
     langBtn.click()
-    expect(rc.store['language']).toBeNull()
+    expect(rc.store['translation_language']).toBeNull()
   })
 
   it('shows a disabled note when rc is unavailable', () => {

@@ -415,7 +415,10 @@ function buildKeyboardOverlay(send: SendFn): { element: HTMLElement; open: () =>
 }
 
 const RC_TOGGLES: { key: string; on: string; ko: string; en: string }[] = [
-  { key: 'language',       on: 'ko', ko: '한국어 (부분)',      en: 'Korean (partial)' },
+  // DCSS's Korean translation build (CNC/Nemelex) reads `translation_language`.
+  // The mainline `language` option only picks joke fake-languages (dwarven, …),
+  // so `language = ko` is a no-op and leaves all text in English.
+  { key: 'translation_language', on: 'ko', ko: '한국어 (부분)', en: 'Korean (partial)' },
   { key: 'hp_warning',     on: '50', ko: 'HP 경고 50%',        en: 'HP warning 50%' },
   { key: 'autofight_stop', on: '50', ko: '자동전투 50% 정지',  en: 'Autofight stop 50%' },
 ]
