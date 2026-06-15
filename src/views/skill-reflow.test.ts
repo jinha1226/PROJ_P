@@ -88,6 +88,24 @@ describe('reflowSkillCrt', () => {
     expect(between.some(t => /Skill.*Level/.test(t))).toBe(true) // repeated header
   })
 
+  it('reflows a translated (Korean) skill grid and keeps a→z order', () => {
+    // Hangul skill names must still anchor as grid rows (the parser no longer
+    // requires an ASCII capital after the sign), so the menu reflows instead of
+    // passing through as the raw wide grid — and the hotkey letters survive.
+    const koLines = [
+      '  기술        레벨        기술        레벨', // header, no digits
+      `  ${'a - 전투술      +0'.padEnd(19)}${L('c - 주문시전     +11')}`,
+      `  ${'b - 회피술      +1'.padEnd(19)}${L('d - 소환술       +11')}`,
+      `  ${''.padEnd(19)}${L('e - 마법부여     +11')}`,
+    ]
+    const out = reflowSkillCrt(koLines).map(text)
+    const order = out
+      .map(t => /^\s*([a-z]) [+\-*] (\S+)/.exec(t))
+      .filter(Boolean)
+      .map(m => m![1])
+    expect(order).toEqual(['a', 'b', 'c', 'd', 'e'])
+  })
+
   it('passes single-spaced help text through unchanged', () => {
     const out = reflowSkillCrt(lines)
     expect(out[out.length - 1]).toBe(' The species aptitude is in white.')

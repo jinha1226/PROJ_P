@@ -17,6 +17,14 @@ describe('extractSkillHotkeys', () => {
     expect(extractSkillHotkeys([line])).toEqual(['k'])
   })
 
+  it('captures hotkeys for translated (Korean) skill names', () => {
+    // Under client-side translation the skill name is Hangul, not an ASCII
+    // capital — the hotkey letters must still be extracted so the on-screen
+    // a/b/c selection keys appear.
+    const line = '  a - 전투 기술          0.0         -2    f + 주문시전         3.0  25%    +3'
+    expect(extractSkillHotkeys([line])).toEqual(['a', 'f'])
+  })
+
   it('captures a digit hotkey from the right column', () => {
     const line = '  m - Shields          0.0         -2    1 - Evocations       0.0         +1'
     expect(extractSkillHotkeys([line])).toEqual(['m', '1'])

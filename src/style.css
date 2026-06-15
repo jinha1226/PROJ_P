@@ -2449,6 +2449,21 @@ html, body {
   min-height: 2.2rem;
 }
 
+/* With the d-pad on, the action strip sits in the tall (~3 d-pad rows) panel to
+   the RIGHT of the d-pad, not the full-width single row of the no-d-pad layout.
+   Restore wrapping there so the buttons fill that block as a grid instead of
+   running off the right edge in one scrolling line. */
+#touch-controls.dpad-on .tc-content { flex: 1; min-height: 0; }
+#touch-controls.dpad-on .tc-strip {
+  flex: 1;
+  min-height: 0;
+  flex-wrap: wrap;
+  align-content: flex-start;
+  overflow-x: hidden;
+  overflow-y: auto;
+}
+#touch-controls.dpad-on .tc-strip .tc-btn { min-height: 2rem; }
+
 .tc-btn {
   flex: 1;
   background: var(--tc-fill);

@@ -20,7 +20,7 @@ import { SKILL_HOTKEY_RE } from './skill-hotkeys'
 // `S Name` — sign + name. This anchor is looser than the lettered
 // SKILL_HOTKEY_RE (a prose bullet "- Casting…" would match), so it's consulted
 // only when the whole menu has no lettered row.
-const BARE_ROW_RE = /[+\-*] [A-Z]/g
+const BARE_ROW_RE = /(?<=^|\s)[+\-*] (?=\S)/g
 
 // A left-column hotkey sits at the indent (col ~2); the right column starts far
 // past the 20-wide name field. Any hotkey at/after this column is the right one.
@@ -209,16 +209,19 @@ export function reflowSkillCrt(lines: string[]): string[] {
   // would be misfiled as header or help text. Extend the range over adjacent
   // two-celled lines; the column-header line and the blank separator above the
   // help text both stop the walk.
-  const HEADER_RE = /^\s*Skill\s+Level/
   // The fixed-width grid always pads the left column so a run of spaces sits
   // immediately before the right cell. Prose footers ("…each skill is in
   // cyan.") flow continuously across that column, so a letter (or a lone
   // inter-word space) lands just before repRight. Requiring the inter-column
   // gap is what stops the walk from swallowing — and then splitting — a long
   // explanatory line whose two halves both happen to be non-empty.
+  //
+  // The column-header row ("Skill  Level …", translated under i18n) must NOT be
+  // pulled in. Rather than match its (translatable) words, require a digit:
+  // every real skill row shows a level/aptitude number, the header has none.
   const twoCells = (i: number): boolean =>
     bestN > 0 && i >= 0 && i < lines.length
-    && !HEADER_RE.test(plains[i])
+    && /\d/.test(plains[i])
     && plains[i][repRight - 1] === ' ' && plains[i][repRight - 2] === ' '
     && plains[i].slice(0, repRight).trim() !== ''
     && plains[i].slice(repRight).trim() !== ''
