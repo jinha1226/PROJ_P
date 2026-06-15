@@ -516,6 +516,91 @@ export const BUILD_GUIDES: Record<string, BuildGuide> = {
       }
     }
   },
+  "Demonspawn/Fighter": {
+    "n": 12,
+    "milestones": {
+      "1": {
+        "Fighting": 3.0,
+        "Armour": 2.6,
+        "Shields": 2.6,
+        "Axes": 1.7,
+        "Maces & Flails": 1.0,
+        "Polearms": 1.0
+      },
+      "3": {
+        "Fighting": 3.0,
+        "Armour": 2.6,
+        "Shields": 2.6,
+        "Axes": 1.8,
+        "Maces & Flails": 1.1,
+        "Polearms": 1.0
+      },
+      "5": {
+        "Fighting": 3.1,
+        "Armour": 2.8,
+        "Shields": 2.8,
+        "Axes": 2.2,
+        "Maces & Flails": 1.4,
+        "Polearms": 1.4
+      },
+      "7": {
+        "Fighting": 3.5,
+        "Armour": 3.0,
+        "Shields": 3.0,
+        "Axes": 2.5,
+        "Maces & Flails": 1.9,
+        "Polearms": 1.8
+      },
+      "9": {
+        "Fighting": 3.5,
+        "Armour": 3.1,
+        "Shields": 3.0,
+        "Axes": 2.5,
+        "Maces & Flails": 2.0,
+        "Polearms": 2.0
+      },
+      "12": {
+        "Axes": 9.4,
+        "Fighting": 8.4,
+        "Armour": 7.7,
+        "Shields": 7.3,
+        "Invocations": 6.5,
+        "Maces & Flails": 6.2
+      },
+      "15": {
+        "Axes": 12.6,
+        "Fighting": 11.2,
+        "Armour": 10.8,
+        "Shields": 9.8,
+        "Maces & Flails": 9.2,
+        "Polearms": 9.2
+      },
+      "18": {
+        "Axes": 15.0,
+        "Fighting": 13.2,
+        "Armour": 12.7,
+        "Shields": 11.8,
+        "Maces & Flails": 10.1,
+        "Polearms": 9.8
+      },
+      "21": {
+        "Axes": 15.0,
+        "Fighting": 13.8,
+        "Armour": 13.1,
+        "Shields": 12.0,
+        "Maces & Flails": 10.1,
+        "Polearms": 9.8
+      },
+      "27": {
+        "Axes": 15.0,
+        "Fighting": 13.8,
+        "Armour": 13.1,
+        "Shields": 12.0,
+        "Maces & Flails": 10.1,
+        "Polearms": 9.8
+      }
+    }
+  },
   "Formicid/Hunter": {
     "n": 9,
     "milestones": {
@@ -1536,6 +1621,261 @@ export const BUILD_GUIDES: Record<string, BuildGuide> = {
       }
     }
   },
+  "Gargoyle/Berserker": {
+    "n": 4,
+    "milestones": {
+      "1": {
+        "Fighting": 3.3,
+        "Maces & Flails": 3.0,
+        "Armour": 2.2,
+        "Staves": 1.7,
+        "Axes": 1.6,
+        "Dodging": 1.6
+      },
+      "3": {
+        "Fighting": 3.7,
+        "Maces & Flails": 3.0,
+        "Armour": 2.2,
+        "Axes": 1.8,
+        "Staves": 1.7,
+        "Dodging": 1.6
+      },
+      "5": {
+        "Fighting": 4.4,
+        "Maces & Flails": 3.0,
+        "Armour": 2.3,
+        "Axes": 2.1,
+        "Staves": 1.7,
+        "Dodging": 1.6
+      },
+      "7": {
+        "Fighting": 5.5,
+        "Armour": 4.5,
+        "Maces & Flails": 3.0,
+        "Axes": 2.5,
+        "Dodging": 2.1,
+        "Staves": 1.7
+      },
+      "9": {
+        "Armour": 7.5,
+        "Fighting": 6.9,
+        "Maces & Flails": 5.7,
+        "Axes": 4.5,
+        "Staves": 4.3,
+        "Dodging": 2.1
+      },
+      "12": {
+        "Armour": 11.9,
+        "Maces & Flails": 10.8,
+        "Fighting": 10.4,
+        "Axes": 8.4,
+        "Polearms": 6.0,
+        "Staves": 4.6
+      },
+      "15": {
+        "Armour": 14.9,
+        "Fighting": 13.4,
+        "Maces & Flails": 12.7,
+        "Axes": 11.3,
+        "Polearms": 10.8,
+        "Shields": 8.0
+      },
+      "18": {
+        "Armour": 17.0,
+        "Fighting": 15.5,
+        "Maces & Flails": 13.2,
+        "Axes": 13.1,
+        "Polearms": 11.8,
+        "Shields": 9.8
+      },
+      "21": {
+        "Armour": 18.6,
+        "Fighting": 17.2,
+        "Shields": 14.7,
+        "Axes": 13.8,
+        "Maces & Flails": 13.4,
+        "Polearms": 11.6
+      },
+      "27": {
+        "Armour": 18.6,
+        "Fighting": 17.2,
+        "Shields": 14.7,
+        "Axes": 13.8,
+        "Maces & Flails": 13.4,
+        "Polearms": 11.6
+      }
+    }
+  },
+  "Coglin/Cinder Acolyte": {
+    "n": 4,
+    "milestones": {
+      "1": {
+        "Fighting": 3.0,
+        "Fire Magic": 2.6,
+        "Axes": 2.4,
+        "Staves": 1.6,
+        "Maces & Flails": 1.5,
+        "Polearms": 1.5
+      },
+      "3": {
+        "Fighting": 3.0,
+        "Axes": 2.9,
+        "Fire Magic": 2.6,
+        "Staves": 2.0,
+        "Maces & Flails": 1.5,
+        "Polearms": 1.5
+      },
+      "5": {
+        "Polearms": 3.4,
+        "Fire Magic": 3.3,
+        "Fighting": 3.0,
+        "Axes": 2.9,
+        "Maces & Flails": 2.0,
+        "Staves": 2.0
+      },
+      "7": {
+        "Fire Magic": 3.3,
+        "Fighting": 3.0,
+        "Axes": 2.9,
+        "Polearms": 2.9,
+        "Maces & Flails": 2.0,
+        "Staves": 2.0
+      },
+      "9": {
+        "Axes": 7.2,
+        "Polearms": 6.0,
+        "Fighting": 5.1,
+        "Staves": 3.7,
+        "Maces & Flails": 3.5,
+        "Fire Magic": 3.3
+      },
+      "12": {
+        "Axes": 10.9,
+        "Fighting": 8.8,
+        "Polearms": 8.0,
+        "Air Magic": 5.9,
+        "Maces & Flails": 5.0,
+        "Staves": 5.0
+      },
+      "15": {
+        "Axes": 10.9,
+        "Fighting": 9.8,
+        "Polearms": 8.7,
+        "Armour": 5.9,
+        "Air Magic": 5.9,
+        "Staves": 5.1
+      },
+      "18": {
+        "Axes": 10.9,
+        "Fighting": 9.8,
+        "Polearms": 8.7,
+        "Armour": 5.9,
+        "Air Magic": 5.9,
+        "Staves": 5.1
+      },
+      "21": {
+        "Axes": 10.9,
+        "Fighting": 9.8,
+        "Polearms": 8.7,
+        "Armour": 5.9,
+        "Air Magic": 5.9,
+        "Staves": 5.1
+      },
+      "27": {
+        "Axes": 10.9,
+        "Fighting": 9.8,
+        "Polearms": 8.7,
+        "Armour": 5.9,
+        "Air Magic": 5.9,
+        "Staves": 5.1
+      }
+    }
+  },
+  "Barachi/Conjurer": {
+    "n": 4,
+    "milestones": {
+      "1": {
+        "Conjurations": 4.3,
+        "Spellcasting": 2.1,
+        "Dodging": 2.1,
+        "Stealth": 1.7,
+        "Fighting": 1.0,
+        "Maces & Flails": 0.0
+      },
+      "3": {
+        "Conjurations": 4.7,
+        "Spellcasting": 3.0,
+        "Dodging": 2.1,
+        "Stealth": 1.7,
+        "Fighting": 1.0,
+        "Maces & Flails": 0.0
+      },
+      "5": {
+        "Conjurations": 5.3,
+        "Spellcasting": 3.0,
+        "Fighting": 2.5,
+        "Dodging": 2.5,
+        "Ranged Weapons": 2.0,
+        "Stealth": 1.7
+      },
+      "7": {
+        "Conjurations": 6.0,
+        "Spellcasting": 4.5,
+        "Ranged Weapons": 4.0,
+        "Fighting": 3.5,
+        "Dodging": 3.5,
+        "Stealth": 1.7
+      },
+      "9": {
+        "Conjurations": 9.8,
+        "Spellcasting": 6.5,
+        "Fighting": 5.0,
+        "Dodging": 3.7,
+        "Stealth": 1.7,
+        "Fire Magic": 1.5
+      },
+      "12": {
+        "Conjurations": 11.0,
+        "Spellcasting": 9.9,
+        "Fighting": 9.0,
+        "Dodging": 9.0,
+        "Ranged Weapons": 7.3,
+        "Invocations": 3.0
+      },
+      "15": {
+        "Conjurations": 13.0,
+        "Dodging": 11.8,
+        "Fighting": 11.5,
+        "Spellcasting": 11.5,
+        "Ranged Weapons": 9.0,
+        "Fire Magic": 5.5
+      },
+      "18": {
+        "Spellcasting": 13.0,
+        "Conjurations": 13.0,
+        "Dodging": 12.0,
+        "Fighting": 11.5,
+        "Ranged Weapons": 9.0,
+        "Fire Magic": 5.5
+      },
+      "21": {
+        "Spellcasting": 13.0,
+        "Conjurations": 13.0,
+        "Dodging": 12.0,
+        "Fighting": 11.5,
+        "Ranged Weapons": 11.0,
+        "Fire Magic": 5.5
+      },
+      "27": {
+        "Conjurations": 16.5,
+        "Spellcasting": 13.5,
+        "Dodging": 12.0,
+        "Fighting": 11.5,
+        "Ranged Weapons": 11.3,
+        "Fire Magic": 5.5
+      }
+    }
+  },
   "Kobold/Earth Elementalist": {
     "n": 3,
     "milestones": {
@@ -1791,7 +2131,15 @@ export const BUILD_GUIDES: Record<string, BuildGuide> = {
     "n": 1,
     "milestones": {}
   },
-  "Gargoyle/Berserker": {
+  "Minotaur/Chaos Knight": {
+    "n": 1,
+    "milestones": {}
+  },
+  "Felid/Shapeshifter": {
+    "n": 1,
+    "milestones": {}
+  },
+  "Gargoyle/Alchemist": {
     "n": 1,
     "milestones": {}
   }
