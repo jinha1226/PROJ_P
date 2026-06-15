@@ -2,6 +2,7 @@ import type { WsConnection } from '../ws/connection'
 import type { ClientMsg, ServerMsg, GameExit } from '../ws/types'
 import { getCurrentGameId } from '../game/current-game'
 import { getRcOption, setRcOption, type RcControls } from '../game/rc/rc-options'
+import { initTranslationFromRc, teardownTranslation } from '../game/i18n/translation'
 import { fitToWidth } from './fit-terminal'
 import { MapStore } from '../game/map/map-store'
 import { MapView } from '../game/map/map-view'
@@ -878,6 +879,11 @@ export function buildGameView(
   // game it's already set (from the lobby handoff) here.
   if (getPref('mapRenderMode') === 'tiles') setRenderMode('tiles')
 
+  // Pull the RC at game start so client-side translation arms automatically
+  // (translation_language) without the user opening settings. The
+  // rcfile_contents handler does the actual init; spectators don't own an RC.
+  if (!spectating && rc.available()) rc.request()
+
   const docKeyHandler = (e: KeyboardEvent) => {
     if (!view.isConnected) { document.removeEventListener('keydown', docKeyHandler); return }
     if (isHarvesting()) { e.preventDefault(); return }  // suppress during silent harvest
@@ -1478,10 +1484,12 @@ export function buildGameView(
         resetHarvest()
         autoHarvestedThisGame = false  // re-harvest for the next game
         spellsDirty = false  // no pending re-harvest carries into the next game
+        teardownTranslation()  // translation is per-game; the next game re-arms from its RC
         onLobby()
         break
 
       case 'game_ended':
+        teardownTranslation()
         // Forward exit details so the lobby renders the exit dialog after the
         // layer switch. The trailing go_lobby + lobby list (often batched with
         // this) land on the lobby's message handler, not ours.
@@ -1496,6 +1504,10 @@ export function buildGameView(
 
       case 'rcfile_contents':
         rcText = msg.contents
+        // Arm client-side translation from the RC (translation_language). No-op
+        // when unset; the build JSON loads asynchronously, so the first few
+        // messages may render untranslated until it arrives.
+        void initTranslationFromRc(rcText)
         for (const cb of rcListeners) cb()
         break
     }

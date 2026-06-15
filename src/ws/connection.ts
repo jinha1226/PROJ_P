@@ -1,4 +1,5 @@
 import type { ClientMsg, ServerMsg } from './types'
+import { translateIncoming } from '../game/i18n/translation'
 
 export type MessageHandler = (msg: ServerMsg) => void
 export type StateHandler = () => void
@@ -109,6 +110,9 @@ export class WsConnection {
       this.onLoginCookie(msg.cookie, msg.expires)
       return
     }
+    // Rewrite translatable text fields in place (no-op unless translation is
+    // armed) before any handler reads the message.
+    translateIncoming(msg)
     this.onMessage(msg)
   }
 }
