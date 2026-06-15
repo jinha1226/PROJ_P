@@ -8,16 +8,14 @@ export interface CoachInput {
   poisonLethal: boolean    // poison is on track to (near-)kill the player
 }
 
-export type CoachHintId = 'poison_lethal' | 'critical_hp' | 'nasty_monster' | 'low_defense'
+// Note: there is intentionally no "low HP" hint — DCSS's own hp_warning RC
+// option already covers that, so a coach version would be redundant noise.
+export type CoachHintId = 'poison_lethal' | 'nasty_monster' | 'low_defense'
 
 export const COACH_HINTS: Record<CoachHintId, { ko: string; en: string }> = {
   poison_lethal: {
     ko: '독이 치명적이에요 — 해독하거나 회복하세요.',
     en: 'Poison may kill you — cure it or heal.',
-  },
-  critical_hp: {
-    ko: '위험! HP가 낮아요 — 후퇴하거나 회복하세요.',
-    en: 'Danger! Low HP — retreat or heal.',
   },
   nasty_monster: {
     ko: '강한 적이에요 — 정면 대결을 피하고 통로로 유인하세요.',
@@ -32,12 +30,10 @@ export const COACH_HINTS: Record<CoachHintId, { ko: string; en: string }> = {
 // Conservative thresholds; returns the single highest-priority hint, or null.
 export function evaluateCoach(i: CoachInput): CoachHintId | null {
   const hpFrac = i.hpMax > 0 ? i.hp / i.hpMax : 1
-  const hostileVisible = i.hostileThreats.length > 0
   const hasNasty = i.hostileThreats.some(t => t >= 3)
   const hasToughOrWorse = i.hostileThreats.some(t => t >= 2)
 
   if (i.poisonLethal) return 'poison_lethal'
-  if (hpFrac < 0.33 && hostileVisible) return 'critical_hp'
   if (hasNasty && hpFrac < 0.6) return 'nasty_monster'
   // Defense advice only when calm (nothing tough/nasty in view) and clearly under-armored.
   if (i.depth >= 2 && !hasToughOrWorse && i.ac < i.depth && i.ev < 13) return 'low_defense'

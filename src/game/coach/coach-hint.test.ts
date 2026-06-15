@@ -9,11 +9,11 @@ describe('coach hint banner', () => {
   })
   it('show() displays the localized text for the hint id', () => {
     const h = createCoachHint()
-    h.show('critical_hp', 'ko')
+    h.show('nasty_monster', 'ko')
     expect(h.element.style.display).not.toBe('none')
-    expect(h.element.textContent).toContain('HP')
-    h.show('critical_hp', 'en')
-    expect(h.element.textContent?.toLowerCase()).toContain('hp')
+    expect(h.element.textContent).toContain('적')
+    h.show('nasty_monster', 'en')
+    expect(h.element.textContent?.toLowerCase()).toContain('enemy')
   })
   it('hide() hides it', () => {
     const h = createCoachHint()
