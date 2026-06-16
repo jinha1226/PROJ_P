@@ -7,6 +7,9 @@ export interface LabelPair { ko: string; en: string }
 export const ACTION_LABELS: Record<string, LabelPair> = {
   // menu mode (! and ? keep their literal key glyph — matches DCSS footer hints)
   'Page down':            { ko: '페이지',   en: 'Page' },
+  // modifier strips
+  'Quiver':               { ko: '화살집',   en: 'Quiver' },
+  'Save & exit':          { ko: '저장/종료', en: 'Save/Exit' },
   // micro
   'Auto-fight nearest':   { ko: '자동전투', en: 'Fight' },
   'Rest until healed':    { ko: '휴식',     en: 'Rest' },

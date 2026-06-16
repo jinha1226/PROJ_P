@@ -26,20 +26,24 @@ describe('semantic labels in the touch HUD', () => {
     expect(pins).toContain('O')
   })
 
-  it('relabels Shift variants and hides dead keys', () => {
+  it('shows the Shift command strip while Shift is held', () => {
     const tc = buildTouchControls(() => {})
-    expect(labels(tc.element)).toContain('둘러보기') // x = examine in play
-    expect(labels(tc.element)).toContain('주문')     // z = cast in play
+    expect(labels(tc.element)).toContain('주문')      // a play action (z = cast)
     ;(tc.element.querySelector('.tc-shift') as HTMLButtonElement).click()
-    expect(labels(tc.element)).toContain('지도')     // Shift+x → X = examine level map
-    expect(labels(tc.element)).not.toContain('주문') // Shift+z → Z has no command → hidden
+    const l = labels(tc.element)
+    expect(l).toContain('지도')        // X = level map
+    expect(l).toContain('능력·변이')   // A = abilities/mutations
+    expect(l).toContain('화살집')      // Q = quiver
+    expect(l).not.toContain('주문')    // play actions are replaced
   })
 
-  it('relabels buttons to the Ctrl variant (x → ^X = save & exit)', () => {
+  it('shows the Ctrl command strip while Ctrl is held', () => {
     const tc = buildTouchControls(() => {})
-    expect(labels(tc.element)).toContain('둘러보기') // x = examine in play
     ;(tc.element.querySelector('.tc-ctrl') as HTMLButtonElement).click()
-    expect(labels(tc.element)).toContain('저장/종료') // Ctrl+x → ^X = save & exit
+    const l = labels(tc.element)
+    expect(l).toContain('저장/종료')   // ^X = save & exit
+    expect(l).toContain('지형찾기')    // ^F = find feature
+    expect(l).toContain('던전개요')    // ^O = dungeon overview
   })
 
   it('swaps to menu meta-keys (페이지 / !) in menu mode', () => {
