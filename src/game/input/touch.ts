@@ -74,6 +74,18 @@ export interface TouchControls {
 }
 
 // Static tabs only; the 'spells' tab renders dynamic content from game-view.
+// Shown in the action strip while a menu/overlay is open, replacing the play
+// actions (which do nothing useful in a menu). Items are selected by tapping
+// the overlay list; these are the meta-keys: page the list, toggle the
+// describe view (!), and help (?).
+export const MENU_BUTTONS: TabButtonDef[][] = [
+  [
+    { label: '⇥', title: 'Page down',         key: 9 },
+    { label: '!', title: 'Describe / toggle', text: '!' },
+    { label: '?', title: 'Menu help',         text: '?' },
+  ],
+]
+
 export const TAB_BUTTONS: Record<Exclude<TabKey, 'spells'>, TabButtonDef[][]> = {
   micro: [
     [
@@ -824,6 +836,9 @@ export function buildTouchControls(send: SendFn, opts: { spellTab?: SpellTabConf
     tabsEl.querySelectorAll<HTMLElement>('.tc-tab').forEach(el => {
       el.classList.toggle('active', el.dataset.tab === tab)
     })
+    // In a menu/overlay the play actions are useless — show menu meta-keys
+    // (page / ! / ?) instead, regardless of which tab is active.
+    if (menuMode) { renderContent(MENU_BUTTONS); return }
     // The z tab hosts the spell grid game-view builds (it owns the spell data,
     // tile loader, and cast logic); refreshSpellTab fills it. Sticky like any
     // tab — stays until the player switches away, so repeat-casting is one tap
@@ -864,9 +879,7 @@ export function buildTouchControls(send: SendFn, opts: { spellTab?: SpellTabConf
       }
       const btn = document.createElement('button')
       btn.className = 'tc-btn'
-      let { text, named } = actionLabel(def, lang)
-      // Tab (key 9) is autofight in play but pages the list in a menu/overlay.
-      if (menuMode && def.key === 9) { text = lang === 'ko' ? '페이지' : 'Page'; named = true }
+      const { text, named } = actionLabel(def, lang)
       if (named) btn.classList.add('named')
       else if (/[^\x20-\x7e]/.test(def.label)) btn.classList.add('glyph')
       btn.textContent = text
@@ -875,26 +888,13 @@ export function buildTouchControls(send: SendFn, opts: { spellTab?: SpellTabConf
       btn.addEventListener('click', () => sendTabKey(def))
       stripEl.appendChild(btn)
     }
-    // In a menu/overlay, "!" toggles the item-action menu to its describe view
-    // (the "Press ! …" footer hint) — surface it as a dedicated button.
-    if (menuMode) {
-      const bang: TabButtonDef = { label: '!', text: '!', title: 'Describe / toggle (!)' }
-      const btn = document.createElement('button')
-      btn.className = 'tc-btn'
-      btn.textContent = '!'
-      btn.title = bang.title!
-      btn.setAttribute('aria-label', bang.title!)
-      btn.addEventListener('touchstart', e => { e.preventDefault(); sendTabKey(bang) }, { passive: false })
-      btn.addEventListener('click', () => sendTabKey(bang))
-      stripEl.appendChild(btn)
-    }
     contentEl.appendChild(stripEl)
   }
 
   function setMenuMode(on: boolean): void {
     if (menuMode === on) return
     menuMode = on
-    if (activeTab !== 'spells') renderContent(TAB_BUTTONS[activeTab])  // re-apply context labels
+    renderTab(activeTab)  // swap between menu meta-keys and the tab's play actions
   }
 
   function enterXMode(): void {
