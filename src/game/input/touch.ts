@@ -122,12 +122,19 @@ export const TAB_BUTTONS: Record<Exclude<TabKey, 'spells'>, TabButtonDef[][]> = 
       { label: 'X',   title: 'Examine level map',     text: 'X' },
       { label: '^O',  title: 'Dungeon overview (Ctrl+O)', key: 15 },
     ],
-    // Bottom row: things you actively do (fire, evoke, use ability, cast).
+    // Middle row: things you actively do (fire, evoke, use ability, cast).
     [
       { label: 'f',   title: 'Fire / quivered',       text: 'f' },
       { label: 'v',   title: 'Evoke item',            text: 'v' },
       { label: 'a',   title: 'Use ability',           text: 'a' },
       { label: 'z',   title: 'Cast spell',            text: 'z' },
+    ],
+    // Bottom row: secondary info screens (fills the reserved 3rd row).
+    [
+      { label: '%',   title: 'Character overview',    text: '%' },
+      { label: 'A',   title: 'Abilities/mutations',   text: 'A' },
+      { label: '^',   title: 'Religion / deity',      text: '^' },
+      { label: '}',   title: 'Runes collected',       text: '}' },
     ],
   ],
 }
@@ -151,10 +158,9 @@ const KEY_LABELS: Map<string, LabelPair> = (() => {
   m.set('Q', { ko: '화살집', en: 'Quiver' })          // Shift+q
   m.set('^X', { ko: '저장/종료', en: 'Save & exit' })  // Ctrl+x
   // These lost their dedicated 기타 buttons but stay reachable in place via the
-  // modifier relabel (Shift+r → R, Ctrl+f → ^F, Shift+a → A), so keep names.
+  // modifier relabel (Shift+r → R, Ctrl+f → ^F), so keep their names.
   m.set('R', ACTION_LABELS['Remove jewellery'])        // Shift+r
   m.set('^F', ACTION_LABELS['Find feature (Ctrl+F)'])  // Ctrl+f
-  m.set('A', ACTION_LABELS['Abilities/mutations'])     // Shift+a
   return m
 })()
 
