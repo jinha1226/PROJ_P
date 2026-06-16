@@ -14,6 +14,8 @@ export interface Prefs {
   // User map-zoom level (index into ZOOM_LEVELS). null = never set, so each
   // renderer falls back to its mode default (ASCII normal, tiles zoomed-in).
   mapZoomLevel: number | null
+  // Spell titles the user hid from the quick-cast surfaces (rail + z tab).
+  hiddenSpells: string[]
 }
 
 const DEFAULTS: Prefs = {
@@ -24,6 +26,7 @@ const DEFAULTS: Prefs = {
   dpadEnabled: true,
   coachEnabled: true,
   mapZoomLevel: null,
+  hiddenSpells: [],
 }
 
 function load(): Prefs {

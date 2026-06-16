@@ -288,6 +288,7 @@ export function buildGameView(
   // power/damage/noise, re-add the second phase in the same change (it lives
   // in git history: `mergeSpellExtra` + the 'extra' harvestPhase).
   let spellCache: SpellEntry[] = []
+  let showHiddenSpells = false  // z-tab toggle to reveal hidden quick-cast spells for un-hiding
   // 'late-base' is the base phase after its input-suppression budget ran out:
   // the `I` reply is slower than HARVEST_SUPPRESS_MS, so the user gets the
   // input channel back, but we keep listening (up to HARVEST_LATE_MS) so the
@@ -2667,6 +2668,22 @@ export function buildGameView(
     touchControls.refreshSpellTab()
   }
 
+  // Quick-cast curation: the player can hide spells (e.g. low-level basics) from
+  // the rail + z tab once they've learned more. Hidden by title (persisted).
+  // Function declarations (not const) so the early setup render can call them.
+  function hiddenSpellSet(): Set<string> { return new Set(getPref('hiddenSpells') ?? []) }
+  function visibleSpells(): SpellEntry[] {
+    const hidden = hiddenSpellSet()
+    return spellCache.filter(s => !hidden.has(s.title))
+  }
+  function setSpellHidden(title: string, hide: boolean): void {
+    const cur = hiddenSpellSet()
+    if (hide) cur.add(title); else cur.delete(title)
+    setPref('hiddenSpells', [...cur])
+    railBuiltFrom = null      // force the rail to rebuild from the new filter
+    exposeSpellCache()        // refresh rail + z-tab grid
+  }
+
   // Build the spell grid for the touch-panel z tab from spellCache, or null when
   // there's nothing to show (no spells / spectating) → the tab shows its empty
   // state. Mirrors the rail's per-spell button (tile + letter badge) but in the
@@ -2690,6 +2707,13 @@ export function buildGameView(
     pop.innerHTML = rows.join('')
     const close = (): void => pop.remove()
     pop.addEventListener('click', close)
+    // Hide / un-hide this spell from the quick-cast surfaces.
+    const isHidden = hiddenSpellSet().has(s.title)
+    const act = document.createElement('button')
+    act.className = 'si-action'
+    act.textContent = isHidden ? '퀵캐스트에 다시 표시' : '퀵캐스트에서 숨기기'
+    act.addEventListener('click', e => { e.stopPropagation(); close(); setSpellHidden(s.title, !isHidden) })
+    pop.appendChild(act)
     view.appendChild(pop)
     // Next pointerdown anywhere dismisses it (deferred so this press doesn't).
     requestAnimationFrame(() => document.addEventListener('pointerdown', close, { once: true }))
@@ -2772,7 +2796,25 @@ export function buildGameView(
     if (spectating || spellCache.length === 0) return null
     const grid = document.createElement('div')
     grid.className = 'tc-spell-grid'
-    for (const s of spellCache) grid.appendChild(makeSpellButton(s, 'tc-spell-btn'))
+    const hidden = hiddenSpellSet()
+    for (const s of spellCache) {
+      if (hidden.has(s.title) && !showHiddenSpells) continue
+      const btn = makeSpellButton(s, 'tc-spell-btn')
+      if (hidden.has(s.title)) btn.classList.add('tc-spell-hidden')  // revealed via the manage toggle
+      grid.appendChild(btn)
+    }
+    // Manage toggle: reveal hidden spells (dimmed) so they can be long-pressed
+    // to un-hide. Only shown once something is hidden.
+    const nHidden = spellCache.filter(s => hidden.has(s.title)).length
+    if (nHidden > 0) {
+      const more = document.createElement('button')
+      more.className = 'tc-spell-more'
+      more.textContent = showHiddenSpells ? '닫기' : `숨김 ${nHidden}`
+      const toggle = (): void => { showHiddenSpells = !showHiddenSpells; touchControls.refreshSpellTab() }
+      more.addEventListener('touchstart', e => { e.preventDefault(); toggle() }, { passive: false })
+      more.addEventListener('click', toggle)
+      grid.appendChild(more)
+    }
     return grid
   }
 
@@ -2869,12 +2911,13 @@ export function buildGameView(
     // Hidden while examining (X-mode): the zoomed-out examine map claims the
     // log/HUD rows, and the rail's row (plus the log overlay) would shrink and
     // occlude the very cells the player entered X-mode to read.
-    const visible = !spectating && !inXMode && spellCache.length > 0
+    const railSpells = visibleSpells()
+    const visible = !spectating && !inXMode && railSpells.length > 0
     view.classList.toggle('spell-row', visible)
     if (!visible) { spellRail.style.display = 'none'; return }
     if (railBuiltFrom !== spellCache) {
       spellRail.innerHTML = ''
-      for (const s of spellCache) spellRail.appendChild(makeSpellButton(s, 'spell-rail-btn'))
+      for (const s of railSpells) spellRail.appendChild(makeSpellButton(s, 'spell-rail-btn'))
       railBuiltFrom = spellCache
     }
     spellRail.style.display = ''
