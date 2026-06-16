@@ -88,24 +88,26 @@ export const MENU_BUTTONS: TabButtonDef[][] = [
 
 export const TAB_BUTTONS: Record<Exclude<TabKey, 'spells'>, TabButtonDef[][]> = {
   micro: [
+    // Row 1: consumables + rest.
     [
       { label: 'q',   title: 'Quaff potion',          text: 'q' },
       { label: 'r',   title: 'Read scroll',           text: 'r' },
-      { label: 'x',   title: 'Examine surroundings',  text: 'x' },
-    ],
-    [
-      { label: 'G',   title: 'Go to level / branch',  text: 'G' },
-      { label: '<',   title: 'Ascend stairs',         text: '<' },
-      { label: '>',   title: 'Descend stairs',        text: '>' },
-      { label: ',',   title: 'Pick up item',          text: ',' },
-    ],
-    [
-      { label: 'm',   title: 'Skills screen',         text: 'm' },
-      { label: 'I',   title: 'List memorised spells', text: 'I' },
+      { label: 'i',   title: 'Inventory',             text: 'i' },
       { label: '5',   title: 'Rest until healed',     text: '5' },
     ],
+    // Row 2: movement / management.
     [
-      { label: 'i',   title: 'Inventory',             text: 'i' },
+      { label: 'G',   title: 'Go to level / branch',  text: 'G' },
+      { label: 'm',   title: 'Skills screen',         text: 'm' },
+      { label: ',',   title: 'Pick up item',          text: ',' },
+      { label: 'I',   title: 'List memorised spells', text: 'I' },
+    ],
+    // Row 3: look / evoke (wands) / stairs.
+    [
+      { label: 'x',   title: 'Examine surroundings',  text: 'x' },
+      { label: 'v',   title: 'Evoke item',            text: 'v' },
+      { label: '<',   title: 'Ascend stairs',         text: '<' },
+      { label: '>',   title: 'Descend stairs',        text: '>' },
     ],
   ],
   // 운영 + 정보 merged into one compact "기타" tab — just the handful that earn
