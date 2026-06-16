@@ -2491,14 +2491,20 @@ html, body {
   flex: 1;
   min-width: 0;
 }
-#touch-controls.dpad-on .tc-content { min-height: calc(3 * 2rem + 2 * 2px); }
+#touch-controls.dpad-on .tc-content { min-height: calc(3 * 2rem + 2 * 2px); width: 100%; }
 #touch-controls.dpad-on .tc-strip {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  /* minmax(0,1fr) + width:100% force four equal columns that fill the panel
+     width on EVERY tab — plain 1fr let the strip shrink-wrap to its content, so
+     a tab with short labels (행동) sat narrower than one with long labels
+     (기타) and looked left-clustered. */
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   grid-auto-rows: 2rem;
   gap: 2px;
   align-content: start;
   overflow: visible;
+  width: 100%;
+  box-sizing: border-box;
 }
 #touch-controls.dpad-on .tc-strip .tc-btn { min-width: 0; min-height: 0; }
 #touch-controls.dpad-on .tc-dpad { align-self: flex-start; }
