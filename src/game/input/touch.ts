@@ -601,7 +601,6 @@ export function buildTouchControls(send: SendFn, opts: { spellTab?: SpellTabConf
   for (const td of tabDefs) {
     const btn = document.createElement('button')
     btn.className = 'tc-tab' + (td.key === 'micro' ? ' active' : '')
-    if (td.key !== 'spells') btn.classList.add('tc-toggle')  // shows the ⇄ flip hint
     btn.textContent = td.label
     btn.title = td.key
     btn.dataset.tab = td.key

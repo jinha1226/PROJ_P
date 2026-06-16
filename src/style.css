@@ -2313,12 +2313,6 @@ html, body {
   --tc-dpad: 2.55rem;
   flex-direction: row;
   align-items: stretch;
-  /* Reclaim part of #app's bottom safe-area pad (25px): drop the whole control
-     cluster ~12px lower so the footer/d-pad sit nearer the screen edge and the
-     map gains that height. ~13px of clearance stays for the home-indicator
-     swipe zone. Ignored in landscape, where #touch-controls is display:contents
-     (no box → no margin) and the panel uses its own bottom margin instead. */
-  margin-bottom: -12px;
 }
 
 /* D-pad: 3×3 CSS grid of large buttons (only present when dpad-on) */
@@ -2443,14 +2437,6 @@ html, body {
 
 .tc-tab:active { background: var(--tc-press); }
 
-/* 행동/기타 toggle: a single visible button that flips the pair. The ⇄ hints
-   that tapping switches rather than re-selecting the shown tab. */
-.tc-toggle::after {
-  content: ' ⇄';
-  opacity: 0.55;
-  font-size: 0.9em;
-}
-
 /* Content area: tab-specific buttons (strip variant just has one child) */
 .tc-content {
   display: flex;
@@ -2506,6 +2492,12 @@ html, body {
 }
 #touch-controls.dpad-on .tc-strip .tc-btn { min-height: 2rem; }
 #touch-controls.dpad-on .tc-dpad { align-self: flex-start; }
+/* Taller header row (Esc / 행동·기타 toggle / pins / Enter) so the top buttons
+   are as easy to hit as the play buttons below them. */
+#touch-controls.dpad-on .tc-esc,
+#touch-controls.dpad-on .tc-enter,
+#touch-controls.dpad-on .tc-pin,
+#touch-controls.dpad-on .tc-tab { height: 2rem; }
 .tc-panel { min-height: 0; }
 .tc-header, .tc-footer { flex-shrink: 0; }
 
