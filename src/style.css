@@ -2539,6 +2539,26 @@ html, body {
 /* --tc-press (not --tc-fill) so the tap still contrasts against the tray fill. */
 .tc-spell-btn:active { background: var(--tc-press); }
 
+/* Spell details popup (long-press / right-click a quick-cast button). */
+.spell-info-popup {
+  position: fixed;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 20;
+  max-width: 80vw;
+  background: var(--surface);
+  border: 1px solid var(--accent);
+  border-radius: 0.5rem;
+  padding: 0.6rem 0.85rem;
+  color: var(--text);
+  font-size: 0.9rem;
+  line-height: 1.55;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+}
+.spell-info-popup .si-title { color: var(--accent); font-weight: bold; margin-bottom: 0.2rem; }
+.spell-info-popup .si-cast { margin-top: 0.35rem; color: var(--text-dim); font-size: 0.8rem; }
+
 /* Footer: Shift, Ctrl, Keyboard */
 .tc-footer {
   display: flex;

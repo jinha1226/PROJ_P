@@ -2674,6 +2674,27 @@ export function buildGameView(
   // One quick-cast button (tile + "za"-style corner letter, tap to cast),
   // shared by the rail and the z-tab grid so the two surfaces can't drift —
   // only the container-specific button class differs.
+  // Long-press / right-click popup with a memorised spell's details (from the
+  // local spell cache — no server round-trip). Dismissed by tapping anywhere.
+  function showSpellInfo(s: SpellEntry): void {
+    view.querySelector('.spell-info-popup')?.remove()
+    const pop = document.createElement('div')
+    pop.className = 'spell-info-popup'
+    const rows = [`<div class="si-title">${escHtml(s.title)}</div>`]
+    if (s.schools) rows.push(`<div>학파: ${escHtml(s.schools)}</div>`)
+    if (s.level != null) rows.push(`<div>레벨: ${s.level}</div>`)
+    if (s.fail) rows.push(`<div>실패율: ${escHtml(s.fail)}</div>`)
+    if (s.range_string) rows.push(`<div>사거리: ${escHtml(s.range_string)}</div>`)
+    if (s.effect) rows.push(`<div>효과: ${escHtml(s.effect)}</div>`)
+    rows.push(`<div class="si-cast">탭하여 시전 · z${escHtml(s.letter)}</div>`)
+    pop.innerHTML = rows.join('')
+    const close = (): void => pop.remove()
+    pop.addEventListener('click', close)
+    view.appendChild(pop)
+    // Next pointerdown anywhere dismisses it (deferred so this press doesn't).
+    requestAnimationFrame(() => document.addEventListener('pointerdown', close, { once: true }))
+  }
+
   function makeSpellButton(s: SpellEntry, btnClass: string): HTMLElement {
     const btn = document.createElement('button')
     btn.className = btnClass
@@ -2697,19 +2718,34 @@ export function buildGameView(
     // Firing on our own touchend keeps double-taps reliable (no browser
     // heuristics) at the cost of finger-up rather than finger-down timing.
     // preventDefault on touchstart suppresses the tap's own synthetic click.
-    let tapX = 0, tapY = 0, tapMoved = false
+    let tapX = 0, tapY = 0, tapMoved = false, longPressed = false, lpTimer = 0
+    const cancelLp = (): void => { if (lpTimer) { window.clearTimeout(lpTimer); lpTimer = 0 } }
     btn.addEventListener('touchstart', e => {
       e.preventDefault()
       const t = e.touches?.[0]
       tapX = t?.clientX ?? 0
       tapY = t?.clientY ?? 0
       tapMoved = false
+      longPressed = false
+      // Long-press → show the spell's details instead of casting.
+      lpTimer = window.setTimeout(() => {
+        longPressed = true
+        navigator.vibrate?.(15)
+        showSpellInfo(s)
+      }, 450)
     }, { passive: false })
     btn.addEventListener('touchmove', e => {
       const t = e.touches?.[0]
-      if (t && Math.hypot(t.clientX - tapX, t.clientY - tapY) > TAP_SLOP_PX) tapMoved = true
+      if (t && Math.hypot(t.clientX - tapX, t.clientY - tapY) > TAP_SLOP_PX) { tapMoved = true; cancelLp() }
     })
-    btn.addEventListener('touchend', () => { if (!tapMoved) castSpellLetter(s.letter) })
+    btn.addEventListener('touchend', () => {
+      cancelLp()
+      if (longPressed) { longPressed = false; return }  // consumed by the info popup
+      if (!tapMoved) castSpellLetter(s.letter)
+    })
+    btn.addEventListener('touchcancel', cancelLp)
+    // Desktop: right-click shows the details (the touch long-press equivalent).
+    btn.addEventListener('contextmenu', e => { e.preventDefault(); showSpellInfo(s) })
     // Mouse/desktop path. Gated on recent touch activity in the view: iOS
     // dispatches its compatibility mouse events (incl. click) at the lift
     // point of an unconsumed drag, so a finger that lands on the floating
