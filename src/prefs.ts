@@ -21,7 +21,7 @@ const DEFAULTS: Prefs = {
   monsterListCollapsed: false,
   mapRenderMode: 'ascii',
   uiLang: 'ko',
-  dpadEnabled: false,
+  dpadEnabled: true,
   coachEnabled: true,
   mapZoomLevel: null,
 }

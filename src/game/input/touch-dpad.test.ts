@@ -6,7 +6,14 @@ import { setPref } from '../../prefs'
 beforeEach(() => { localStorage.clear() })
 
 describe('d-pad toggle', () => {
-  it('omits the d-pad by default (dpadEnabled false)', () => {
+  it('renders the d-pad by default (dpadEnabled true)', () => {
+    const tc = buildTouchControls(() => {})
+    expect(tc.element.querySelector('.tc-dpad')).not.toBeNull()
+    expect(tc.element.classList.contains('dpad-on')).toBe(true)
+  })
+
+  it('omits the d-pad when dpadEnabled is explicitly false', () => {
+    setPref('dpadEnabled', false)
     const tc = buildTouchControls(() => {})
     expect(tc.element.querySelector('.tc-dpad')).toBeNull()
     expect(tc.element.classList.contains('dpad-on')).toBe(false)

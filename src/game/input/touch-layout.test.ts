@@ -1,8 +1,10 @@
 // @vitest-environment happy-dom
 import { describe, it, expect, beforeEach } from 'vitest'
 import { buildTouchControls } from './touch'
+import { setPref } from '../../prefs'
 
-beforeEach(() => { localStorage.clear() })
+// This suite exercises the no-d-pad layout specifically (d-pad is on by default).
+beforeEach(() => { localStorage.clear(); setPref('dpadEnabled', false) })
 
 describe('layout v2: no d-pad, action strip present', () => {
   it('builds no d-pad element', () => {
