@@ -10,7 +10,7 @@ import {
 } from './keyboard'
 import { createShiftToggle } from './shift-state'
 import { getPref, setPref, type UiLang } from '../../prefs'
-import { actionLabel, TAB_LABELS } from './action-labels'
+import { actionLabel, ACTION_LABELS, TAB_LABELS, type LabelPair } from './action-labels'
 import type { RcControls } from '../rc/rc-options'
 
 type SendFn = (msg: ClientMsg) => void
@@ -148,6 +148,24 @@ export const TAB_BUTTONS: Record<Exclude<TabKey, 'spells'>, TabButtonDef[][]> = 
     ],
   ],
 }
+
+// Reverse map: the key a button sends → its localized label. Built from every
+// tab's defs, so a modifier-shifted key that happens to be another known
+// command (e.g. Shift+r → "R" = Remove jewellery, Ctrl+o → "^O" = overview)
+// can be relabelled accurately without a separate hand-maintained table.
+const KEY_LABELS: Map<string, LabelPair> = (() => {
+  const m = new Map<string, LabelPair>()
+  for (const tab of Object.values(TAB_BUTTONS)) {
+    for (const row of tab) {
+      for (const def of row) {
+        const lp = def.title ? ACTION_LABELS[def.title] : undefined
+        const keyStr = def.text ?? def.label
+        if (lp && keyStr) m.set(keyStr, lp)
+      }
+    }
+  }
+  return m
+})()
 
 // Virtual QWERTY keyboard overlay. Letter and symbol layers, sticky Shift
 // (tap = once, double-tap = locked, tap from lock = off) and one-shot Ctrl,
@@ -459,6 +477,8 @@ export function buildTouchControls(send: SendFn, opts: { spellTab?: SpellTabConf
     shiftBtn.classList.toggle('active', shift.state === 'once')
     shiftBtn.classList.toggle('locked', shift.state === 'lock')
     ctrlBtn.classList.toggle('active', ctrlActive)
+    // Relabel the action buttons to the modifier's variant (q→Q, o→^O, …).
+    if (contentEl) renderTab(activeTab)
   }
 
   // Called after each key dispatch. Keeps shift lock engaged so the next
@@ -866,6 +886,28 @@ export function buildTouchControls(send: SendFn, opts: { spellTab?: SpellTabConf
     else renderTab('micro')
   }
 
+  // Label a button accounting for the active modifier: a letter under Shift (or
+  // Ctrl) sends a different key, so relabel it to that key's known command
+  // (KEY_LABELS) or its raw glyph — matching what sendTabKey actually sends.
+  function effectiveLabel(def: TabButtonDef): { text: string; named: boolean } {
+    if (def.text && def.text.length === 1) {
+      if (shift.isOn) {
+        const k = def.text.toUpperCase()
+        const lp = KEY_LABELS.get(k)
+        return lp ? { text: lp[lang], named: true } : { text: k, named: false }
+      }
+      if (ctrlActive) {
+        const up = def.text.toUpperCase()
+        if (CAPTURED_CTRL.has(up)) {
+          const k = '^' + up
+          const lp = KEY_LABELS.get(k)
+          return lp ? { text: lp[lang], named: true } : { text: k, named: false }
+        }
+      }
+    }
+    return actionLabel(def, lang)
+  }
+
   function renderContent(rows: TabButtonDef[][]): void {
     contentEl.innerHTML = ''
     const stripEl = document.createElement('div')
@@ -879,7 +921,7 @@ export function buildTouchControls(send: SendFn, opts: { spellTab?: SpellTabConf
       }
       const btn = document.createElement('button')
       btn.className = 'tc-btn'
-      const { text, named } = actionLabel(def, lang)
+      const { text, named } = effectiveLabel(def)
       if (named) btn.classList.add('named')
       else if (/[^\x20-\x7e]/.test(def.label)) btn.classList.add('glyph')
       btn.textContent = text

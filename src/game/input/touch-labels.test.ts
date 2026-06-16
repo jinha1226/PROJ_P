@@ -19,6 +19,20 @@ describe('semantic labels in the touch HUD', () => {
     expect(texts).not.toContain('o')    // raw key no longer shown
   })
 
+  it('relabels buttons to the Shift variant (x → X = level map)', () => {
+    const tc = buildTouchControls(() => {})
+    expect(labels(tc.element)).toContain('둘러보기') // x = examine in play
+    ;(tc.element.querySelector('.tc-shift') as HTMLButtonElement).click()
+    expect(labels(tc.element)).toContain('지도')     // Shift+x → X = examine level map
+  })
+
+  it('relabels buttons to the Ctrl variant (o → ^O = overview)', () => {
+    const tc = buildTouchControls(() => {})
+    expect(labels(tc.element)).toContain('자동탐색') // o = auto-explore in play
+    ;(tc.element.querySelector('.tc-ctrl') as HTMLButtonElement).click()
+    expect(labels(tc.element)).toContain('던전개요') // Ctrl+o → ^O = dungeon overview
+  })
+
   it('relabels the Tab button to 페이지 in menu mode, back to 자동전투 in play', () => {
     const tc = buildTouchControls(() => {})
     expect(labels(tc.element)).toContain('자동전투') // Tab = autofight in play
