@@ -2063,6 +2063,20 @@ html, body {
   -webkit-tap-highlight-color: transparent;
 }
 .spell-rail-btn:active { background: var(--surface); }
+/* Hidden spells, revealed (dimmed) by the rail's "+N" toggle so they can be
+   long-pressed → "다시 표시". */
+.spell-rail-btn.tc-spell-hidden { opacity: 0.4; }
+/* Rail toggle that reveals/closes hidden spells. Text, not a tile, so it gets
+   explicit sizing to sit flush with the tile buttons. */
+.spell-rail-more {
+  height: var(--spell-rail-h);
+  min-width: 2.2rem;
+  padding: 0 0.4rem;
+  line-height: var(--spell-rail-h);
+  font-size: 0.7rem;
+  color: var(--text-dim);
+  white-space: nowrap;
+}
 /* Corner cast-keystroke letter ("za"), shared by the rail and the z-tab grid
    (both built by makeSpellButton) so it looks/sits the same in both. */
 .spell-letter {
@@ -2296,7 +2310,7 @@ html, body {
    Cap height to 3 d-pad rows so a tall spell grid scrolls inside the panel
    rather than growing the whole strip. */
 #touch-controls.dpad-on {
-  --tc-dpad: 3.1rem;
+  --tc-dpad: 2.8rem;
   flex-direction: row;
   align-items: stretch;
   max-height: calc(var(--tc-dpad) * 3 + 4px + 0.4rem);
@@ -2463,7 +2477,17 @@ html, body {
    the RIGHT of the d-pad, not the full-width single row of the no-d-pad layout.
    Restore wrapping there so the buttons fill that block as a grid instead of
    running off the right edge in one scrolling line. */
-#touch-controls.dpad-on .tc-content { flex: 1 1 0; min-height: 0; overflow: hidden; }
+/* Header (tabs) and footer (modifiers) must never be overrun by a tall action
+   grid. Flex column + max-height let the footer ride up over the content on
+   short viewports; a 3-row grid (fixed / scroll / fixed) pins both ends and
+   gives the middle row a hard `minmax(0,1fr)` cap so the strip scrolls inside
+   it instead of pushing the footer past the panel's bottom edge. */
+#touch-controls.dpad-on .tc-panel {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  min-height: 0;
+}
+#touch-controls.dpad-on .tc-content { min-height: 0; overflow: hidden; }
 #touch-controls.dpad-on .tc-strip {
   flex: 1;
   min-height: 0;
@@ -2473,8 +2497,6 @@ html, body {
   overflow-y: auto;
 }
 #touch-controls.dpad-on .tc-strip .tc-btn { min-height: 2rem; }
-/* Header (tabs) and footer (modifiers) never shrink or get overrun — the
-   scrollable content sits between them, not under them. */
 .tc-panel { min-height: 0; }
 .tc-header, .tc-footer { flex-shrink: 0; }
 

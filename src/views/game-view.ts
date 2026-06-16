@@ -288,7 +288,11 @@ export function buildGameView(
   // power/damage/noise, re-add the second phase in the same change (it lives
   // in git history: `mergeSpellExtra` + the 'extra' harvestPhase).
   let spellCache: SpellEntry[] = []
-  let showHiddenSpells = false  // z-tab toggle to reveal hidden quick-cast spells for un-hiding
+  let showHiddenSpells = false  // toggle to reveal hidden quick-cast spells for un-hiding
+  // Signature of the rail's last build (declared here, not beside renderSpellRail,
+  // because exposeSpellCache → renderSpellRail runs during early setup, before a
+  // declaration further down would have left its temporal dead zone).
+  let railSig = ''
   // 'late-base' is the base phase after its input-suppression budget ran out:
   // the `I` reply is slower than HARVEST_SUPPRESS_MS, so the user gets the
   // input channel back, but we keep listening (up to HARVEST_LATE_MS) so the
@@ -2672,15 +2676,11 @@ export function buildGameView(
   // the rail + z tab once they've learned more. Hidden by title (persisted).
   // Function declarations (not const) so the early setup render can call them.
   function hiddenSpellSet(): Set<string> { return new Set(getPref('hiddenSpells') ?? []) }
-  function visibleSpells(): SpellEntry[] {
-    const hidden = hiddenSpellSet()
-    return spellCache.filter(s => !hidden.has(s.title))
-  }
   function setSpellHidden(title: string, hide: boolean): void {
     const cur = hiddenSpellSet()
     if (hide) cur.add(title); else cur.delete(title)
     setPref('hiddenSpells', [...cur])
-    railBuiltFrom = null      // force the rail to rebuild from the new filter
+    railSig = ''              // force the rail to rebuild from the new filter
     exposeSpellCache()        // refresh rail + z-tab grid
   }
 
@@ -2712,22 +2712,6 @@ export function buildGameView(
     function onDown(e: Event): void { if (!pop.contains(e.target as Node)) close() }
     // Tapping the popup's text (not a button — buttons stopPropagation) closes.
     pop.addEventListener('click', close)
-    // Full in-game description (damage / power) — the cast menu's describe mode:
-    // z opens "Cast which spell?", ? switches it to describe, the letter
-    // selects. Describe mode does not cast, so this can't fire the spell.
-    if (!spectating) {
-      const detail = document.createElement('button')
-      detail.className = 'si-action'
-      detail.textContent = '자세히 (데미지·설명)'
-      detail.addEventListener('click', e => {
-        e.stopPropagation()
-        close()
-        conn.send({ msg: 'input', text: 'z' })
-        conn.send({ msg: 'input', text: '?' })
-        conn.send({ msg: 'input', text: s.letter })
-      })
-      pop.appendChild(detail)
-    }
     // Hide / un-hide this spell from the quick-cast surfaces.
     const isHidden = hiddenSpellSet().has(s.title)
     const act = document.createElement('button')
@@ -2927,19 +2911,47 @@ export function buildGameView(
   // reference identity distinguishes "content changed, rebuild" from
   // "visibility toggled, just un/hide" — the X-mode enter/exit calls land on
   // the cheap path instead of rebuilding every button + tile per examine.
-  let railBuiltFrom: SpellEntry[] | null = null
+  // (railSig is declared up near spellCache to dodge the early-setup TDZ.)
   function renderSpellRail(): void {
     // Hidden while examining (X-mode): the zoomed-out examine map claims the
     // log/HUD rows, and the rail's row (plus the log overlay) would shrink and
     // occlude the very cells the player entered X-mode to read.
-    const railSpells = visibleSpells()
-    const visible = !spectating && !inXMode && railSpells.length > 0
+    const hidden = hiddenSpellSet()
+    const vis = spellCache.filter(s => !hidden.has(s.title))
+    const nHidden = spellCache.length - vis.length
+    // Keep the rail alive whenever spells exist (even if all are hidden) so the
+    // "+N" toggle below stays reachable — otherwise hiding every spell would
+    // strand the only un-hide affordance (the z tab is disabled).
+    const visible = !spectating && !inXMode && spellCache.length > 0 && (vis.length > 0 || nHidden > 0)
     view.classList.toggle('spell-row', visible)
-    if (!visible) { spellRail.style.display = 'none'; return }
-    if (railBuiltFrom !== spellCache) {
+    if (!visible) { spellRail.style.display = 'none'; railSig = ''; return }
+    const sig = `${vis.map(s => s.letter).join('')}|${nHidden}|${showHiddenSpells ? 1 : 0}`
+    if (sig !== railSig) {
       spellRail.innerHTML = ''
-      for (const s of railSpells) spellRail.appendChild(makeSpellButton(s, 'spell-rail-btn'))
-      railBuiltFrom = spellCache
+      for (const s of vis) spellRail.appendChild(makeSpellButton(s, 'spell-rail-btn'))
+      if (showHiddenSpells) {
+        for (const s of spellCache) {
+          if (!hidden.has(s.title)) continue
+          const b = makeSpellButton(s, 'spell-rail-btn')
+          b.classList.add('tc-spell-hidden')   // dimmed; long-press → 다시 표시
+          spellRail.appendChild(b)
+        }
+      }
+      if (nHidden > 0) {
+        const more = document.createElement('button')
+        more.className = 'spell-rail-btn spell-rail-more'
+        more.textContent = showHiddenSpells ? '✕' : `+${nHidden}`
+        more.title = showHiddenSpells ? '숨긴 주문 닫기' : `숨긴 주문 ${nHidden}개 보기`
+        const toggle = (e: Event): void => {
+          e.preventDefault()
+          showHiddenSpells = !showHiddenSpells
+          renderSpellRail()
+        }
+        more.addEventListener('touchstart', toggle, { passive: false })
+        more.addEventListener('click', toggle)
+        spellRail.appendChild(more)
+      }
+      railSig = sig
     }
     spellRail.style.display = ''
   }
