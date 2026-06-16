@@ -24,9 +24,11 @@ describe('semantic labels in the touch HUD', () => {
     expect(labels(tc.element)).toContain('자동전투') // Tab = autofight in play
     tc.setMenuMode(true)
     expect(labels(tc.element)).toContain('페이지')   // Tab = page in a menu
+    expect(labels(tc.element)).toContain('!')        // describe/toggle button added
     expect(labels(tc.element)).not.toContain('자동전투')
     tc.setMenuMode(false)
     expect(labels(tc.element)).toContain('자동전투')
+    expect(labels(tc.element)).not.toContain('!')    // ! only in menu mode
   })
 
   it('named buttons get the "named" class for text styling', () => {

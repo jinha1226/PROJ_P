@@ -875,6 +875,19 @@ export function buildTouchControls(send: SendFn, opts: { spellTab?: SpellTabConf
       btn.addEventListener('click', () => sendTabKey(def))
       stripEl.appendChild(btn)
     }
+    // In a menu/overlay, "!" toggles the item-action menu to its describe view
+    // (the "Press ! …" footer hint) — surface it as a dedicated button.
+    if (menuMode) {
+      const bang: TabButtonDef = { label: '!', text: '!', title: 'Describe / toggle (!)' }
+      const btn = document.createElement('button')
+      btn.className = 'tc-btn'
+      btn.textContent = '!'
+      btn.title = bang.title!
+      btn.setAttribute('aria-label', bang.title!)
+      btn.addEventListener('touchstart', e => { e.preventDefault(); sendTabKey(bang) }, { passive: false })
+      btn.addEventListener('click', () => sendTabKey(bang))
+      stripEl.appendChild(btn)
+    }
     contentEl.appendChild(stripEl)
   }
 
