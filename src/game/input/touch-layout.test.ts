@@ -24,9 +24,9 @@ describe('layout v2: no d-pad, action strip present', () => {
   it('action buttons still send their key on tap', () => {
     const sent: unknown[] = []
     const tc = buildTouchControls(m => sent.push(m))
-    const explore = [...tc.element.querySelectorAll('.tc-content .tc-btn')]
-      .find(b => b.textContent === '자동탐색') as HTMLButtonElement
-    explore.click()
-    expect(sent).toContainEqual({ msg: 'input', text: 'o' })
+    const skills = [...tc.element.querySelectorAll('.tc-content .tc-btn')]
+      .find(b => b.textContent === '기술') as HTMLButtonElement
+    skills.click()
+    expect(sent).toContainEqual({ msg: 'input', text: 'm' })
   })
 })

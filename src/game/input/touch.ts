@@ -89,29 +89,20 @@ export const MENU_BUTTONS: TabButtonDef[][] = [
 export const TAB_BUTTONS: Record<Exclude<TabKey, 'spells'>, TabButtonDef[][]> = {
   micro: [
     [
-      { label: '⇥',   title: 'Auto-fight nearest',    key: 9 },
       { label: 'q',   title: 'Quaff potion',          text: 'q' },
       { label: 'r',   title: 'Read scroll',           text: 'r' },
-      { label: 'v',   title: 'Evoke item',            text: 'v' },
-    ],
-    [
       { label: 'z',   title: 'Cast spell',            text: 'z' },
-      { label: 'a',   title: 'Use ability',           text: 'a' },
       { label: 'x',   title: 'Examine surroundings',  text: 'x' },
-      { label: ',',   title: 'Pick up item',          text: ',' },
     ],
     [
-      { label: 'o',   title: 'Auto-explore',          text: 'o' },
       { label: 'G',   title: 'Go to level / branch',  text: 'G' },
       { label: '<',   title: 'Ascend stairs',         text: '<' },
       { label: '>',   title: 'Descend stairs',        text: '>' },
+      { label: 'm',   title: 'Skills screen',         text: 'm' },
     ],
     [
-      { label: 'm',   title: 'Skills screen',         text: 'm' },
       { label: 'M',   title: 'Spell library',         text: 'M' },
       { label: 'I',   title: 'List memorised spells', text: 'I' },
-    ],
-    [
       { label: '5',   title: 'Rest until healed',     text: '5' },
       { label: 'i',   title: 'Inventory',             text: 'i' },
     ],
@@ -124,14 +115,19 @@ export const TAB_BUTTONS: Record<Exclude<TabKey, 'spells'>, TabButtonDef[][]> = 
       { label: 'P',   title: 'Put on jewellery',      text: 'P' },
     ],
     [
+      { label: 'v',   title: 'Evoke item',            text: 'v' },
+      { label: 'a',   title: 'Use ability',           text: 'a' },
       { label: 'd',   title: 'Drop',                  text: 'd' },
-      { label: '^F',  title: 'Find feature (Ctrl+F)', key: 6 },
-      { label: '^O',  title: 'Dungeon overview (Ctrl+O)', key: 15 },
       { label: 'e',   title: 'Equip / exclude',       text: 'e' },
     ],
     [
+      { label: '^F',  title: 'Find feature (Ctrl+F)', key: 6 },
+      { label: '^O',  title: 'Dungeon overview (Ctrl+O)', key: 15 },
       { label: 'X',   title: 'Examine level map',     text: 'X' },
       { label: 'f',   title: 'Fire / quivered',       text: 'f' },
+    ],
+    [
+      { label: ',',   title: 'Pick up item',          text: ',' },
     ],
   ],
   info: [
@@ -168,6 +164,9 @@ const KEY_LABELS: Map<string, LabelPair> = (() => {
       }
     }
   }
+  // Modifier-reachable commands that have no dedicated button of their own.
+  m.set('Q', { ko: '화살집', en: 'Quiver' })       // Shift+q
+  m.set('^X', { ko: '저장/종료', en: 'Save & exit' }) // Ctrl+x
   return m
 })()
 
@@ -569,6 +568,24 @@ export function buildTouchControls(send: SendFn, opts: { spellTab?: SpellTabConf
   escBtn.addEventListener('touchstart', e => { e.preventDefault(); send({ msg: 'key', keycode: 27 }); clearOneshot() }, { passive: false })
   escBtn.addEventListener('click', () => { send({ msg: 'key', keycode: 27 }); clearOneshot() })
   headerEl.appendChild(escBtn)
+
+  // Pinned heavy-use actions — always visible regardless of the active tab.
+  // Shown as compact glyphs (⇥ = autofight, O = auto-explore).
+  const fightBtn = document.createElement('button')
+  fightBtn.className = 'tc-pin'
+  fightBtn.textContent = '⇥'
+  fightBtn.title = 'Auto-fight nearest'
+  fightBtn.addEventListener('touchstart', e => { e.preventDefault(); send({ msg: 'key', keycode: 9 }); clearOneshot() }, { passive: false })
+  fightBtn.addEventListener('click', () => { send({ msg: 'key', keycode: 9 }); clearOneshot() })
+  headerEl.appendChild(fightBtn)
+
+  const exploreBtn = document.createElement('button')
+  exploreBtn.className = 'tc-pin'
+  exploreBtn.textContent = 'O'
+  exploreBtn.title = 'Auto-explore'
+  exploreBtn.addEventListener('touchstart', e => { e.preventDefault(); send({ msg: 'input', text: 'o' }); clearOneshot() }, { passive: false })
+  exploreBtn.addEventListener('click', () => { send({ msg: 'input', text: 'o' }); clearOneshot() })
+  headerEl.appendChild(exploreBtn)
 
   tabsEl = document.createElement('div')
   tabsEl.className = 'tc-tabs'

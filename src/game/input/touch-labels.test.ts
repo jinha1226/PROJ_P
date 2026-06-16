@@ -14,9 +14,16 @@ describe('semantic labels in the touch HUD', () => {
   it('renders Korean action labels by default (uiLang default ko)', () => {
     const tc = buildTouchControls(() => {})
     const texts = labels(tc.element)
-    expect(texts).toContain('자동탐색') // Auto-explore
-    expect(texts).toContain('휴식')     // Rest
-    expect(texts).not.toContain('o')    // raw key no longer shown
+    expect(texts).toContain('기술')     // Skills (m)
+    expect(texts).toContain('휴식')     // Rest (5)
+    expect(texts).not.toContain('m')    // raw key no longer shown
+  })
+
+  it('pins autofight (⇥) and auto-explore (O) in the header', () => {
+    const tc = buildTouchControls(() => {})
+    const pins = [...tc.element.querySelectorAll('.tc-pin')].map(b => b.textContent)
+    expect(pins).toContain('⇥')
+    expect(pins).toContain('O')
   })
 
   it('relabels buttons to the Shift variant (x → X = level map)', () => {
@@ -26,39 +33,40 @@ describe('semantic labels in the touch HUD', () => {
     expect(labels(tc.element)).toContain('지도')     // Shift+x → X = examine level map
   })
 
-  it('relabels buttons to the Ctrl variant (o → ^O = overview)', () => {
+  it('relabels buttons to the Ctrl variant (x → ^X = save & exit)', () => {
     const tc = buildTouchControls(() => {})
-    expect(labels(tc.element)).toContain('자동탐색') // o = auto-explore in play
+    expect(labels(tc.element)).toContain('둘러보기') // x = examine in play
     ;(tc.element.querySelector('.tc-ctrl') as HTMLButtonElement).click()
-    expect(labels(tc.element)).toContain('던전개요') // Ctrl+o → ^O = dungeon overview
+    expect(labels(tc.element)).toContain('저장/종료') // Ctrl+x → ^X = save & exit
   })
 
-  it('relabels the Tab button to 페이지 in menu mode, back to 자동전투 in play', () => {
+  it('swaps to menu meta-keys (페이지 / !) in menu mode', () => {
     const tc = buildTouchControls(() => {})
-    expect(labels(tc.element)).toContain('자동전투') // Tab = autofight in play
+    expect(labels(tc.element)).toContain('물약')      // a play action
+    expect(labels(tc.element)).not.toContain('페이지')
     tc.setMenuMode(true)
     expect(labels(tc.element)).toContain('페이지')   // Tab = page in a menu
-    expect(labels(tc.element)).toContain('!')        // describe/toggle button added
-    expect(labels(tc.element)).not.toContain('자동전투')
+    expect(labels(tc.element)).toContain('!')        // describe/toggle button
+    expect(labels(tc.element)).not.toContain('물약')
     tc.setMenuMode(false)
-    expect(labels(tc.element)).toContain('자동전투')
-    expect(labels(tc.element)).not.toContain('!')    // ! only in menu mode
+    expect(labels(tc.element)).toContain('물약')
+    expect(labels(tc.element)).not.toContain('!')
   })
 
   it('named buttons get the "named" class for text styling', () => {
     const tc = buildTouchControls(() => {})
-    const explore = [...tc.element.querySelectorAll('.tc-content .tc-btn')]
-      .find(b => b.textContent === '자동탐색')!
-    expect(explore.classList.contains('named')).toBe(true)
+    const skills = [...tc.element.querySelectorAll('.tc-content .tc-btn')]
+      .find(b => b.textContent === '기술')!
+    expect(skills.classList.contains('named')).toBe(true)
   })
 
   it('still sends the original key when a semantic button is tapped', () => {
     const sent: unknown[] = []
     const tc = buildTouchControls(m => sent.push(m))
-    const explore = [...tc.element.querySelectorAll('.tc-content .tc-btn')]
-      .find(b => b.textContent === '자동탐색') as HTMLButtonElement
-    explore.click()
-    expect(sent).toContainEqual({ msg: 'input', text: 'o' })
+    const skills = [...tc.element.querySelectorAll('.tc-content .tc-btn')]
+      .find(b => b.textContent === '기술') as HTMLButtonElement
+    skills.click()
+    expect(sent).toContainEqual({ msg: 'input', text: 'm' })
   })
 })
 
@@ -70,8 +78,8 @@ describe('language toggle', () => {
     expect(toggle).toBeTruthy()
     toggle.click()
     const texts = [...tc.element.querySelectorAll('.tc-content .tc-btn')].map(b => b.textContent)
-    expect(texts).toContain('Explore')
-    expect(texts).not.toContain('자동탐색')
+    expect(texts).toContain('Skills')
+    expect(texts).not.toContain('기술')
   })
 
   it('persists the chosen language to prefs', () => {
