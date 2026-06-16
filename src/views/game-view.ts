@@ -2705,7 +2705,12 @@ export function buildGameView(
     if (s.effect) rows.push(`<div>효과: ${escHtml(s.effect)}</div>`)
     rows.push(`<div class="si-cast">탭하여 시전 · z${escHtml(s.letter)}</div>`)
     pop.innerHTML = rows.join('')
-    const close = (): void => pop.remove()
+    const close = (): void => { pop.remove(); document.removeEventListener('pointerdown', onDown, true) }
+    // Dismiss only on a press OUTSIDE the popup — a press on the popup's own
+    // buttons must reach their click handler (was closing first → hide/detail
+    // never fired). Capture phase so it sees the press before anything else.
+    function onDown(e: Event): void { if (!pop.contains(e.target as Node)) close() }
+    // Tapping the popup's text (not a button — buttons stopPropagation) closes.
     pop.addEventListener('click', close)
     // Full in-game description (damage / power) — the cast menu's describe mode:
     // z opens "Cast which spell?", ? switches it to describe, the letter
@@ -2731,8 +2736,8 @@ export function buildGameView(
     act.addEventListener('click', e => { e.stopPropagation(); close(); setSpellHidden(s.title, !isHidden) })
     pop.appendChild(act)
     view.appendChild(pop)
-    // Next pointerdown anywhere dismisses it (deferred so this press doesn't).
-    requestAnimationFrame(() => document.addEventListener('pointerdown', close, { once: true }))
+    // Deferred so the long-press's own release doesn't immediately dismiss.
+    requestAnimationFrame(() => document.addEventListener('pointerdown', onDown, true))
   }
 
   function makeSpellButton(s: SpellEntry, btnClass: string): HTMLElement {
