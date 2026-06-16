@@ -109,35 +109,26 @@ export const TAB_BUTTONS: Record<Exclude<TabKey, 'spells'>, TabButtonDef[][]> = 
     ],
   ],
   // 운영 + 정보 merged into one "기타" tab — everything that isn't a core action.
+  // Rarely-used gear/admin commands (wield, equip, jewellery, drop, find,
+  // reassign, item knowledge) were dropped; R / ^F stay reachable via Shift+r /
+  // Ctrl+f relabels (see KEY_LABELS extras below).
   macro: [
     [
-      { label: 'w',   title: 'Wield weapon',          text: 'w' },
-      { label: 'e',   title: 'Equip / exclude',       text: 'e' },
-      { label: 'P',   title: 'Put on jewellery',      text: 'P' },
-      { label: 'R',   title: 'Remove jewellery',      text: 'R' },
-    ],
-    [
-      { label: 'd',   title: 'Drop',                  text: 'd' },
       { label: 'f',   title: 'Fire / quivered',       text: 'f' },
-      { label: '^F',  title: 'Find feature (Ctrl+F)', key: 6 },
       { label: '^O',  title: 'Dungeon overview (Ctrl+O)', key: 15 },
-    ],
-    [
       { label: 'X',   title: 'Examine level map',     text: 'X' },
       { label: '@',   title: 'Character status',      text: '@' },
+    ],
+    [
       { label: '%',   title: 'Character overview',    text: '%' },
       { label: 'A',   title: 'Abilities/mutations',   text: 'A' },
-    ],
-    [
       { label: 'v',   title: 'Evoke item',            text: 'v' },
       { label: 'a',   title: 'Use ability',           text: 'a' },
-      { label: '^',   title: 'Religion / deity',      text: '^' },
-      { label: 't',   title: 'Tell allies (tt to shout)', text: 't' },
     ],
     [
-      { label: '=',   title: 'Reassign inventory/spell letters', text: '=' },
+      { label: '^',   title: 'Religion / deity',      text: '^' },
+      { label: 't',   title: 'Tell allies (tt to shout)', text: 't' },
       { label: '}',   title: 'Runes collected',       text: '}' },
-      { label: '\\',  title: 'Item knowledge',        text: '\\' },
       { label: '$',   title: 'Gold / shopping list',  text: '$' },
     ],
     [
@@ -166,6 +157,10 @@ const KEY_LABELS: Map<string, LabelPair> = (() => {
   // Modifier-reachable commands with no dedicated button of their own.
   m.set('Q', { ko: '화살집', en: 'Quiver' })          // Shift+q
   m.set('^X', { ko: '저장/종료', en: 'Save & exit' })  // Ctrl+x
+  // These two lost their dedicated 기타 buttons but stay reachable in place via
+  // the modifier relabel (Shift+r → R, Ctrl+f → ^F), so keep their names.
+  m.set('R', ACTION_LABELS['Remove jewellery'])        // Shift+r
+  m.set('^F', ACTION_LABELS['Find feature (Ctrl+F)'])  // Ctrl+f
   return m
 })()
 
