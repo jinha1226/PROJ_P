@@ -2484,6 +2484,12 @@ html, body {
   display: flex;
   flex-direction: column;
   min-height: 0;
+  /* Fill the width left of... er, right of the d-pad. Without flex-grow the
+     panel shrinks to its content (the 4×1fr grid collapses to min-content),
+     leaving the whole control band hugging the left edge with a dead gutter on
+     the right. flex:1 + min-width:0 makes it span the remaining width. */
+  flex: 1;
+  min-width: 0;
 }
 #touch-controls.dpad-on .tc-content { min-height: calc(3 * 2rem + 2 * 2px); }
 #touch-controls.dpad-on .tc-strip {
