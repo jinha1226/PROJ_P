@@ -20,7 +20,7 @@ export const ACTION_LABELS: Record<string, LabelPair> = {
   'Fire / quivered':      { ko: '발사',     en: 'Fire' },
   'Evoke item':           { ko: '발동',     en: 'Evoke' },
   'Use ability':          { ko: '능력',     en: 'Ability' },
-  'Cast spell':           { ko: '주문',     en: 'Cast' },
+  'Cast spell':           { ko: '시전',     en: 'Cast' },
   'Examine surroundings': { ko: '관찰',     en: 'Look' },
   'Pick up item':         { ko: '줍기',     en: 'Pick up' },
   // macro
@@ -47,7 +47,7 @@ export const ACTION_LABELS: Record<string, LabelPair> = {
   'Item knowledge':                    { ko: '아이템지식', en: 'Known' },
   'Gold / shopping list':              { ko: '소지금',   en: 'Gold' },
   'Spell library':                     { ko: '주문서고', en: 'Library' },
-  'List memorised spells':             { ko: '암기주문', en: 'Spells' },
+  'List memorised spells':             { ko: '주문',     en: 'Spells' },
   'Help':                              { ko: '도움말',   en: 'Help' },
 }
 

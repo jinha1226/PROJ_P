@@ -91,7 +91,6 @@ export const TAB_BUTTONS: Record<Exclude<TabKey, 'spells'>, TabButtonDef[][]> = 
     [
       { label: 'q',   title: 'Quaff potion',          text: 'q' },
       { label: 'r',   title: 'Read scroll',           text: 'r' },
-      { label: 'z',   title: 'Cast spell',            text: 'z' },
       { label: 'x',   title: 'Examine surroundings',  text: 'x' },
     ],
     [
@@ -102,7 +101,6 @@ export const TAB_BUTTONS: Record<Exclude<TabKey, 'spells'>, TabButtonDef[][]> = 
     ],
     [
       { label: 'm',   title: 'Skills screen',         text: 'm' },
-      { label: 'M',   title: 'Spell library',         text: 'M' },
       { label: 'I',   title: 'List memorised spells', text: 'I' },
       { label: '5',   title: 'Rest until healed',     text: '5' },
     ],
@@ -143,6 +141,8 @@ export const TAB_BUTTONS: Record<Exclude<TabKey, 'spells'>, TabButtonDef[][]> = 
       { label: '$',   title: 'Gold / shopping list',  text: '$' },
     ],
     [
+      { label: 'z',   title: 'Cast spell',            text: 'z' },
+      { label: 'M',   title: 'Spell library',         text: 'M' },
       { label: '?',   title: 'Help',                  text: '?' },
     ],
   ],
@@ -569,14 +569,14 @@ export function buildTouchControls(send: SendFn, opts: { spellTab?: SpellTabConf
   headerEl.appendChild(escBtn)
 
   // Pinned heavy-use actions — always visible regardless of the active tab.
-  // Shown as compact glyphs (⇥ = autofight, O = auto-explore).
+  // Shown as compact glyphs (⇥ = autofight, O = auto-explore). Appended AFTER
+  // the tab strip so they sit at the far right, the thumb's natural reach.
   const fightBtn = document.createElement('button')
   fightBtn.className = 'tc-pin'
   fightBtn.textContent = '⇥'
   fightBtn.title = 'Auto-fight nearest'
   fightBtn.addEventListener('touchstart', e => { e.preventDefault(); send({ msg: 'key', keycode: 9 }); clearOneshot() }, { passive: false })
   fightBtn.addEventListener('click', () => { send({ msg: 'key', keycode: 9 }); clearOneshot() })
-  headerEl.appendChild(fightBtn)
 
   const exploreBtn = document.createElement('button')
   exploreBtn.className = 'tc-pin'
@@ -584,7 +584,6 @@ export function buildTouchControls(send: SendFn, opts: { spellTab?: SpellTabConf
   exploreBtn.title = 'Auto-explore'
   exploreBtn.addEventListener('touchstart', e => { e.preventDefault(); send({ msg: 'input', text: 'o' }); clearOneshot() }, { passive: false })
   exploreBtn.addEventListener('click', () => { send({ msg: 'input', text: 'o' }); clearOneshot() })
-  headerEl.appendChild(exploreBtn)
 
   tabsEl = document.createElement('div')
   tabsEl.className = 'tc-tabs'
@@ -609,13 +608,10 @@ export function buildTouchControls(send: SendFn, opts: { spellTab?: SpellTabConf
   }
   headerEl.appendChild(tabsEl)
 
-  const enterBtn = document.createElement('button')
-  enterBtn.className = 'tc-enter'
-  enterBtn.textContent = '⏎'
-  enterBtn.title = 'Enter'
-  enterBtn.addEventListener('touchstart', e => { e.preventDefault(); send({ msg: 'key', keycode: 13 }); clearOneshot() }, { passive: false })
-  enterBtn.addEventListener('click', () => { send({ msg: 'key', keycode: 13 }); clearOneshot() })
-  headerEl.appendChild(enterBtn)
+  // Pins live at the far right (Enter was dropped here — rarely used in play,
+  // and still reachable via the virtual keyboard).
+  headerEl.appendChild(fightBtn)
+  headerEl.appendChild(exploreBtn)
 
   // Content area — replaced on tab switch or mode change
   contentEl = document.createElement('div')

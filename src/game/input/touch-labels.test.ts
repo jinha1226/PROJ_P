@@ -34,7 +34,6 @@ describe('semantic labels in the touch HUD', () => {
     expect(l).toContain('화살집')   // Shift+q → Q = quiver (in q's slot)
     expect(l).toContain('지도')     // Shift+x → X = level map
     expect(l).not.toContain('물약') // q's slot is now 화살집
-    expect(l).not.toContain('주문') // Shift+z is a dead key → empty slot
   })
 
   it('relabels in place under Ctrl (x → 저장/종료)', () => {
