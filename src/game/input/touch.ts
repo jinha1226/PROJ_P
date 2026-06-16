@@ -14,7 +14,7 @@ import { actionLabel, ACTION_LABELS, TAB_LABELS, type LabelPair } from './action
 import type { RcControls } from '../rc/rc-options'
 
 type SendFn = (msg: ClientMsg) => void
-type TabKey = 'micro' | 'macro' | 'info' | 'spells'
+type TabKey = 'micro' | 'macro' | 'spells'
 
 // Toggled off for testing (2026-06): evaluating whether the horizontal spell
 // rail row is sufficient on its own. The z quick-cast tab stays fully wired
@@ -98,47 +98,46 @@ export const TAB_BUTTONS: Record<Exclude<TabKey, 'spells'>, TabButtonDef[][]> = 
       { label: 'G',   title: 'Go to level / branch',  text: 'G' },
       { label: '<',   title: 'Ascend stairs',         text: '<' },
       { label: '>',   title: 'Descend stairs',        text: '>' },
-      { label: 'm',   title: 'Skills screen',         text: 'm' },
+      { label: ',',   title: 'Pick up item',          text: ',' },
     ],
     [
+      { label: 'm',   title: 'Skills screen',         text: 'm' },
       { label: 'M',   title: 'Spell library',         text: 'M' },
       { label: 'I',   title: 'List memorised spells', text: 'I' },
       { label: '5',   title: 'Rest until healed',     text: '5' },
+    ],
+    [
       { label: 'i',   title: 'Inventory',             text: 'i' },
     ],
   ],
+  // 운영 + 정보 merged into one "기타" tab — everything that isn't a core action.
   macro: [
     [
       { label: 'w',   title: 'Wield weapon',          text: 'w' },
-      { label: 'R',   title: 'Remove jewellery',      text: 'R' },
-      { label: 't',   title: 'Tell allies (tt to shout)', text: 't' },
+      { label: 'e',   title: 'Equip / exclude',       text: 'e' },
       { label: 'P',   title: 'Put on jewellery',      text: 'P' },
+      { label: 'R',   title: 'Remove jewellery',      text: 'R' },
+    ],
+    [
+      { label: 'd',   title: 'Drop',                  text: 'd' },
+      { label: 'f',   title: 'Fire / quivered',       text: 'f' },
+      { label: '^F',  title: 'Find feature (Ctrl+F)', key: 6 },
+      { label: '^O',  title: 'Dungeon overview (Ctrl+O)', key: 15 },
+    ],
+    [
+      { label: 'X',   title: 'Examine level map',     text: 'X' },
+      { label: '@',   title: 'Character status',      text: '@' },
+      { label: '%',   title: 'Character overview',    text: '%' },
+      { label: 'A',   title: 'Abilities/mutations',   text: 'A' },
     ],
     [
       { label: 'v',   title: 'Evoke item',            text: 'v' },
       { label: 'a',   title: 'Use ability',           text: 'a' },
-      { label: 'd',   title: 'Drop',                  text: 'd' },
-      { label: 'e',   title: 'Equip / exclude',       text: 'e' },
-    ],
-    [
-      { label: '^F',  title: 'Find feature (Ctrl+F)', key: 6 },
-      { label: '^O',  title: 'Dungeon overview (Ctrl+O)', key: 15 },
-      { label: 'X',   title: 'Examine level map',     text: 'X' },
-      { label: 'f',   title: 'Fire / quivered',       text: 'f' },
-    ],
-    [
-      { label: ',',   title: 'Pick up item',          text: ',' },
-    ],
-  ],
-  info: [
-    [
-      { label: '@',   title: 'Character status',      text: '@' },
-      { label: '%',   title: 'Character overview',    text: '%' },
       { label: '^',   title: 'Religion / deity',      text: '^' },
-      { label: '=',   title: 'Reassign inventory/spell letters', text: '=' },
+      { label: 't',   title: 'Tell allies (tt to shout)', text: 't' },
     ],
     [
-      { label: 'A',   title: 'Abilities/mutations',   text: 'A' },
+      { label: '=',   title: 'Reassign inventory/spell letters', text: '=' },
       { label: '}',   title: 'Runes collected',       text: '}' },
       { label: '\\',  title: 'Item knowledge',        text: '\\' },
       { label: '$',   title: 'Gold / shopping list',  text: '$' },
@@ -594,7 +593,7 @@ export function buildTouchControls(send: SendFn, opts: { spellTab?: SpellTabConf
   // no spells to cast), sitting immediately right of the @ tab. Swaps the
   // content grid like any other tab.
   if (opts.spellTab) tabDefs.push({ key: 'spells', label: TAB_LABELS.spells[lang] })
-  tabDefs.push({ key: 'macro', label: TAB_LABELS.macro[lang] }, { key: 'info', label: TAB_LABELS.info[lang] })
+  tabDefs.push({ key: 'macro', label: TAB_LABELS.macro[lang] })
   for (const td of tabDefs) {
     const btn = document.createElement('button')
     btn.className = 'tc-tab' + (td.key === 'micro' ? ' active' : '')

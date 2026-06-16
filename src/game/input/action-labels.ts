@@ -21,7 +21,7 @@ export const ACTION_LABELS: Record<string, LabelPair> = {
   'Evoke item':           { ko: '발동',     en: 'Evoke' },
   'Use ability':          { ko: '능력',     en: 'Ability' },
   'Cast spell':           { ko: '주문',     en: 'Cast' },
-  'Examine surroundings': { ko: '둘러보기', en: 'Look' },
+  'Examine surroundings': { ko: '관찰',     en: 'Look' },
   'Pick up item':         { ko: '줍기',     en: 'Pick up' },
   // macro
   'Wield weapon':              { ko: '무기',     en: 'Wield' },
@@ -30,7 +30,7 @@ export const ACTION_LABELS: Record<string, LabelPair> = {
   'Put on jewellery':          { ko: '장신구',   en: 'Put on' },
   'Drop':                      { ko: '버리기',   en: 'Drop' },
   'Find feature (Ctrl+F)':     { ko: '지형찾기', en: 'Find' },
-  'Go to level / branch':      { ko: '원거리이동', en: 'Travel' },
+  'Go to level / branch':      { ko: '이동',     en: 'Travel' },
   'Dungeon overview (Ctrl+O)': { ko: '던전개요', en: 'Overview' },
   'Examine level map':         { ko: '지도',     en: 'Map' },
   'Equip / exclude':           { ko: '장착',     en: 'Equip' },
@@ -51,10 +51,9 @@ export const ACTION_LABELS: Record<string, LabelPair> = {
   'Help':                              { ko: '도움말',   en: 'Help' },
 }
 
-export const TAB_LABELS: Record<'micro' | 'macro' | 'info' | 'spells', LabelPair> = {
+export const TAB_LABELS: Record<'micro' | 'macro' | 'spells', LabelPair> = {
   micro:  { ko: '행동', en: 'Act' },
-  macro:  { ko: '운영', en: 'More' },
-  info:   { ko: '정보', en: 'Info' },
+  macro:  { ko: '기타', en: 'More' },   // merged 운영 + 정보
   spells: { ko: '주문', en: 'Spells' },
 }
 

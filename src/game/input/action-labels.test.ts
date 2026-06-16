@@ -40,7 +40,7 @@ describe('label coverage', () => {
   })
 
   it('every tab has a KO and EN label', () => {
-    for (const key of ['micro', 'macro', 'info', 'spells'] as const) {
+    for (const key of ['micro', 'macro', 'spells'] as const) {
       expect(TAB_LABELS[key].ko.length).toBeGreaterThan(0)
       expect(TAB_LABELS[key].en.length).toBeGreaterThan(0)
     }

@@ -99,6 +99,6 @@ describe('language toggle', () => {
     const tc = buildTouchControls(() => {})
     const tabTexts = [...tc.element.querySelectorAll('.tc-tab')].map(b => b.textContent)
     expect(tabTexts).toContain('행동') // micro
-    expect(tabTexts).toContain('정보') // info
+    expect(tabTexts).toContain('기타') // merged 운영+정보
   })
 })
