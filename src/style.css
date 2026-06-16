@@ -2310,7 +2310,7 @@ html, body {
    Cap height to 3 d-pad rows so a tall spell grid scrolls inside the panel
    rather than growing the whole strip. */
 #touch-controls.dpad-on {
-  --tc-dpad: 2.8rem;
+  --tc-dpad: 2.55rem;
   flex-direction: row;
   align-items: stretch;
   max-height: calc(var(--tc-dpad) * 3 + 4px + 0.4rem);
@@ -2437,6 +2437,14 @@ html, body {
 }
 
 .tc-tab:active { background: var(--tc-press); }
+
+/* 행동/기타 toggle: a single visible button that flips the pair. The ⇄ hints
+   that tapping switches rather than re-selecting the shown tab. */
+.tc-toggle::after {
+  content: ' ⇄';
+  opacity: 0.55;
+  font-size: 0.9em;
+}
 
 /* Content area: tab-specific buttons (strip variant just has one child) */
 .tc-content {

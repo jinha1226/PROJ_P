@@ -593,25 +593,43 @@ export function buildTouchControls(send: SendFn, opts: { spellTab?: SpellTabConf
   // content grid like any other tab.
   if (opts.spellTab) tabDefs.push({ key: 'spells', label: TAB_LABELS.spells[lang] })
   tabDefs.push({ key: 'macro', label: TAB_LABELS.macro[lang] })
+  // 행동/기타 act as a single toggle: only the active one is shown, and tapping
+  // it flips to the other (renderTab hides the inactive twin). Both elements
+  // stay in the DOM so the disabled spells tab's harvest/grid wiring — and the
+  // tests that click `.tc-tab[data-tab=…]` — keep working unchanged.
+  const flipMicroMacro = (): void => renderTab(activeTab === 'micro' ? 'macro' : 'micro')
   for (const td of tabDefs) {
     const btn = document.createElement('button')
     btn.className = 'tc-tab' + (td.key === 'micro' ? ' active' : '')
+    if (td.key !== 'spells') btn.classList.add('tc-toggle')  // shows the ⇄ flip hint
     btn.textContent = td.label
     btn.title = td.key
     btn.dataset.tab = td.key
     // The z tab starts hidden; refreshSpellTab() reveals it once a harvest
     // finds spells (and hides it again if the player ends up with none).
-    if (td.key === 'spells') btn.style.display = 'none'
-    btn.addEventListener('touchstart', e => { e.preventDefault(); renderTab(td.key) }, { passive: false })
-    btn.addEventListener('click', () => renderTab(td.key))
+    // The macro twin starts hidden too — micro is the initial active tab.
+    if (td.key === 'spells' || td.key === 'macro') btn.style.display = 'none'
+    // spells navigates to itself (kept for the harvest/grid wiring + tests);
+    // micro/macro share one flip handler so the visible one toggles the pair.
+    const onTap = td.key === 'spells' ? () => renderTab('spells') : flipMicroMacro
+    btn.addEventListener('touchstart', e => { e.preventDefault(); onTap() }, { passive: false })
+    btn.addEventListener('click', onTap)
     tabsEl.appendChild(btn)
   }
   headerEl.appendChild(tabsEl)
 
-  // Pins live at the far right (Enter was dropped here — rarely used in play,
-  // and still reachable via the virtual keyboard).
+  // Pins, then Enter, at the far right. Enter is mandatory in play — it confirms
+  // spell targeting (fire-at-nearest) — so it stays always-visible.
   headerEl.appendChild(fightBtn)
   headerEl.appendChild(exploreBtn)
+
+  const enterBtn = document.createElement('button')
+  enterBtn.className = 'tc-enter'
+  enterBtn.textContent = '⏎'
+  enterBtn.title = 'Enter'
+  enterBtn.addEventListener('touchstart', e => { e.preventDefault(); send({ msg: 'key', keycode: 13 }); clearOneshot() }, { passive: false })
+  enterBtn.addEventListener('click', () => { send({ msg: 'key', keycode: 13 }); clearOneshot() })
+  headerEl.appendChild(enterBtn)
 
   // Content area — replaced on tab switch or mode change
   contentEl = document.createElement('div')
@@ -870,7 +888,11 @@ export function buildTouchControls(send: SendFn, opts: { spellTab?: SpellTabConf
   function renderTab(tab: TabKey): void {
     activeTab = tab
     tabsEl.querySelectorAll<HTMLElement>('.tc-tab').forEach(el => {
-      el.classList.toggle('active', el.dataset.tab === tab)
+      const key = el.dataset.tab
+      el.classList.toggle('active', key === tab)
+      // Toggle the micro/macro pair: show only the active one (the spells tab's
+      // visibility stays owned by refreshSpellTab).
+      if (key === 'micro' || key === 'macro') el.style.display = key === tab ? '' : 'none'
     })
     // In a menu/overlay the play actions are useless — show menu meta-keys
     // (page / ! / ?) instead, regardless of which tab is active.
