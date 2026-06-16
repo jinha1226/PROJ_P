@@ -2473,24 +2473,28 @@ html, body {
 }
 
 /* With the d-pad on, the action strip sits in the panel to the RIGHT of the
-   d-pad. The buttons wrap into rows and the panel grows to fit them — NO inner
-   scroll — so every action is visible at once and the footer (modifiers) flows
-   directly below the last row, pinned to the panel's bottom. The cluster height
-   is content-driven (no max-height cap), so the panel can run taller than the
-   d-pad; the d-pad then sits at the top of its stretched column. */
+   d-pad as a fixed 4-column grid (NO inner scroll). A grid — not wrapping flex —
+   keeps every button the same width and in the same column whether the strip
+   holds 8 (기타), 11 (행동) or 3 (a menu's meta-keys) buttons, so the layout
+   never reflows. The content area reserves 3 rows so the panel height is
+   identical across tabs and when a menu (inventory / spell list) opens — the
+   d-pad and map stay put instead of jumping. The footer flows directly below
+   the reserved area, pinned to the panel's bottom. */
 #touch-controls.dpad-on .tc-panel {
   display: flex;
   flex-direction: column;
   min-height: 0;
 }
-#touch-controls.dpad-on .tc-content { min-height: 0; }
+#touch-controls.dpad-on .tc-content { min-height: calc(3 * 2rem + 2 * 2px); }
 #touch-controls.dpad-on .tc-strip {
-  flex: none;
-  flex-wrap: wrap;
-  align-content: flex-start;
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  grid-auto-rows: 2rem;
+  gap: 2px;
+  align-content: start;
   overflow: visible;
 }
-#touch-controls.dpad-on .tc-strip .tc-btn { min-height: 2rem; }
+#touch-controls.dpad-on .tc-strip .tc-btn { min-width: 0; min-height: 0; }
 #touch-controls.dpad-on .tc-dpad { align-self: flex-start; }
 /* Taller header row (Esc / 행동·기타 toggle / pins / Enter) so the top buttons
    are as easy to hit as the play buttons below them. */
