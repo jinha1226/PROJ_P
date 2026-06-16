@@ -2306,14 +2306,19 @@ html, body {
   border-top: 1px solid transparent;
 }
 
-/* D-pad mode: switch to row layout and set the d-pad cell size token.
-   Cap height to 3 d-pad rows so a tall spell grid scrolls inside the panel
-   rather than growing the whole strip. */
+/* D-pad mode: switch to row layout and set the d-pad cell size token. No height
+   cap — the panel grows to fit its wrapped action rows + footer (no inner
+   scroll); the map (1fr) yields the difference. */
 #touch-controls.dpad-on {
   --tc-dpad: 2.55rem;
   flex-direction: row;
   align-items: stretch;
-  max-height: calc(var(--tc-dpad) * 3 + 4px + 0.4rem);
+  /* Reclaim part of #app's bottom safe-area pad (25px): drop the whole control
+     cluster ~12px lower so the footer/d-pad sit nearer the screen edge and the
+     map gains that height. ~13px of clearance stays for the home-indicator
+     swipe zone. Ignored in landscape, where #touch-controls is display:contents
+     (no box → no margin) and the panel uses its own bottom margin instead. */
+  margin-bottom: -12px;
 }
 
 /* D-pad: 3×3 CSS grid of large buttons (only present when dpad-on) */
@@ -2481,30 +2486,26 @@ html, body {
   min-height: 2.2rem;
 }
 
-/* With the d-pad on, the action strip sits in the tall (~3 d-pad rows) panel to
-   the RIGHT of the d-pad, not the full-width single row of the no-d-pad layout.
-   Restore wrapping there so the buttons fill that block as a grid instead of
-   running off the right edge in one scrolling line. */
-/* Header (tabs) and footer (modifiers) must never be overrun by a tall action
-   grid. Flex column + max-height let the footer ride up over the content on
-   short viewports; a 3-row grid (fixed / scroll / fixed) pins both ends and
-   gives the middle row a hard `minmax(0,1fr)` cap so the strip scrolls inside
-   it instead of pushing the footer past the panel's bottom edge. */
+/* With the d-pad on, the action strip sits in the panel to the RIGHT of the
+   d-pad. The buttons wrap into rows and the panel grows to fit them — NO inner
+   scroll — so every action is visible at once and the footer (modifiers) flows
+   directly below the last row, pinned to the panel's bottom. The cluster height
+   is content-driven (no max-height cap), so the panel can run taller than the
+   d-pad; the d-pad then sits at the top of its stretched column. */
 #touch-controls.dpad-on .tc-panel {
-  display: grid;
-  grid-template-rows: auto minmax(0, 1fr) auto;
+  display: flex;
+  flex-direction: column;
   min-height: 0;
 }
-#touch-controls.dpad-on .tc-content { min-height: 0; overflow: hidden; }
+#touch-controls.dpad-on .tc-content { min-height: 0; }
 #touch-controls.dpad-on .tc-strip {
-  flex: 1;
-  min-height: 0;
+  flex: none;
   flex-wrap: wrap;
   align-content: flex-start;
-  overflow-x: hidden;
-  overflow-y: auto;
+  overflow: visible;
 }
 #touch-controls.dpad-on .tc-strip .tc-btn { min-height: 2rem; }
+#touch-controls.dpad-on .tc-dpad { align-self: flex-start; }
 .tc-panel { min-height: 0; }
 .tc-header, .tc-footer { flex-shrink: 0; }
 
