@@ -90,21 +90,30 @@ export const TAB_BUTTONS: Record<Exclude<TabKey, 'spells'>, TabButtonDef[][]> = 
   micro: [
     [
       { label: '⇥',   title: 'Auto-fight nearest',    key: 9 },
-      { label: '5',   title: 'Rest until healed',     text: '5' },
-      { label: 'i',   title: 'Inventory',             text: 'i' },
-      { label: 'o',   title: 'Auto-explore',          text: 'o' },
-    ],
-    [
       { label: 'q',   title: 'Quaff potion',          text: 'q' },
       { label: 'r',   title: 'Read scroll',           text: 'r' },
-      { label: 'f',   title: 'Fire / quivered',       text: 'f' },
       { label: 'v',   title: 'Evoke item',            text: 'v' },
     ],
     [
-      { label: 'a',   title: 'Use ability',           text: 'a' },
       { label: 'z',   title: 'Cast spell',            text: 'z' },
+      { label: 'a',   title: 'Use ability',           text: 'a' },
       { label: 'x',   title: 'Examine surroundings',  text: 'x' },
       { label: ',',   title: 'Pick up item',          text: ',' },
+    ],
+    [
+      { label: 'o',   title: 'Auto-explore',          text: 'o' },
+      { label: 'G',   title: 'Go to level / branch',  text: 'G' },
+      { label: '<',   title: 'Ascend stairs',         text: '<' },
+      { label: '>',   title: 'Descend stairs',        text: '>' },
+    ],
+    [
+      { label: 'm',   title: 'Skills screen',         text: 'm' },
+      { label: 'M',   title: 'Spell library',         text: 'M' },
+      { label: 'I',   title: 'List memorised spells', text: 'I' },
+    ],
+    [
+      { label: '5',   title: 'Rest until healed',     text: '5' },
+      { label: 'i',   title: 'Inventory',             text: 'i' },
     ],
   ],
   macro: [
@@ -117,14 +126,12 @@ export const TAB_BUTTONS: Record<Exclude<TabKey, 'spells'>, TabButtonDef[][]> = 
     [
       { label: 'd',   title: 'Drop',                  text: 'd' },
       { label: '^F',  title: 'Find feature (Ctrl+F)', key: 6 },
-      { label: 'G',   title: 'Go to level / branch',  text: 'G' },
       { label: '^O',  title: 'Dungeon overview (Ctrl+O)', key: 15 },
+      { label: 'e',   title: 'Equip / exclude',       text: 'e' },
     ],
     [
       { label: 'X',   title: 'Examine level map',     text: 'X' },
-      { label: 'e',   title: 'Equip / exclude',       text: 'e' },
-      { label: '<',   title: 'Ascend stairs',         text: '<' },
-      { label: '>',   title: 'Descend stairs',        text: '>' },
+      { label: 'f',   title: 'Fire / quivered',       text: 'f' },
     ],
   ],
   info: [
@@ -136,14 +143,11 @@ export const TAB_BUTTONS: Record<Exclude<TabKey, 'spells'>, TabButtonDef[][]> = 
     ],
     [
       { label: 'A',   title: 'Abilities/mutations',   text: 'A' },
-      { label: 'm',   title: 'Skills screen',         text: 'm' },
       { label: '}',   title: 'Runes collected',       text: '}' },
       { label: '\\',  title: 'Item knowledge',        text: '\\' },
+      { label: '$',   title: 'Gold / shopping list',  text: '$' },
     ],
     [
-      { label: '$',    title: 'Gold / shopping list',   text: '$' },
-      { label: 'M',    title: 'Spell library',        text: 'M' },
-      { label: 'I',   title: 'List memorised spells', text: 'I' },
       { label: '?',   title: 'Help',                  text: '?' },
     ],
   ],
