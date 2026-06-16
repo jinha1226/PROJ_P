@@ -2707,6 +2707,22 @@ export function buildGameView(
     pop.innerHTML = rows.join('')
     const close = (): void => pop.remove()
     pop.addEventListener('click', close)
+    // Full in-game description (damage / power) — the cast menu's describe mode:
+    // z opens "Cast which spell?", ? switches it to describe, the letter
+    // selects. Describe mode does not cast, so this can't fire the spell.
+    if (!spectating) {
+      const detail = document.createElement('button')
+      detail.className = 'si-action'
+      detail.textContent = '자세히 (데미지·설명)'
+      detail.addEventListener('click', e => {
+        e.stopPropagation()
+        close()
+        conn.send({ msg: 'input', text: 'z' })
+        conn.send({ msg: 'input', text: '?' })
+        conn.send({ msg: 'input', text: s.letter })
+      })
+      pop.appendChild(detail)
+    }
     // Hide / un-hide this spell from the quick-cast surfaces.
     const isHidden = hiddenSpellSet().has(s.title)
     const act = document.createElement('button')

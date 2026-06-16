@@ -2463,7 +2463,7 @@ html, body {
    the RIGHT of the d-pad, not the full-width single row of the no-d-pad layout.
    Restore wrapping there so the buttons fill that block as a grid instead of
    running off the right edge in one scrolling line. */
-#touch-controls.dpad-on .tc-content { flex: 1; min-height: 0; }
+#touch-controls.dpad-on .tc-content { flex: 1 1 0; min-height: 0; overflow: hidden; }
 #touch-controls.dpad-on .tc-strip {
   flex: 1;
   min-height: 0;
@@ -2473,6 +2473,10 @@ html, body {
   overflow-y: auto;
 }
 #touch-controls.dpad-on .tc-strip .tc-btn { min-height: 2rem; }
+/* Header (tabs) and footer (modifiers) never shrink or get overrun — the
+   scrollable content sits between them, not under them. */
+.tc-panel { min-height: 0; }
+.tc-header, .tc-footer { flex-shrink: 0; }
 
 .tc-btn {
   flex: 1;
