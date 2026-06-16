@@ -910,21 +910,17 @@ export function buildTouchControls(send: SendFn, opts: { spellTab?: SpellTabConf
   // Label a button accounting for the active modifier: a letter under Shift (or
   // Ctrl) sends a different key, so relabel it to that key's known command
   // (KEY_LABELS) or its raw glyph — matching what sendTabKey actually sends.
-  function effectiveLabel(def: TabButtonDef): { text: string; named: boolean } {
-    if (def.text && def.text.length === 1) {
-      if (shift.isOn) {
-        const k = def.text.toUpperCase()
-        const lp = KEY_LABELS.get(k)
-        return lp ? { text: lp[lang], named: true } : { text: k, named: false }
-      }
-      if (ctrlActive) {
-        const up = def.text.toUpperCase()
-        if (CAPTURED_CTRL.has(up)) {
-          const k = '^' + up
-          const lp = KEY_LABELS.get(k)
-          return lp ? { text: lp[lang], named: true } : { text: k, named: false }
-        }
-      }
+  // Returns the button's label under the active modifier, or null to HIDE it —
+  // a lowercase-letter button whose modified key isn't a known command is a
+  // dead key under that modifier, so it's removed rather than shown inert.
+  // Symbols, digits, uppercase keys, and specials (Tab/!/?) are never hidden.
+  function effectiveLabel(def: TabButtonDef): { text: string; named: boolean } | null {
+    const mod = shift.isOn || ctrlActive
+    if (mod && def.text && /^[a-z]$/.test(def.text)) {
+      const up = def.text.toUpperCase()
+      const sentKey = shift.isOn ? up : (CAPTURED_CTRL.has(up) ? '^' + up : def.text)
+      const lp = KEY_LABELS.get(sentKey)
+      return lp ? { text: lp[lang], named: true } : null
     }
     return actionLabel(def, lang)
   }
@@ -940,9 +936,11 @@ export function buildTouchControls(send: SendFn, opts: { spellTab?: SpellTabConf
         stripEl.appendChild(spacer)
         continue
       }
+      const label = effectiveLabel(def)
+      if (!label) continue  // dead key under the active modifier — hide it
       const btn = document.createElement('button')
       btn.className = 'tc-btn'
-      const { text, named } = effectiveLabel(def)
+      const { text, named } = label
       if (named) btn.classList.add('named')
       else if (/[^\x20-\x7e]/.test(def.label)) btn.classList.add('glyph')
       btn.textContent = text

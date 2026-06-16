@@ -26,11 +26,13 @@ describe('semantic labels in the touch HUD', () => {
     expect(pins).toContain('O')
   })
 
-  it('relabels buttons to the Shift variant (x → X = level map)', () => {
+  it('relabels Shift variants and hides dead keys', () => {
     const tc = buildTouchControls(() => {})
     expect(labels(tc.element)).toContain('둘러보기') // x = examine in play
+    expect(labels(tc.element)).toContain('주문')     // z = cast in play
     ;(tc.element.querySelector('.tc-shift') as HTMLButtonElement).click()
     expect(labels(tc.element)).toContain('지도')     // Shift+x → X = examine level map
+    expect(labels(tc.element)).not.toContain('주문') // Shift+z → Z has no command → hidden
   })
 
   it('relabels buttons to the Ctrl variant (x → ^X = save & exit)', () => {
