@@ -10,7 +10,7 @@ import {
 } from './keyboard'
 import { createShiftToggle } from './shift-state'
 import { getPref, setPref, type UiLang } from '../../prefs'
-import { actionLabel, TAB_LABELS } from './action-labels'
+import { actionLabel, ACTION_LABELS, TAB_LABELS, type LabelPair } from './action-labels'
 import type { RcControls } from '../rc/rc-options'
 
 type SendFn = (msg: ClientMsg) => void
@@ -86,30 +86,6 @@ export const MENU_BUTTONS: TabButtonDef[][] = [
   ],
 ]
 
-// Shown in place of the active tab while Shift / Ctrl is held — the useful
-// commands for that modifier, gathered from across the tabs, so the freed
-// space carries real actions instead of inert relabelled keys.
-export const SHIFT_BUTTONS: TabButtonDef[][] = [
-  [
-    { label: 'X', title: 'Examine level map',     text: 'X' },
-    { label: 'A', title: 'Abilities/mutations',   text: 'A' },
-    { label: 'M', title: 'Spell library',         text: 'M' },
-    { label: 'I', title: 'List memorised spells', text: 'I' },
-  ],
-  [
-    { label: 'R', title: 'Remove jewellery',      text: 'R' },
-    { label: 'P', title: 'Put on jewellery',      text: 'P' },
-    { label: 'Q', title: 'Quiver',                text: 'Q' },
-  ],
-]
-export const CTRL_BUTTONS: TabButtonDef[][] = [
-  [
-    { label: '^F', title: 'Find feature (Ctrl+F)',     key: 6 },
-    { label: '^O', title: 'Dungeon overview (Ctrl+O)', key: 15 },
-    { label: '^X', title: 'Save & exit',               key: 24 },
-  ],
-]
-
 export const TAB_BUTTONS: Record<Exclude<TabKey, 'spells'>, TabButtonDef[][]> = {
   micro: [
     [
@@ -172,6 +148,27 @@ export const TAB_BUTTONS: Record<Exclude<TabKey, 'spells'>, TabButtonDef[][]> = 
     ],
   ],
 }
+
+// Reverse map: the key a button sends → its localized label, built from every
+// tab's defs. Lets a modifier-shifted key that is itself a known command
+// (Shift+r → "R" = Remove jewellery, Ctrl+x → "^X" = save & exit) be relabelled
+// in place, so each button keeps its position under a modifier.
+const KEY_LABELS: Map<string, LabelPair> = (() => {
+  const m = new Map<string, LabelPair>()
+  for (const tab of Object.values(TAB_BUTTONS)) {
+    for (const row of tab) {
+      for (const def of row) {
+        const lp = def.title ? ACTION_LABELS[def.title] : undefined
+        const keyStr = def.text ?? def.label
+        if (lp && keyStr) m.set(keyStr, lp)
+      }
+    }
+  }
+  // Modifier-reachable commands with no dedicated button of their own.
+  m.set('Q', { ko: '화살집', en: 'Quiver' })          // Shift+q
+  m.set('^X', { ko: '저장/종료', en: 'Save & exit' })  // Ctrl+x
+  return m
+})()
 
 // Virtual QWERTY keyboard overlay. Letter and symbol layers, sticky Shift
 // (tap = once, double-tap = locked, tap from lock = off) and one-shot Ctrl,
@@ -883,10 +880,6 @@ export function buildTouchControls(send: SendFn, opts: { spellTab?: SpellTabConf
     // In a menu/overlay the play actions are useless — show menu meta-keys
     // (page / ! / ?) instead, regardless of which tab is active.
     if (menuMode) { renderContent(MENU_BUTTONS); return }
-    // While a modifier is held, show that modifier's useful command set in
-    // place of the tab (Shift/Ctrl pick the commands; see refreshMods re-render).
-    if (shift.isOn) { renderContent(SHIFT_BUTTONS); return }
-    if (ctrlActive) { renderContent(CTRL_BUTTONS); return }
     // The z tab hosts the spell grid game-view builds (it owns the spell data,
     // tile loader, and cast logic); refreshSpellTab fills it. Sticky like any
     // tab — stays until the player switches away, so repeat-casting is one tap
@@ -914,20 +907,36 @@ export function buildTouchControls(send: SendFn, opts: { spellTab?: SpellTabConf
     else renderTab('micro')
   }
 
+  // Under a held modifier, relabel a letter button in place to the command its
+  // modified key triggers (q→화살집, r→장신구해제, x→지도). Returns null when
+  // that modified key is a dead key (no command) so the slot renders empty,
+  // keeping every other button in its position. Symbols/digits/uppercase/
+  // specials are never modified here.
+  function modifierLabel(def: TabButtonDef): { text: string; named: boolean } | null | undefined {
+    if (!(shift.isOn || ctrlActive)) return undefined  // no modifier — use base label
+    if (!def.text || !/^[a-z]$/.test(def.text)) return undefined
+    const up = def.text.toUpperCase()
+    const sentKey = shift.isOn ? up : (CAPTURED_CTRL.has(up) ? '^' + up : def.text)
+    const lp = KEY_LABELS.get(sentKey)
+    return lp ? { text: lp[lang], named: true } : null  // null = dead key → empty slot
+  }
+
   function renderContent(rows: TabButtonDef[][]): void {
     contentEl.innerHTML = ''
     const stripEl = document.createElement('div')
     stripEl.className = 'tc-row tc-strip'
+    const spacer = (): void => {
+      const s = document.createElement('div')
+      s.className = 'tc-btn tc-btn-spacer'
+      stripEl.appendChild(s)
+    }
     for (const def of rows.flat()) {
-      if (!def.label) {
-        const spacer = document.createElement('div')
-        spacer.className = 'tc-btn tc-btn-spacer'
-        stripEl.appendChild(spacer)
-        continue
-      }
+      if (!def.label) { spacer(); continue }
+      const mod = modifierLabel(def)
+      if (mod === null) { spacer(); continue }  // dead key under modifier — keep the slot empty
       const btn = document.createElement('button')
       btn.className = 'tc-btn'
-      const { text, named } = actionLabel(def, lang)
+      const { text, named } = mod ?? actionLabel(def, lang)
       if (named) btn.classList.add('named')
       else if (/[^\x20-\x7e]/.test(def.label)) btn.classList.add('glyph')
       btn.textContent = text
