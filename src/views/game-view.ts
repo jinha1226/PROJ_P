@@ -3202,6 +3202,7 @@ export function buildGameView(
     // ends up with nothing (no title, no tile inserted by buildBody) so help
     // popups don't render a blank bar.
     if (!title && headerEl.children.length === 1) headerEl.remove()
+    touchControls.setMenuMode(true)  // Tab pages the list here, not autofight
     view.focus({ preventScroll: true })
   }
 
@@ -3352,6 +3353,7 @@ export function buildGameView(
       showHud()
     }
     touchControls.element.style.display = ''
+    touchControls.setMenuMode(false)  // back to normal play: Tab = autofight
     requestAnimationFrame(() => {
       mapView.fitToContainer()
       view.focus({ preventScroll: true })

@@ -19,6 +19,16 @@ describe('semantic labels in the touch HUD', () => {
     expect(texts).not.toContain('o')    // raw key no longer shown
   })
 
+  it('relabels the Tab button to 페이지 in menu mode, back to 자동전투 in play', () => {
+    const tc = buildTouchControls(() => {})
+    expect(labels(tc.element)).toContain('자동전투') // Tab = autofight in play
+    tc.setMenuMode(true)
+    expect(labels(tc.element)).toContain('페이지')   // Tab = page in a menu
+    expect(labels(tc.element)).not.toContain('자동전투')
+    tc.setMenuMode(false)
+    expect(labels(tc.element)).toContain('자동전투')
+  })
+
   it('named buttons get the "named" class for text styling', () => {
     const tc = buildTouchControls(() => {})
     const explore = [...tc.element.querySelectorAll('.tc-content .tc-btn')]

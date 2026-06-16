@@ -70,6 +70,7 @@ export interface TouchControls {
   openKbd(): void
   closeKbd(): void
   refreshSpellTab(): void  // re-render the z tab if it is the active tab
+  setMenuMode(on: boolean): void  // relabel context-dependent keys while a menu/overlay is open
 }
 
 // Static tabs only; the 'spells' tab renders dynamic content from game-view.
@@ -426,6 +427,9 @@ const RC_TOGGLES: { key: string; on: string; ko: string; en: string }[] = [
 export function buildTouchControls(send: SendFn, opts: { spellTab?: SpellTabConfig; onRequestRebuild?: () => void; rc?: RcControls } = {}): TouchControls {
   let ctrlActive = false
   let activeTab: TabKey = 'micro'
+  // True while a menu/overlay is open: Tab pages the list there instead of
+  // autofighting, so its button is relabelled to match (see renderContent).
+  let menuMode = false
   let lang: UiLang = getPref('uiLang')
   const dpadEnabled = getPref('dpadEnabled')
 
@@ -860,7 +864,9 @@ export function buildTouchControls(send: SendFn, opts: { spellTab?: SpellTabConf
       }
       const btn = document.createElement('button')
       btn.className = 'tc-btn'
-      const { text, named } = actionLabel(def, lang)
+      let { text, named } = actionLabel(def, lang)
+      // Tab (key 9) is autofight in play but pages the list in a menu/overlay.
+      if (menuMode && def.key === 9) { text = lang === 'ko' ? '페이지' : 'Page'; named = true }
       if (named) btn.classList.add('named')
       else if (/[^\x20-\x7e]/.test(def.label)) btn.classList.add('glyph')
       btn.textContent = text
@@ -870,6 +876,12 @@ export function buildTouchControls(send: SendFn, opts: { spellTab?: SpellTabConf
       stripEl.appendChild(btn)
     }
     contentEl.appendChild(stripEl)
+  }
+
+  function setMenuMode(on: boolean): void {
+    if (menuMode === on) return
+    menuMode = on
+    if (activeTab !== 'spells') renderContent(TAB_BUTTONS[activeTab])  // re-apply context labels
   }
 
   function enterXMode(): void {
@@ -886,5 +898,5 @@ export function buildTouchControls(send: SendFn, opts: { spellTab?: SpellTabConf
   if (dpadEnabled) buildDpad()
   renderContent(TAB_BUTTONS.micro)
 
-  return { element: root, enterXMode, exitXMode, openKbd, closeKbd, refreshSpellTab }
+  return { element: root, enterXMode, exitXMode, openKbd, closeKbd, refreshSpellTab, setMenuMode }
 }
