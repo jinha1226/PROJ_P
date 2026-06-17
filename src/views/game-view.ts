@@ -2158,7 +2158,9 @@ export function buildGameView(
           const dashAt = plainName.indexOf(' - ')
           choiceName = (dashAt >= 0 ? plainName.slice(dashAt + 3) : plainName).trim()
         }
-        const strength = choiceName ? guideStrength(choiceName) : 0
+        // Gated on the Beginner-Coach toggle like the other coach surfaces, so
+        // turning it off also drops the guided species/background highlight.
+        const strength = (choiceName && getPref('coachEnabled')) ? guideStrength(choiceName) : 0
         if (strength > 0) {
           btnEl.classList.add('ngc-guided')
           // More samples → redder; fewer → whiter. Map n∈[4,25] to t∈[0,1].
@@ -2255,7 +2257,9 @@ export function buildGameView(
       // Build coach: median skill levels of competent players for this build at
       // the player's XL, surfaced at the top of the skill screen. Build comes
       // from the welcome line (build-detect); null when unknown or unguided.
-      const b = getCurrentBuild()
+      // Gated on the same Beginner-Coach toggle as the hint banner, so turning
+      // the coach off silences every beginner surface (was still showing here).
+      const b = getPref('coachEnabled') ? getCurrentBuild() : null
       const rec = b ? recommend(b.species, b.background, currentXL) : null
       if (rec) {
         const recEl = document.createElement('div')
