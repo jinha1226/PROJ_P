@@ -735,7 +735,9 @@ export function buildTouchControls(send: SendFn, opts: { spellTab?: SpellTabConf
       updateTabLabels()
       renderTab(activeTab)
     }
-    langToggleBtn.addEventListener('touchstart', e => { e.preventDefault(); toggleLang() }, { passive: false })
+    // click only (not touchstart+click): a settings toggle that fires on both
+    // events flips twice per tap → net no change, so the setting never sticks
+    // (looked like it "reset on restart"). Latency doesn't matter here.
     langToggleBtn.addEventListener('click', toggleLang)
     langRow.appendChild(langLabel)
     langRow.appendChild(langToggleBtn)
@@ -755,8 +757,7 @@ export function buildTouchControls(send: SendFn, opts: { spellTab?: SpellTabConf
       syncDpadBtn()
       opts.onRequestRebuild?.()
     }
-    dpadToggleBtn.addEventListener('touchstart', e => { e.preventDefault(); toggleDpad() }, { passive: false })
-    dpadToggleBtn.addEventListener('click', toggleDpad)
+    dpadToggleBtn.addEventListener('click', toggleDpad)  // click only — see langToggleBtn
     dpadRow.appendChild(dpadLabel)
     dpadRow.appendChild(dpadToggleBtn)
     settingsOverlay.appendChild(dpadRow)
@@ -774,8 +775,7 @@ export function buildTouchControls(send: SendFn, opts: { spellTab?: SpellTabConf
       setPref('coachEnabled', !getPref('coachEnabled'))
       syncCoachBtn()
     }
-    coachToggleBtn.addEventListener('touchstart', e => { e.preventDefault(); toggleCoach() }, { passive: false })
-    coachToggleBtn.addEventListener('click', toggleCoach)
+    coachToggleBtn.addEventListener('click', toggleCoach)  // click only — see langToggleBtn
     coachRow.appendChild(coachLabel)
     coachRow.appendChild(coachToggleBtn)
     settingsOverlay.appendChild(coachRow)

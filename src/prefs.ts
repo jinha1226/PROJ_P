@@ -29,14 +29,21 @@ const DEFAULTS: Prefs = {
   hiddenSpells: [],
 }
 
+// Session fallback for values whose localStorage write failed (private mode,
+// "block all cookies", or storage disabled all throw on setItem). Without this
+// a blocked write was silently swallowed and getPref kept returning the old
+// value, so a toggle (e.g. the coach) appeared to "not turn off" at all. These
+// still won't survive a reload — only fixing the browser's storage, or shipping
+// a different default, can do that — but the setting works for the session.
+const memOverride: Partial<Prefs> = {}
+
 function load(): Prefs {
+  let stored: Partial<Prefs> = {}
   try {
     const raw = localStorage.getItem(KEY)
-    if (!raw) return { ...DEFAULTS }
-    return { ...DEFAULTS, ...(JSON.parse(raw) as Partial<Prefs>) }
-  } catch {
-    return { ...DEFAULTS }
-  }
+    if (raw) stored = JSON.parse(raw) as Partial<Prefs>
+  } catch {}
+  return { ...DEFAULTS, ...stored, ...memOverride }
 }
 
 export function getPref<K extends keyof Prefs>(k: K): Prefs[K] {
@@ -47,7 +54,10 @@ export function setPref<K extends keyof Prefs>(k: K, v: Prefs[K]): void {
   const next = { ...load(), [k]: v }
   try {
     localStorage.setItem(KEY, JSON.stringify(next))
-  } catch {}
+    delete memOverride[k]   // persisted for real — drop any stale session override
+  } catch {
+    memOverride[k] = v      // storage blocked — keep it live for this session
+  }
 }
 
 export function getLastSpectateServer(): string | null {

@@ -101,3 +101,27 @@ describe('language toggle', () => {
     expect(tabTexts).toContain('기타') // merged 운영+정보
   })
 })
+
+describe('settings toggles persist (single fire per tap)', () => {
+  it('persists Beginner Coach = off to prefs', () => {
+    const tc = buildTouchControls(() => {})
+    ;(tc.element.querySelector('.tc-settings') as HTMLButtonElement).click()
+    const toggle = tc.element.querySelector('.tc-set-coach') as HTMLButtonElement
+    expect(toggle.textContent).toBe('켬/On')   // default on
+    toggle.click()
+    expect(toggle.textContent).toBe('끔/Off')
+    expect(localStorage.getItem('pocketzot:prefs')).toContain('"coachEnabled":false')
+  })
+
+  it('a real tap (touchstart THEN click) toggles exactly once — not back to on', () => {
+    const tc = buildTouchControls(() => {})
+    ;(tc.element.querySelector('.tc-settings') as HTMLButtonElement).click()
+    const toggle = tc.element.querySelector('.tc-set-coach') as HTMLButtonElement
+    // A device tap fires touchstart and then a synthesized click. If the button
+    // handled BOTH, the coach would flip twice (off→on) and never stick — the
+    // bug this guards. Only `click` is bound now, so this nets a single toggle.
+    toggle.dispatchEvent(new Event('touchstart', { bubbles: true, cancelable: true }))
+    toggle.dispatchEvent(new Event('click', { bubbles: true }))
+    expect(localStorage.getItem('pocketzot:prefs')).toContain('"coachEnabled":false')
+  })
+})
