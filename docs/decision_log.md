@@ -151,3 +151,61 @@ Conservative thresholds; one hint at a time; throttled; dismissible
 `coachEnabled` pref (default ON) in the settings overlay. Threat estimate is
 approximate (DCSS threat tier + depth heuristic) — may be wrong, hence
 conservative. Skill-based advice deferred (needs skill screen).
+
+## 2026-06-15 — Korean is CLIENT-SIDE; `translation_language` (corrects 06-14 RC note)
+
+**Correction to the 2026-06-14 RC entry:** mainline DCSS `language` only selects
+joke/fake languages (dwarven, …), so `language = ko` is a no-op. The CNC/Nemelex
+Korean build reads **`translation_language = ko`** — that is the key the RC
+toggle now writes.
+
+But the RC option alone is insufficient: upstream PocketZot parsers assume
+English (regexes hard-match English text and break under Korean output). So
+translation is done **client-side** (`src/game/i18n/`): `WsConnection.dispatch`
+intercepts incoming messages and runs `translateIncoming` BEFORE the handlers,
+using a ko/en table plus the Nemelex translation build JSON. Build species/
+background are captured PRE-translation (`observeBuildMessage` from the
+"Welcome, X the <Species> <Background>." line) so the coach still matches.
+Default server set to **Nemelex (CNC)**; new games are Korean from char-select.
+
+## 2026-06-16 — Build-guide coach (winning-replay-derived skill progression)
+
+Complements the reactive threat/stat coach with a **per-build skill-progression
+guide** mined from winning ttyrec replays (turn-by-turn skill levels), keyed by
+`Species/Background`. Surfaced at the top of the skill (`m`) screen as
+"목표 XL… : <skill> <level> · …", colored by sample-size confidence; the
+new-game char-select highlights guided species/backgrounds (redder = more
+samples). Ruled out (durable): RAG/wiki corpus (too heavy), morgue files
+(end-state-maxed, not progression), manual curation (version-drifts). Data:
+~191 builds in `src/game/coach/build-guides.ts` (offline pipeline, not in repo).
+All three beginner surfaces (hint banner + skill-rec + char-select highlight)
+are gated on the single `coachEnabled` toggle.
+
+## 2026-06-17 — Touch-control redesign (d-pad layout, stable grid)
+
+- **D-pad is the default layout.** Controls are a `[d-pad | panel]` flex row;
+  panel header = `Esc | 행동/기타 toggle | pinned ⇥(autofight) / O(auto-explore)
+  | Enter`. Enter is mandatory (confirms spell targeting), pins sit far-right
+  for thumb reach.
+- **행동/기타 are one toggle** (only the active tab shown; tap flips). The `z`
+  spell-tab is disabled (`ENABLE_SPELL_TAB=false`) — quick-cast lives in the
+  floating spell rail, and hidden-spell un-hide is the rail's "+N" toggle.
+- **Action strip = fixed 4-column grid** (`repeat(4, minmax(0,1fr))`,
+  `width:100%`) with **3 reserved rows**, so button position/size stay constant
+  across tabs AND when a menu (inventory/spell list) swaps in its meta-keys — no
+  reflow, no map jump. Panel needs `flex:1` to fill the width beside the d-pad
+  (without it the grid shrink-wrapped and the UI looked left-clustered).
+- Final buttons — 행동 (12): 물약 두루마리 소지품 휴식 / 이동 기술 줍기 주문 /
+  관찰 발동 계단↑ 계단↓. 기타 (12): 상태 주문서고 지도 던전개요 / 발사 발동 능력
+  시전 / 캐릭터 능력·변이 신앙 룬. (R/^F/older gear cmds dropped; R via Shift+r,
+  ^F via Ctrl+f relabels.)
+
+## 2026-06-18 — Settings persistence hardening
+
+- Settings toggles bind **`click` only** (was touchstart+click): a double-bind
+  flips the value twice per tap → net no change, so a toggle never stuck.
+- `prefs.setPref` keeps an **in-memory override when `localStorage.setItem`
+  throws** (private browsing / blocked site storage silently swallowed the
+  write, so `getPref` kept returning the old value). The setting now applies for
+  the session even with blocked storage; cross-restart persistence still
+  requires working storage (else the only durable fix is changing a default).
