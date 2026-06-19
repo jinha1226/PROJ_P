@@ -31,17 +31,36 @@ describe('semantic labels in the touch HUD', () => {
     expect(labels(tc.element)).toContain('물약')   // q = quaff in play
     ;(tc.element.querySelector('.tc-shift') as HTMLButtonElement).click()
     const l = labels(tc.element)
-    expect(l).toContain('화살집')   // Shift+q → Q = quiver (in q's slot)
-    expect(l).toContain('지도')     // Shift+x → X = level map
-    expect(l).not.toContain('물약') // q's slot is now 화살집
+    expect(l).toContain('화살집')     // Shift+q → Q = quiver (in q's slot)
+    expect(l).toContain('능력·변이')  // Shift+a → A = abilities/mutations
+    expect(l).not.toContain('물약')   // q's slot is now 화살집
   })
 
-  it('relabels in place under Ctrl (x → 저장/종료)', () => {
+  it('relabels in place under Ctrl (f → 지형찾기)', () => {
     const tc = buildTouchControls(() => {})
     ;(tc.element.querySelector('.tc-ctrl') as HTMLButtonElement).click()
     const l = labels(tc.element)
-    expect(l).toContain('저장/종료') // Ctrl+x → ^X = save & exit
+    expect(l).toContain('지형찾기')  // Ctrl+f → ^F = find feature
     expect(l).not.toContain('물약')  // Ctrl+q is a dead key → empty slot
+  })
+
+  it('backfills dead Ctrl slots with the exit/save commands', () => {
+    const tc = buildTouchControls(() => {})
+    ;(tc.element.querySelector('.tc-ctrl') as HTMLButtonElement).click()
+    const l = labels(tc.element)
+    expect(l).toContain('저장/종료') // Ctrl+X
+    expect(l).toContain('저장')      // Ctrl+S
+    expect(l).toContain('포기')      // Ctrl+Q
+  })
+
+  it('sends the raw control keycode when a backfilled slot is tapped', () => {
+    const sent: unknown[] = []
+    const tc = buildTouchControls(m => sent.push(m))
+    ;(tc.element.querySelector('.tc-ctrl') as HTMLButtonElement).click()
+    const save = [...tc.element.querySelectorAll('.tc-content .tc-btn')]
+      .find(b => b.textContent === '저장/종료') as HTMLButtonElement
+    save.click()
+    expect(sent).toContainEqual({ msg: 'key', keycode: 'X'.charCodeAt(0) - 64 }) // ^X = 24
   })
 
   it('swaps to menu meta-keys (페이지 / !) in menu mode', () => {

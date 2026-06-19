@@ -102,10 +102,10 @@ export const TAB_BUTTONS: Record<Exclude<TabKey, 'spells'>, TabButtonDef[][]> = 
       { label: ',',   title: 'Pick up item',          text: ',' },
       { label: 'I',   title: 'List memorised spells', text: 'I' },
     ],
-    // Row 3: look / evoke (wands) / stairs.
+    // Row 3: ability / fire / stairs.
     [
-      { label: 'x',   title: 'Examine surroundings',  text: 'x' },
-      { label: 'v',   title: 'Evoke item',            text: 'v' },
+      { label: 'a',   title: 'Use ability',           text: 'a' },
+      { label: 'f',   title: 'Fire / quivered',       text: 'f' },
       { label: '<',   title: 'Ascend stairs',         text: '<' },
       { label: '>',   title: 'Descend stairs',        text: '>' },
     ],
@@ -143,7 +143,7 @@ export const TAB_BUTTONS: Record<Exclude<TabKey, 'spells'>, TabButtonDef[][]> = 
 
 // Reverse map: the key a button sends → its localized label, built from every
 // tab's defs. Lets a modifier-shifted key that is itself a known command
-// (Shift+r → "R" = Remove jewellery, Ctrl+x → "^X" = save & exit) be relabelled
+// (Shift+r → "R" = Remove jewellery, Ctrl+f → "^F" = find feature) be relabelled
 // in place, so each button keeps its position under a modifier.
 const KEY_LABELS: Map<string, LabelPair> = (() => {
   const m = new Map<string, LabelPair>()
@@ -158,13 +158,21 @@ const KEY_LABELS: Map<string, LabelPair> = (() => {
   }
   // Modifier-reachable commands with no dedicated button of their own.
   m.set('Q', { ko: '화살집', en: 'Quiver' })          // Shift+q
-  m.set('^X', { ko: '저장/종료', en: 'Save & exit' })  // Ctrl+x
   // These lost their dedicated 기타 buttons but stay reachable in place via the
   // modifier relabel (Shift+r → R, Ctrl+f → ^F), so keep their names.
   m.set('R', ACTION_LABELS['Remove jewellery'])        // Shift+r
   m.set('^F', ACTION_LABELS['Find feature (Ctrl+F)'])  // Ctrl+f
   return m
 })()
+
+// Ctrl-only exit/save commands that have no dedicated button. While Ctrl is held,
+// the dead-key empty slots (Ctrl+i, Ctrl+m, …) are backfilled with these in order
+// so save & exit / quit stay reachable on touch. Sent as the raw control keycode.
+const CTRL_FILL: { key: string; label: LabelPair }[] = [
+  { key: 'X', label: { ko: '저장/종료', en: 'Save/Exit' } },  // ^X
+  { key: 'S', label: { ko: '저장',      en: 'Save now' } },   // ^S
+  { key: 'Q', label: { ko: '포기',      en: 'Quit' } },       // ^Q
+]
 
 // Virtual QWERTY keyboard overlay. Letter and symbol layers, sticky Shift
 // (tap = once, double-tap = locked, tap from lock = off) and one-shot Ctrl,
@@ -943,10 +951,33 @@ export function buildTouchControls(send: SendFn, opts: { spellTab?: SpellTabConf
       s.className = 'tc-btn tc-btn-spacer'
       stripEl.appendChild(s)
     }
+    // Backfill a dead-key Ctrl slot with the next exit/save command (Ctrl+X/S/Q).
+    // Only while Ctrl is held and in play (menus have their own meta-keys).
+    let fillIdx = 0
+    const fillCtrlSlot = (): boolean => {
+      if (!ctrlActive || menuMode) return false
+      const item = CTRL_FILL[fillIdx]
+      if (!item) return false
+      fillIdx++
+      const btn = document.createElement('button')
+      btn.className = 'tc-btn named'
+      btn.textContent = item.label[lang]
+      btn.title = `Ctrl+${item.key}`
+      btn.setAttribute('aria-label', btn.title)
+      const keycode = item.key.charCodeAt(0) - 64
+      const fire = (): void => { send({ msg: 'key', keycode }); clearOneshot() }
+      btn.addEventListener('touchstart', e => { e.preventDefault(); fire() }, { passive: false })
+      btn.addEventListener('click', fire)
+      stripEl.appendChild(btn)
+      return true
+    }
     for (const def of rows.flat()) {
       if (!def.label) { spacer(); continue }
       const mod = modifierLabel(def)
-      if (mod === null) { spacer(); continue }  // dead key under modifier — keep the slot empty
+      if (mod === null) {  // dead key under modifier
+        if (fillCtrlSlot()) continue  // surface a Ctrl exit/save command here
+        spacer(); continue            // otherwise keep the slot empty
+      }
       const btn = document.createElement('button')
       btn.className = 'tc-btn'
       const { text, named } = mod ?? actionLabel(def, lang)
