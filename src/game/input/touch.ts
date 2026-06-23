@@ -83,6 +83,7 @@ export const MENU_BUTTONS: TabButtonDef[][] = [
     { label: '⇥', title: 'Page down',         key: 9 },
     { label: '!', title: 'Describe / toggle', text: '!' },
     { label: '?', title: 'Menu help',         text: '?' },
+    { label: '$', title: 'Gold / select $',   text: '$' },
   ],
 ]
 
