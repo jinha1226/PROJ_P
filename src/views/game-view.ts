@@ -670,6 +670,17 @@ export function buildGameView(
   // resolved the server's getchm() — close the now-stale numpad. Without
   // this, kbd users see a phantom numpad after pressing R+digit on hardware.
   let radiusNumpadActive = false
+  // Set when the user fires interlevel travel (G / Ctrl-G). The destination
+  // prompt that follows wants a depth number, so the next input dialog opens
+  // the numpad. Consumed (and cleared) by takeTravelInput() when that dialog
+  // appears — keying off the command is far more robust than matching prompt
+  // text, which varies by branch/context.
+  let expectTravelInput = false
+  function takeTravelInput(): boolean {
+    const v = expectTravelInput
+    expectTravelInput = false
+    return v
+  }
   function afterUserSend(msg: ClientMsg): void {
     if (radiusNumpadActive) {
       removeNumpadInput()
@@ -677,6 +688,10 @@ export function buildGameView(
     }
     if (inXMode && msg.msg === 'input' && msg.text === 'R') {
       showNumpadInput('Exclusion radius (0–9):', { closeAfterDigit: true })
+    }
+    // G (input) or Ctrl-G (keycode 7) → CMD_INTERLEVEL_TRAVEL.
+    if ((msg.msg === 'input' && msg.text === 'G') || (msg.msg === 'key' && msg.keycode === 7)) {
+      expectTravelInput = true
     }
   }
 
@@ -1801,7 +1816,7 @@ export function buildGameView(
     })
     titleEl.appendChild(input)
     titlePromptInput = input
-    autoOpenKbd()
+    autoOpenKbd({ numpad: takeTravelInput() || isTravelPrompt(prompt) })
     requestAnimationFrame(() => input.focus())
   }
 
@@ -1877,7 +1892,7 @@ export function buildGameView(
 
     wrap.appendChild(input)
     uiOverlay.appendChild(wrap)
-    autoOpenKbd({ numpad: isTravelPrompt(msg.prompt) })
+    autoOpenKbd({ numpad: takeTravelInput() || isTravelPrompt(msg.prompt) })
     requestAnimationFrame(() => input.focus())
   }
 
@@ -3646,7 +3661,7 @@ export function buildGameView(
     row.appendChild(input)
     pushMsgRow(row, false)  // input row isn't pruned by the 50-row cap
     requestAnimationFrame(() => input.focus())
-    autoOpenKbd()
+    autoOpenKbd({ numpad: takeTravelInput() })
   }
 
   function makePromptRow(text: string): HTMLElement {

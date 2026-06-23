@@ -411,6 +411,27 @@ describe('X-mode (eXamine level map) via cursor', () => {
   })
 })
 
+describe('dungeon-travel numpad', () => {
+  const kbdKeys = (h: Harness) => [...h.view.querySelectorAll('.kbd-key')].map(b => b.textContent)
+
+  it('opens the numpad for the destination prompt after G', () => {
+    const h = setup()
+    const travel = [...h.view.querySelectorAll('.tc-content .tc-btn')]
+      .find(b => b.textContent === '이동') as HTMLButtonElement
+    travel.click()
+    expect(sent(h)).toContainEqual({ msg: 'input', text: 'G' })
+    h.dispatch({ msg: 'ui-push', type: 'msgwin-get-line', prompt: 'Where to? ' } as unknown as ServerMsg)
+    expect(kbdKeys(h)).toContain('7')   // numpad digit
+    expect(kbdKeys(h)).not.toContain('q') // not the letter layer
+  })
+
+  it('opens the letter layer for a non-travel input prompt', () => {
+    const h = setup()
+    h.dispatch({ msg: 'ui-push', type: 'msgwin-get-line', prompt: 'Describe what?' } as unknown as ServerMsg)
+    expect(kbdKeys(h)).toContain('q')
+  })
+})
+
 describe('input_mode COMMAND transition', () => {
   it('hides the more button on the return to normal play (mode 1)', () => {
     const h = setup()
