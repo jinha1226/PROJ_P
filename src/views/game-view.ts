@@ -357,9 +357,17 @@ export function buildGameView(
   // open across overlay transitions.
   let kbdAutoOpened = false
 
-  function autoOpenKbd(): void {
-    touchControls.openKbd()
+  function autoOpenKbd(opts?: { numpad?: boolean }): void {
+    touchControls.openKbd(opts)
     kbdAutoOpened = true
+  }
+
+  // Dungeon-travel prompts (G, "go to level") want a number, not letters — open
+  // the numpad so depth entry is one tap. Matched loosely on the prompt text;
+  // the numpad's ABC key still reaches letters for branch names (e.g. "Lair").
+  function isTravelPrompt(prompt?: string): boolean {
+    if (!prompt) return false
+    return /travel|where to|go to|\blevel\b|\bbranch\b|\bdepth\b/i.test(stripDcss(prompt))
   }
 
   function autoCloseKbdIfOurs(): void {
@@ -1869,7 +1877,7 @@ export function buildGameView(
 
     wrap.appendChild(input)
     uiOverlay.appendChild(wrap)
-    autoOpenKbd()
+    autoOpenKbd({ numpad: isTravelPrompt(msg.prompt) })
     requestAnimationFrame(() => input.focus())
   }
 

@@ -93,6 +93,37 @@ describe('semantic labels in the touch HUD', () => {
   })
 })
 
+describe('keyboard numpad layer', () => {
+  function kbdKeys(root: HTMLElement): string[] {
+    return [...root.querySelectorAll('.kbd-key')].map(b => b.textContent ?? '')
+  }
+
+  it('openKbd({numpad}) shows digits, no letters', () => {
+    const tc = buildTouchControls(() => {})
+    tc.openKbd({ numpad: true })
+    const keys = kbdKeys(tc.element)
+    for (const d of ['0', '1', '5', '9']) expect(keys).toContain(d)
+    expect(keys).not.toContain('q')  // numpad layer has no letter keys
+    expect(keys).toContain('ABC')    // …but can switch to them
+  })
+
+  it('plain openKbd() still opens the letter layer', () => {
+    const tc = buildTouchControls(() => {})
+    tc.openKbd()
+    expect(kbdKeys(tc.element)).toContain('q')
+  })
+
+  it('a numpad digit sends its keystroke when no input is focused', () => {
+    const sent: unknown[] = []
+    const tc = buildTouchControls(m => sent.push(m))
+    tc.openKbd({ numpad: true })
+    const seven = [...tc.element.querySelectorAll('.kbd-key')]
+      .find(b => b.textContent === '7') as HTMLButtonElement
+    seven.click()
+    expect(sent).toContainEqual({ msg: 'input', text: '7' })
+  })
+})
+
 describe('language toggle', () => {
   it('flips labels KO -> EN when the toggle is tapped', () => {
     const tc = buildTouchControls(() => {})

@@ -67,7 +67,7 @@ export interface TouchControls {
   element: HTMLElement
   enterXMode(): void
   exitXMode(): void
-  openKbd(): void
+  openKbd(opts?: { numpad?: boolean }): void
   closeKbd(): void
   refreshSpellTab(): void  // re-render the z tab if it is the active tab
   setMenuMode(on: boolean): void  // relabel context-dependent keys while a menu/overlay is open
@@ -175,11 +175,13 @@ const CTRL_FILL: { key: string; label: LabelPair }[] = [
   { key: 'Q', label: { ko: '포기',      en: 'Quit' } },       // ^Q
 ]
 
-// Virtual QWERTY keyboard overlay. Letter and symbol layers, sticky Shift
-// (tap = once, double-tap = locked, tap from lock = off) and one-shot Ctrl,
-// [123]/[ABC] toggle. Replaces the touch-controls strip while open.
-function buildKeyboardOverlay(send: SendFn): { element: HTMLElement; open: () => void; close: () => void } {
-  type Layer = 'letters' | 'symbols'
+type Layer = 'letters' | 'symbols' | 'numpad'
+
+// Virtual QWERTY keyboard overlay. Letter, symbol and numpad layers, sticky
+// Shift (tap = once, double-tap = locked, tap from lock = off) and one-shot
+// Ctrl, [123]/[ABC] toggle. The numpad layer is opened for numeric prompts
+// (dungeon travel depth). Replaces the touch-controls strip while open.
+function buildKeyboardOverlay(send: SendFn): { element: HTMLElement; open: (initialLayer?: Layer) => void; close: () => void } {
   let layer: Layer = 'letters'
   let ctrlActive = false
 
@@ -417,7 +419,19 @@ function buildKeyboardOverlay(send: SendFn): { element: HTMLElement; open: () =>
     shiftBtns.length = 0
     ctrlBtns.length = 0
 
-    if (layer === 'letters') {
+    if (layer === 'numpad') {
+      // Phone-style 3×3 grid + zero, for numeric prompts (travel depth). Digits
+      // type into the focused input via dispatchChar, same as any other key.
+      addRow(['1', '2', '3'].map(c => makeCharBtn(c, c)))
+      addRow(['4', '5', '6'].map(c => makeCharBtn(c, c)))
+      addRow(['7', '8', '9'].map(c => makeCharBtn(c, c)))
+      addRow([
+        makeBtn('⌫', 'wide flex glyph', () => dispatchKey(8, CK_CTRL_BKSP)),
+        makeCharBtn('0', '0'),
+        makeBtn('⏎', 'wide flex glyph', () => dispatchKey(13)),
+      ])
+      addRow(buildBottomRow('ABC', 'letters'))
+    } else if (layer === 'letters') {
       addRow(LETTER_ROW_1.map(c => LETTER_DIRS[c] ? makeLetterBtnWithCorner(c, LETTER_DIRS[c]) : makeLetterBtn(c)))
       addRow(LETTER_ROW_2.map(c => LETTER_DIRS[c] ? makeLetterBtnWithCorner(c, LETTER_DIRS[c]) : makeLetterBtn(c)))
       const r3: HTMLButtonElement[] = []
@@ -441,8 +455,8 @@ function buildKeyboardOverlay(send: SendFn): { element: HTMLElement; open: () =>
     refreshMods()
   }
 
-  function open(): void {
-    layer = 'letters'
+  function open(initialLayer: Layer = 'letters'): void {
+    layer = initialLayer
     clearAllMods()
     rebuild()
     overlay.style.display = 'flex'
@@ -543,8 +557,11 @@ export function buildTouchControls(send: SendFn, opts: { spellTab?: SpellTabConf
   root.classList.toggle('dpad-on', dpadEnabled)
 
   // Keyboard overlay (fixed position, renders above everything)
-  const { element: kbdEl, open: openKbd, close: closeKbd } = buildKeyboardOverlay(send)
+  const { element: kbdEl, open: openKbdLayer, close: closeKbd } = buildKeyboardOverlay(send)
   root.appendChild(kbdEl)
+  // numpad:true opens straight to the numeric grid (travel-depth prompts); the
+  // ABC key inside it switches back to the full keyboard if letters are needed.
+  const openKbd = (opts?: { numpad?: boolean }): void => openKbdLayer(opts?.numpad ? 'numpad' : 'letters')
 
   // --- D-pad (optional, gated by dpadEnabled pref) ---
 
