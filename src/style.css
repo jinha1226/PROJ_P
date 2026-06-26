@@ -770,6 +770,13 @@ html, body {
 }
 .zoom-btn:active { background: rgba(245, 158, 11, 0.25); }
 .zoom-btn:disabled { opacity: 0.25; cursor: default; }
+/* Overview toggle lit while active (markers + widest zoom engaged). */
+.zoom-overview.active {
+  opacity: 1;
+  color: var(--accent);
+  background: rgba(245, 158, 11, 0.28);
+  border-color: var(--accent);
+}
 
 /* Map */
 #map-grid {

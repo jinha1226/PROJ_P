@@ -181,6 +181,20 @@ function decodeBg(bg: number | number[] | undefined): DecodedBg {
 // full-bleed fill turning the freed area into more cells.
 // Falls back to ASCII glyphs (also drawn on the canvas) until the tile
 // atlases finish loading.
+
+// Classifies a cell for the overview marker overlay (drawMarkers). Stairs are
+// detected by their map glyph — `>` down, `<` up — which is reliable across
+// render modes and versions (escape hatches and branch entrances share the
+// glyph, and surfacing those too is fine: they're all navigation). Shops are a
+// planned addition once their map glyph/feature is confirmed against live data.
+export function overviewMarker(cell: Cell | undefined): { ch: string; color: string } | null {
+  switch (cell?.g) {
+    case '>': return { ch: '>', color: '#ffe14d' }  // downstairs / branch down
+    case '<': return { ch: '<', color: '#5ed6ff' }  // upstairs / branch up
+    default:  return null
+  }
+}
+
 export class TileMapView {
   private container: HTMLElement
   private canvas: HTMLCanvasElement
@@ -200,6 +214,10 @@ export class TileMapView {
   // setViewportSize early-exit (see the comment there).
   private lastCssW = 0
   private zoomLevel = ZOOM_DEFAULT
+  // Overview map markers: when on, a final pass overlays a large, readable
+  // stair glyph on each stair cell (see drawMarkers). Driven by the overview
+  // toggle in game-view, which also jumps to the widest zoom level.
+  private markersOn = false
   // Multiplier on cellPx — mirrors MapView.fontScale. X-mode sets this to
   // <1 to shrink cells and let the full-bleed fill add more of them.
   // Named `renderScale` internally; setFontScale() stores into it for API
@@ -362,6 +380,13 @@ export class TileMapView {
   getZoomLevel(): number { return this.zoomLevel }
   setZoomMode(on: boolean): void { this.zoomLevel = zoomModeToLevel(on) }
   isZoomMode(): boolean { return levelIsZoomed(this.zoomLevel) }
+  // Toggle the overview stair/shop marker overlay. Repaints so the markers
+  // appear/clear immediately (the caller also refits when it changes zoom).
+  setMarkers(on: boolean): void {
+    if (this.markersOn === on) return
+    this.markersOn = on
+    if (this.ready) this.fullRender()
+  }
 
   fitToContainer(): void {
     const rect = this.container.getBoundingClientRect()
@@ -504,11 +529,47 @@ export class TileMapView {
         const row = (tag - col) / this.viewportW
         this.paintCell(col, row, offX + col, offY + row)
       }
+      // Markers overlay the whole viewport, not just the dirty halo — they're
+      // sparse and drawn last (on top), so a full re-stamp is cheap and keeps
+      // them from being clipped by a neighbour's repaint.
+      if (this.markersOn) this.drawMarkers()
       return
     }
     for (let row = 0; row < this.viewportH; row++) {
       for (let col = 0; col < this.viewportW; col++) {
         this.paintCell(col, row, offX + col, offY + row)
+      }
+    }
+    if (this.markersOn) this.drawMarkers()
+  }
+
+  // Overview-only overlay: a large, high-contrast stair glyph stamped on each
+  // stair cell so it's spottable when tiles are shrunk to fit a wide view. The
+  // backing canvas draws each cell at ATLAS_CELL then CSS-scales to cellPx, so
+  // we inverse-scale the font (draw it ATLAS_CELL/cellPx× larger) to land at a
+  // roughly fixed on-screen size regardless of how far out the zoom is. Drawn
+  // as the final pass (over tiles, cursor, minibars); glyphs may spill past
+  // their cell, which is fine since stairs are sparse and this runs last.
+  private drawMarkers(): void {
+    const ctx = this.ctx
+    const TARGET_PX = 18  // desired on-screen glyph height
+    const scale = this.cellPx / ATLAS_CELL || 1
+    const fontPx = Math.max(ATLAS_CELL * 0.9, TARGET_PX / scale)
+    ctx.font = `bold ${fontPx}px ui-monospace, SFMono-Regular, Menlo, monospace`
+    ctx.textBaseline = 'middle'
+    ctx.textAlign = 'center'
+    ctx.lineWidth = Math.max(2, fontPx / 6)
+    ctx.lineJoin = 'round'
+    for (let row = 0; row < this.viewportH; row++) {
+      for (let col = 0; col < this.viewportW; col++) {
+        const marker = overviewMarker(this.store.get(this.offX + col, this.offY + row))
+        if (!marker) continue
+        const cx = col * ATLAS_CELL + ATLAS_CELL / 2
+        const cy = row * ATLAS_CELL + ATLAS_CELL / 2
+        ctx.strokeStyle = '#000'      // outline for contrast over any tile
+        ctx.strokeText(marker.ch, cx, cy)
+        ctx.fillStyle = marker.color
+        ctx.fillText(marker.ch, cx, cy)
       }
     }
   }

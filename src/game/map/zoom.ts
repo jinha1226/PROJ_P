@@ -22,20 +22,31 @@ export interface ZoomSpec {
 }
 
 // Index 0 = most zoomed OUT, last = most zoomed IN.
+// The three widest levels (0–2) were added for the "overview" map toggle —
+// a one-tap wide view for spotting stairs/shops after clearing a floor. They
+// extend the zoom-OUT end, so the legacy levels shifted up by 3 (ZOOM_DEFAULT,
+// ZOOM_TOGGLE below track that). Prepending — not appending — keeps the
+// "index 0 = most out" convention every caller relies on (ZOOM_MIN, the +/-
+// button disabling, etc.).
 export const ZOOM_LEVELS: readonly ZoomSpec[] = [
-  { ascii: { minW: 41, minH: 25, maxFs: 36 }, tileAxis: 25 }, // 0: zoom out
-  { ascii: { minW: 33, minH: 21, maxFs: 36 }, tileAxis: 21 }, // 1: normal  (ZOOM_DEFAULT)
-  { ascii: { minW: 29, minH: 19, maxFs: 48 }, tileAxis: 19 }, // 2
-  { ascii: { minW: 25, minH: 17, maxFs: 64 }, tileAxis: 17 }, // 3: old zoom (ZOOM_TOGGLE)
-  { ascii: { minW: 19, minH: 17, maxFs: 84 }, tileAxis: 15 }, // 4: max zoom in
+  { ascii: { minW: 59, minH: 43, maxFs: 24 }, tileAxis: 43 }, // 0: overview (ZOOM_OVERVIEW)
+  { ascii: { minW: 53, minH: 37, maxFs: 28 }, tileAxis: 37 }, // 1: wide
+  { ascii: { minW: 47, minH: 31, maxFs: 32 }, tileAxis: 31 }, // 2: wide
+  { ascii: { minW: 41, minH: 25, maxFs: 36 }, tileAxis: 25 }, // 3: zoom out
+  { ascii: { minW: 33, minH: 21, maxFs: 36 }, tileAxis: 21 }, // 4: normal  (ZOOM_DEFAULT)
+  { ascii: { minW: 29, minH: 19, maxFs: 48 }, tileAxis: 19 }, // 5
+  { ascii: { minW: 25, minH: 17, maxFs: 64 }, tileAxis: 17 }, // 6: old zoom (ZOOM_TOGGLE)
+  { ascii: { minW: 19, minH: 17, maxFs: 84 }, tileAxis: 15 }, // 7: max zoom in
 ]
 
 export const ZOOM_MIN = 0
 export const ZOOM_MAX = ZOOM_LEVELS.length - 1
+// Widest level — the target the overview map toggle jumps to.
+export const ZOOM_OVERVIEW = 0
 // Level that reproduces the legacy "normal" (un-zoomed) view.
-export const ZOOM_DEFAULT = 1
+export const ZOOM_DEFAULT = 4
 // Level the double-tap toggle / tile-mode default jumps to — the legacy "zoom".
-export const ZOOM_TOGGLE = 3
+export const ZOOM_TOGGLE = 6
 
 export function clampZoom(level: number): number {
   if (level < ZOOM_MIN) return ZOOM_MIN

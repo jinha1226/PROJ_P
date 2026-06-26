@@ -90,6 +90,11 @@ export class MapView {
     return levelIsZoomed(this.zoomLevel)
   }
 
+  // No-op: the overview marker overlay is tile-mode only. ASCII already draws
+  // `<`/`>` legibly, so there's nothing to add here — present so game-view can
+  // call setMarkers() on either renderer without a type check.
+  setMarkers(_on: boolean): void {}
+
   // Pick font size + viewport dimensions together to fill the container.
   // Font is sized so a minimum viewport fits (33×21 normally; reduced on the
   // binding axis when zoomMode is on); viewport then expands in whichever

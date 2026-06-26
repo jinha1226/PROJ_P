@@ -454,6 +454,31 @@ describe('X-mode (eXamine level map) via cursor', () => {
   })
 })
 
+describe('overview map toggle', () => {
+  const overviewBtn = (h: Harness) => h.view.querySelector<HTMLButtonElement>('.zoom-overview')!
+
+  it('renders the overview button and toggles its active state on tap', () => {
+    const h = setup()
+    const btn = overviewBtn(h)
+    expect(btn).toBeTruthy()
+    expect(btn.classList.contains('active')).toBe(false)
+    btn.click()
+    expect(btn.classList.contains('active')).toBe(true)
+    btn.click()
+    expect(btn.classList.contains('active')).toBe(false)
+  })
+
+  it('a manual zoom step exits overview', () => {
+    const h = setup()
+    const btn = overviewBtn(h)
+    btn.click()
+    expect(btn.classList.contains('active')).toBe(true)
+    const zoomIn = h.view.querySelector<HTMLButtonElement>('#zoom-controls .zoom-btn')! // first child = +
+    zoomIn.click()
+    expect(btn.classList.contains('active')).toBe(false)
+  })
+})
+
 describe('dungeon-travel numpad', () => {
   const kbdKeys = (h: Harness) => [...h.view.querySelectorAll('.kbd-key')].map(b => b.textContent)
 

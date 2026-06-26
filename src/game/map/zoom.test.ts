@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import {
-  ZOOM_LEVELS, ZOOM_MIN, ZOOM_MAX, ZOOM_DEFAULT, ZOOM_TOGGLE,
+  ZOOM_LEVELS, ZOOM_MIN, ZOOM_MAX, ZOOM_DEFAULT, ZOOM_TOGGLE, ZOOM_OVERVIEW,
   clampZoom, zoomSpec, zoomModeToLevel, levelIsZoomed,
 } from './zoom'
 
@@ -19,6 +19,15 @@ describe('zoom levels', () => {
       ascii: { minW: 25, minH: 17, maxFs: 64 },
       tileAxis: 17,
     })
+  })
+
+  it('overview is the widest level (most cells, most zoomed out)', () => {
+    expect(ZOOM_OVERVIEW).toBe(ZOOM_MIN)
+    expect(ZOOM_LEVELS[ZOOM_OVERVIEW].tileAxis).toBe(
+      Math.max(...ZOOM_LEVELS.map(s => s.tileAxis)),
+    )
+    // Strictly wider than the legacy normal view it toggles away from.
+    expect(ZOOM_LEVELS[ZOOM_OVERVIEW].tileAxis).toBeGreaterThan(ZOOM_LEVELS[ZOOM_DEFAULT].tileAxis)
   })
 
   it('levels are monotonic: zooming in never shows more cells or a smaller cap', () => {

@@ -9,7 +9,7 @@ import { fitToWidth } from './fit-terminal'
 import { MapStore } from '../game/map/map-store'
 import { MapView } from '../game/map/map-view'
 import { TileMapView } from '../game/map/tile-map-view'
-import { ZOOM_MIN, ZOOM_MAX, ZOOM_DEFAULT, ZOOM_TOGGLE, clampZoom } from '../game/map/zoom'
+import { ZOOM_MIN, ZOOM_MAX, ZOOM_DEFAULT, ZOOM_TOGGLE, ZOOM_OVERVIEW, clampZoom } from '../game/map/zoom'
 import { StatsView } from '../game/hud/stats-view'
 import { StatusView } from '../game/hud/status-view'
 import { MonsterListView } from '../game/hud/monster-list'
@@ -429,20 +429,55 @@ export function buildGameView(
   zoomInBtn.className = 'zoom-btn'
   zoomInBtn.textContent = '+'
   zoomInBtn.title = 'Zoom in / 확대'
-  zoomControls.append(zoomInBtn, zoomOutBtn)
+  // One-tap overview: jump to the widest zoom + stair/shop markers, tap again
+  // to return to the user's zoom. Handy for finding the stairs after clearing
+  // a floor. Transient — it never persists to mapZoomLevel, so a reload comes
+  // back at the real zoom, and any manual +/- exits it (see applyZoom).
+  const overviewBtn = document.createElement('button')
+  overviewBtn.className = 'zoom-btn zoom-overview'
+  overviewBtn.textContent = '▣'
+  overviewBtn.title = 'Overview / 전체보기'
+  zoomControls.append(zoomInBtn, zoomOutBtn, overviewBtn)
   mapWrap.appendChild(zoomControls)
+
+  let overviewActive = false
 
   function updateZoomButtons(level: number): void {
     zoomOutBtn.disabled = level <= ZOOM_MIN
     zoomInBtn.disabled = level >= ZOOM_MAX
   }
+  // Leave overview without changing zoom (markers off, button un-lit). Called
+  // when a manual zoom or a render-mode swap supersedes the overview view.
+  function clearOverview(): void {
+    if (!overviewActive) return
+    overviewActive = false
+    overviewBtn.classList.remove('active')
+    mapView.setMarkers(false)
+  }
   function applyZoom(level: number): void {
+    clearOverview()
     const next = clampZoom(level)
     mapView.setZoomLevel(next)
     mapView.fitToContainer()
     setPref('mapZoomLevel', next)
     updateZoomButtons(next)
   }
+  function toggleOverview(): void {
+    overviewActive = !overviewActive
+    overviewBtn.classList.toggle('active', overviewActive)
+    mapView.setMarkers(overviewActive)
+    const level = overviewActive ? ZOOM_OVERVIEW : currentZoomLevel()
+    mapView.setZoomLevel(level)
+    mapView.fitToContainer()
+    updateZoomButtons(level)
+  }
+  const overviewTap = (e: Event): void => {
+    e.preventDefault()
+    e.stopPropagation()
+    toggleOverview()
+  }
+  overviewBtn.addEventListener('touchstart', overviewTap, { passive: false })
+  overviewBtn.addEventListener('click', overviewTap)
   // preventDefault on touchstart suppresses the synthesized click (so the step
   // fires once on touch); stopPropagation keeps the tap off the map's
   // travel/double-tap handlers underneath. Desktop uses the click path.
@@ -838,6 +873,10 @@ export function buildGameView(
     if (mode === renderMode) return
     renderMode = mode
     setPref('mapRenderMode', mode)
+    // The swap builds a fresh view (markers default off) at the user's real
+    // zoom, so drop any active overview state to match — no setMarkers needed.
+    overviewActive = false
+    overviewBtn.classList.remove('active')
     // CSS hook for mode-dependent chrome (e.g. the floating log's scrim
     // lightens over tiles — see --msglog-bg in style.css).
     view.classList.toggle('tiles-mode', mode === 'tiles')
