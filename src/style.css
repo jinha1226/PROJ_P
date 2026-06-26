@@ -2262,6 +2262,23 @@ html, body {
 }
 /* No selectable skills (distributed training) → no letter buttons. */
 .skill-letter-row:empty { display: none; }
+
+/* Skill-training preset Save/Apply buttons — their own full-width row, pinned
+   above the letter buttons (order keeps them out of the letter wrap). */
+.skill-preset-row {
+  display: flex;
+  gap: 0.3rem;
+  width: 100%;
+  flex-basis: 100%;
+  order: -2;
+  padding-bottom: 0.2rem;
+}
+.skill-preset-btn {
+  flex: 1 1 0;
+  font-size: 0.9rem;
+  min-height: 2.2rem;
+  padding: 0.2rem 0.4rem;
+}
 .skill-letter-btn {
   flex: 0 0 auto;
   min-width: 2.2rem;

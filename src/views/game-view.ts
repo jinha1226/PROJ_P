@@ -23,6 +23,7 @@ import { uiColor, escHtml, dcssToHtml, DCSS_COLOR_MAP } from '../game/dcss-color
 import { parsePromptText, PROMPT_TRIGGER_RE } from './prompt-parse'
 import { extractSkillHotkeys } from './skill-hotkeys'
 import { reflowSkillCrt } from './skill-reflow'
+import { parseSkillRows, trainedNames, computeSkillToggles, presetToRc, rcToPreset } from './skill-preset'
 import { TEX, getTileLoader, type TileLoader } from '../game/tiles/tile-loader'
 import { renderTiles, appendIconOverlays, monsterTileSpec, prependDngnLayer, type TileRef } from '../game/tiles/tile-view'
 import { getPref, setPref } from '../prefs'
@@ -2340,6 +2341,59 @@ export function buildGameView(
     if (crtTag === 'skills') updateSkillLetterButtons()
   }
 
+  // Read the currently-rendered skill menu (post-reflow .crt-line text) into
+  // structured rows for the preset save/apply buttons.
+  const PRESET_RC_KEY = 'pocketzot_skill_preset'
+  function currentSkillRows(): ReturnType<typeof parseSkillRows> {
+    const lines: string[] = []
+    uiOverlay.querySelectorAll<HTMLElement>('.crt-line').forEach(l => lines.push(l.textContent ?? ''))
+    return parseSkillRows(lines)
+  }
+
+  // Save / Apply buttons for the skill-training preset (see skill-preset.ts).
+  // The preset (a list of skill names) lives in the RC file so it survives an
+  // incognito session; the actual training is set by sending toggle keystrokes
+  // to the open skill menu — the same path the letter buttons use.
+  function buildSkillPresetButtons(): void {
+    const ko = getPref('uiLang') === 'ko'
+    const row = document.createElement('div')
+    row.className = 'skill-preset-row'
+
+    const flash = (btn: HTMLButtonElement, text: string, restore: string): void => {
+      btn.textContent = text
+      window.setTimeout(() => { btn.textContent = restore }, 1200)
+    }
+
+    const saveBtn = document.createElement('button')
+    saveBtn.className = 'menu-ctrl-btn skill-preset-btn'
+    const saveLabel = ko ? '세트저장' : 'Save set'
+    saveBtn.textContent = saveLabel
+    const doSave = (): void => {
+      const names = trainedNames(currentSkillRows())
+      rc.setOption(PRESET_RC_KEY, names.length ? presetToRc(names) : null)
+      flash(saveBtn, ko ? '저장됨' : 'Saved', saveLabel)
+    }
+    saveBtn.addEventListener('click', () => { doSave(); view.focus({ preventScroll: true }) })
+    saveBtn.addEventListener('touchstart', (e) => { e.preventDefault(); doSave() }, { passive: false })
+
+    const applyBtn = document.createElement('button')
+    applyBtn.className = 'menu-ctrl-btn skill-preset-btn'
+    const applyLabel = ko ? '세트적용' : 'Apply set'
+    applyBtn.textContent = applyLabel
+    const doApply = (): void => {
+      const preset = rcToPreset(rc.getOption(PRESET_RC_KEY))
+      if (!preset.length) { flash(applyBtn, ko ? '세트없음' : 'No set', applyLabel); return }
+      for (const ch of computeSkillToggles(currentSkillRows(), preset)) {
+        conn.send({ msg: 'input', text: ch })
+      }
+    }
+    applyBtn.addEventListener('click', () => { doApply(); view.focus({ preventScroll: true }) })
+    applyBtn.addEventListener('touchstart', (e) => { e.preventDefault(); doApply() }, { passive: false })
+
+    row.append(saveBtn, applyBtn)
+    menuControls.appendChild(row)
+  }
+
   function updateSkillLetterButtons(): void {
     const lines: string[] = []
     uiOverlay.querySelectorAll<HTMLElement>('.crt-line').forEach(line => {
@@ -2503,6 +2557,9 @@ export function buildGameView(
     // like the skill screen. innerHTML was just cleared above, so re-add it on
     // every rebuild.
     updateMenuLetterButtons()
+    // Skill menu gets the preset Save/Apply buttons (RC-backed; see
+    // buildSkillPresetButtons). innerHTML was cleared, so re-add on rebuild.
+    if (tag === 'skills') buildSkillPresetButtons()
   }
 
   function applyShiftBtnState(btn: HTMLElement): void {

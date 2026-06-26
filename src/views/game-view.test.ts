@@ -382,6 +382,25 @@ describe('menu handler', () => {
     expect(letterBtns(h)).toHaveLength(0)
   })
 
+  it('skill menu shows the preset Save/Apply buttons', () => {
+    const h = setup()
+    h.dispatch({ msg: 'menu', type: 'crt', tag: 'skills' })
+    h.dispatch({ msg: 'txt', id: 1, lines: { '0': ' a + Fighting   14', '1': ' b - Dodging   5' } })
+    const presetBtns = [...h.view.querySelectorAll('#menu-controls .skill-preset-btn')]
+    expect(presetBtns.map(b => b.textContent)).toEqual(['세트저장', '세트적용'])
+  })
+
+  it('Apply with no saved preset is a no-op (sends nothing, flashes a hint)', () => {
+    const h = setup()
+    h.dispatch({ msg: 'menu', type: 'crt', tag: 'skills' })
+    h.dispatch({ msg: 'txt', id: 1, lines: { '0': ' a + Fighting   14' } })
+    const apply = [...h.view.querySelectorAll<HTMLButtonElement>('#menu-controls .skill-preset-btn')]
+      .find(b => b.textContent === '세트적용')!
+    apply.click()
+    expect(apply.textContent).toBe('세트없음')                  // hint, not a toggle
+    expect(sent(h)).not.toContainEqual({ msg: 'input', text: 'a' })
+  })
+
   it('renders a type:crt menu as a CRT display and paints txt lines into it', () => {
     const h = setup()
     h.dispatch({ msg: 'menu', type: 'crt' })
