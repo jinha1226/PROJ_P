@@ -2460,6 +2460,10 @@ export function buildGameView(
       }
       menuControls.appendChild(btn)
     }
+    // Marking menus (shop/stash/acquirement) get a per-item a/b/c letter row,
+    // like the skill screen. innerHTML was just cleared above, so re-add it on
+    // every rebuild.
+    updateMenuLetterButtons()
   }
 
   function applyShiftBtnState(btn: HTMLElement): void {
@@ -3139,6 +3143,7 @@ export function buildGameView(
     } else {
       renderMenuItems(msg.items)
     }
+    updateMenuLetterButtons()  // refresh a/b/c letters when item rows change
     syncMenuShiftLabels()
   }
 
@@ -3188,6 +3193,94 @@ export function buildGameView(
     return out
   }
 
+  // Activate a menu item the way a row tap does. Shared by the item rows and
+  // the menu-controls letter buttons (updateMenuLetterButtons) so both paths
+  // stay in lockstep.
+  function activateMenuItem(item: MenuItem, i: number): void {
+    const keycode = item.hotkeys?.[0]
+    // Shop shift-tap: shopping list uses the uppercase letter as a direct
+    // keybind (shopping.cc), separate from the arrows-select activate-on-
+    // hover path — so route it before the MF_ARROWS_SELECT branch below,
+    // which would otherwise preempt it with Space and just mark for purchase.
+    if (
+      activeMenu?.tag === 'shop'
+      && menuShift.isOn
+      && keycode != null
+      && keycode >= 97 && keycode <= 122
+    ) {
+      conn.send({ msg: 'key', keycode: keycode - 32 })
+      menuShift.consume()
+      return
+    }
+    // ARROWS_SELECT menus expect activation against the current hover, not via
+    // row hotkeys: Enter for singleselect, Space for multiselect (upstream
+    // menu.js:1066). Move server hover to the tapped row and then send the
+    // activation key — leaves server state matching the user's tap target.
+    // (For stash search, sending the row's letter would happen to produce the
+    // same visible X-mode preview, but the upstream protocol path is more
+    // robust.)
+    const flags = activeMenu?.flags ?? 0
+    if (flags & MF_ARROWS_SELECT) {
+      setMenuHover(i, false)
+      const activateKey = (flags & MF_MULTISELECT) ? 32 : 13
+      conn.send({ msg: 'key', keycode: activateKey })
+      menuShift.consume()
+      return
+    }
+    if (keycode == null) return
+    conn.send({ msg: 'key', keycode })
+    menuShift.consume()
+  }
+
+  // Per-item letter buttons in the menu-controls bar for marking menus (shop,
+  // stash-search, acquirement). Mirrors updateSkillLetterButtons: the skill
+  // screen sources its a/b/c letters from parsed CRT text, but these menus are
+  // structured webtiles menus, so we read activeMenu.items directly. Reuses the
+  // .skill-letter-row / .skill-letter-btn classes so the ⇧ toggle relabels them
+  // (uppercase = shop shopping-list) via syncMenuShiftLabels, and so the styling
+  // matches the skill screen. Tapping a button runs the same activateMenuItem
+  // path as tapping the row.
+  function updateMenuLetterButtons(): void {
+    const tag = activeMenu?.tag
+    if (tag !== 'shop' && tag !== 'stash' && tag !== 'acquirement') return
+    // While the server holds the menu open for a (y/N) confirmation the item
+    // list is gone and buildMenuControls has swapped the bar to Y/N — drop the
+    // stale letter row instead of leaving dead buttons.
+    if (currentInputMode === MOUSE_MODE_YESNO) {
+      menuControls.querySelector('.skill-letter-row')?.remove()
+      return
+    }
+    let row = menuControls.querySelector<HTMLElement>('.skill-letter-row')
+    if (!row) {
+      row = document.createElement('div')
+      row.className = 'skill-letter-row'
+      menuControls.insertBefore(row, menuControls.firstChild)
+    }
+    row.innerHTML = ''
+    const shiftOn = menuShift.isOn
+    const items = activeMenu?.items ?? []
+    for (let i = 0; i < items.length; i++) {
+      const item = items[i]
+      if (item.level === 0 || item.level === 1) continue  // separators/headers
+      const code = item.hotkeys?.[0]
+      if (code == null || code < 97 || code > 122) continue  // a-z item rows only
+      const letter = String.fromCharCode(code)
+      const btn = document.createElement('button')
+      btn.className = 'menu-ctrl-btn skill-letter-btn'
+      btn.textContent = shiftOn ? letter.toUpperCase() : letter
+      const fire = () => activateMenuItem(item, i)
+      btn.addEventListener('click', () => {
+        fire()
+        view.focus({ preventScroll: true })
+      })
+      btn.addEventListener('touchstart', (e) => {
+        e.preventDefault()
+        fire()
+      }, { passive: false })
+      row.appendChild(btn)
+    }
+  }
+
   function fillMenuItems(listEl: HTMLElement, rawItems: MenuItem[]): void {
     const coalesced = coalesceMenuItems(rawItems)
     for (let c = 0; c < coalesced.length; c++) {
@@ -3200,7 +3293,6 @@ export function buildGameView(
         hdr.innerHTML = dcssToHtml(String(item.text ?? ''))
         listEl.appendChild(hdr)
       } else {                        // level 2: item row
-        const keycode = item.hotkeys?.[0]
         // Render the row text verbatim (markup → HTML), mirroring the
         // reference client (menu.js set_item_contents): the hotkey letter and
         // the " - "/" + " selection marker are part of item.text — DCSS bakes
@@ -3223,41 +3315,7 @@ export function buildGameView(
         const prefix = String(item.text ?? '')
           .match(/^\s*(?:<[a-zA-Z]+>.<\/[a-zA-Z]+>|(?:<[^>]+>)*.)\s([-+# $])\s/)
         const selected = prefix?.[1] === '+'
-        const el = makeItemButton(dcssToHtml(String(item.text ?? '')), () => {
-          // Shop shift-tap: shopping list uses the uppercase letter as a direct
-          // keybind (shopping.cc), separate from the arrows-select activate-on-
-          // hover path — so route it before the MF_ARROWS_SELECT branch below,
-          // which would otherwise preempt it with Space and just mark for
-          // purchase.
-          if (
-            activeMenu?.tag === 'shop'
-            && menuShift.isOn
-            && keycode != null
-            && keycode >= 97 && keycode <= 122
-          ) {
-            conn.send({ msg: 'key', keycode: keycode - 32 })
-            menuShift.consume()
-            return
-          }
-          // ARROWS_SELECT menus expect activation against the current hover,
-          // not via row hotkeys: Enter for singleselect, Space for multiselect
-          // (upstream menu.js:1066). Move server hover to the tapped row and
-          // then send the activation key — leaves server state matching the
-          // user's tap target. (For stash search, sending the row's letter
-          // would happen to produce the same visible X-mode preview, but the
-          // upstream protocol path is more robust.)
-          const flags = activeMenu?.flags ?? 0
-          if (flags & MF_ARROWS_SELECT) {
-            setMenuHover(i, false)
-            const activateKey = (flags & MF_MULTISELECT) ? 32 : 13
-            conn.send({ msg: 'key', keycode: activateKey })
-            menuShift.consume()
-            return
-          }
-          if (keycode == null) return
-          conn.send({ msg: 'key', keycode })
-          menuShift.consume()
-        }, itemColor)
+        const el = makeItemButton(dcssToHtml(String(item.text ?? '')), () => activateMenuItem(item, i), itemColor)
         if (item.tiles && item.tiles.length > 0) {
           el.insertBefore(renderTiles(loader, item.tiles), el.firstChild)
         }

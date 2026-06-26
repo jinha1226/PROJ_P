@@ -65,5 +65,9 @@ export function actionLabel(
 ): { text: string; named: boolean } {
   const pair = def.title ? ACTION_LABELS[def.title] : undefined
   if (!pair) return { text: def.label, named: false }
-  return { text: pair[lang], named: true }
+  // Named buttons append the raw key in parens — e.g. 소지품(i) — so the
+  // function name and the keystroke it sends are both visible. The .named
+  // wrap (white-space:normal, keep-all) drops "(key)" to a 2nd line when the
+  // button is too narrow, so this never overflows the fixed 4-col grid.
+  return { text: `${pair[lang]}(${def.label})`, named: true }
 }

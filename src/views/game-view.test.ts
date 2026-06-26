@@ -339,6 +339,49 @@ describe('menu handler', () => {
     expect(sent(h)).toContainEqual({ msg: 'key', keycode: 97 })
   })
 
+  const menuCtrls = (h: Harness) => h.view.querySelector<HTMLElement>('#menu-controls')!
+  const letterBtns = (h: Harness) =>
+    [...menuCtrls(h).querySelectorAll<HTMLButtonElement>('.skill-letter-btn')]
+
+  it('shop menu: renders a per-item a/b/c letter row that marks via the item hotkey', () => {
+    const h = setup()
+    h.dispatch({
+      msg: 'menu',
+      tag: 'shop',
+      title: { text: 'Welcome to the shop!' },
+      items: [
+        { level: 1, text: 'Armour' },                           // header: no button
+        { level: 2, text: 'a - a +0 robe (10 gold)', hotkeys: [97] },
+        { level: 2, text: 'b - a buckler (25 gold)', hotkeys: [98] },
+      ],
+    })
+    expect(letterBtns(h).map(b => b.textContent)).toEqual(['a', 'b'])
+    letterBtns(h)[1].click()
+    expect(sent(h)).toContainEqual({ msg: 'key', keycode: 98 })  // marks item b
+  })
+
+  it('shop letter button respects the ⇧ toggle (uppercase = shopping list)', () => {
+    const h = setup()
+    h.dispatch({
+      msg: 'menu',
+      tag: 'shop',
+      title: { text: 'Welcome to the shop!' },
+      items: [{ level: 2, text: 'a - a +0 robe (10 gold)', hotkeys: [97] }],
+    })
+    menuCtrls(h).querySelector<HTMLButtonElement>('[data-shift="true"]')!.click()
+    expect(letterBtns(h)[0].textContent).toBe('A')              // relabelled by ⇧
+    letterBtns(h)[0].click()
+    expect(sent(h)).toContainEqual({ msg: 'key', keycode: 65 }) // uppercase A
+  })
+
+  it('stash/inventory menus: no letter row for non-marking tags', () => {
+    const h = setup()
+    h.dispatch({ msg: 'menu', tag: 'inventory', title: { text: 'Inventory' }, items: [
+      { level: 2, text: 'a - a +0 short sword', hotkeys: [97] },
+    ] })
+    expect(letterBtns(h)).toHaveLength(0)
+  })
+
   it('renders a type:crt menu as a CRT display and paints txt lines into it', () => {
     const h = setup()
     h.dispatch({ msg: 'menu', type: 'crt' })
@@ -417,7 +460,7 @@ describe('dungeon-travel numpad', () => {
   it('opens the numpad for the destination prompt after G', () => {
     const h = setup()
     const travel = [...h.view.querySelectorAll('.tc-content .tc-btn')]
-      .find(b => b.textContent === '이동') as HTMLButtonElement
+      .find(b => b.textContent === '이동(G)') as HTMLButtonElement
     travel.click()
     expect(sent(h)).toContainEqual({ msg: 'input', text: 'G' })
     h.dispatch({ msg: 'ui-push', type: 'msgwin-get-line', prompt: 'Where to? ' } as unknown as ServerMsg)

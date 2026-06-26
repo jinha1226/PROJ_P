@@ -25,7 +25,7 @@ describe('layout v2: no d-pad, action strip present', () => {
     const sent: unknown[] = []
     const tc = buildTouchControls(m => sent.push(m))
     const skills = [...tc.element.querySelectorAll('.tc-content .tc-btn')]
-      .find(b => b.textContent === '기술') as HTMLButtonElement
+      .find(b => b.textContent === '기술(m)') as HTMLButtonElement
     skills.click()
     expect(sent).toContainEqual({ msg: 'input', text: 'm' })
   })

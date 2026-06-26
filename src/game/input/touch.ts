@@ -957,7 +957,9 @@ export function buildTouchControls(send: SendFn, opts: { spellTab?: SpellTabConf
     const up = def.text.toUpperCase()
     const sentKey = shift.isOn ? up : (CAPTURED_CTRL.has(up) ? '^' + up : def.text)
     const lp = KEY_LABELS.get(sentKey)
-    return lp ? { text: lp[lang], named: true } : null  // null = dead key → empty slot
+    // Mirror actionLabel: show the function name with its (key) suffix, here
+    // the modifier-shifted key actually sent (R, ^F, …).
+    return lp ? { text: `${lp[lang]}(${sentKey})`, named: true } : null  // null = dead key → empty slot
   }
 
   function renderContent(rows: TabButtonDef[][]): void {

@@ -3,14 +3,14 @@ import { actionLabel, ACTION_LABELS, TAB_LABELS } from './action-labels'
 import { TAB_BUTTONS } from './touch'
 
 describe('actionLabel', () => {
-  it('returns the Korean label for a known title', () => {
+  it('returns the Korean label plus the key for a known title', () => {
     const r = actionLabel({ label: 'o', title: 'Auto-explore' }, 'ko')
-    expect(r).toEqual({ text: '자동탐색', named: true })
+    expect(r).toEqual({ text: '자동탐색(o)', named: true })
   })
 
-  it('returns the English label for a known title', () => {
+  it('returns the English label plus the key for a known title', () => {
     const r = actionLabel({ label: 'o', title: 'Auto-explore' }, 'en')
-    expect(r).toEqual({ text: 'Explore', named: true })
+    expect(r).toEqual({ text: 'Explore(o)', named: true })
   })
 
   it('falls back to the raw label when title is unknown', () => {
