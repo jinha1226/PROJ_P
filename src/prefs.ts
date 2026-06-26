@@ -24,7 +24,7 @@ const DEFAULTS: Prefs = {
   mapRenderMode: 'ascii',
   uiLang: 'ko',
   dpadEnabled: true,
-  coachEnabled: true,
+  coachEnabled: false,
   mapZoomLevel: null,
   hiddenSpells: [],
 }
