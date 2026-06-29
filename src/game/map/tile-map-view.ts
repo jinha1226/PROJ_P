@@ -182,15 +182,16 @@ function decodeBg(bg: number | number[] | undefined): DecodedBg {
 // Falls back to ASCII glyphs (also drawn on the canvas) until the tile
 // atlases finish loading.
 
-// Classifies a cell for the overview marker overlay (drawMarkers). Stairs are
-// detected by their map glyph — `>` down, `<` up — which is reliable across
-// render modes and versions (escape hatches and branch entrances share the
-// glyph, and surfacing those too is fine: they're all navigation). Shops are a
-// planned addition once their map glyph/feature is confirmed against live data.
+// Classifies a cell for the overview marker overlay (drawMarkers). Detected by
+// map glyph, which is reliable across render modes and versions:
+//   >  downstairs / branch down   <  upstairs / branch up   ∩  shop / gate /
+// portal. Escape hatches and branch entrances share the stair glyphs, and
+// surfacing those too is fine — they're all navigation targets.
 export function overviewMarker(cell: Cell | undefined): { ch: string; color: string } | null {
   switch (cell?.g) {
     case '>': return { ch: '>', color: '#ffe14d' }  // downstairs / branch down
     case '<': return { ch: '<', color: '#5ed6ff' }  // upstairs / branch up
+    case '∩': return { ch: '∩', color: '#e879f9' }  // shop / gateway / portal
     default:  return null
   }
 }

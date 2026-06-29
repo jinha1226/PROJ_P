@@ -50,9 +50,9 @@ overlay reuses that text-draw capability via a final `drawMarkers()` pass:
 - Detection is by **map glyph** (`cell.g`) — reliable across render modes and
   versions. Escape hatches / branch entrances share `>`/`<` and surfacing them
   is fine (all navigation). `overviewMarker()` is the single classifier.
-- **Shops deferred**: their map glyph/feature wasn't confidently known offline.
-  `overviewMarker` is structured so shops are a one-line add once confirmed
-  against live data. Stairs (the stated primary need) ship now.
+- Shops / gates / portals are marked too, via the `∩` glyph (confirmed against
+  live data), in a distinct colour. Detection stays glyph-based in
+  `overviewMarker`.
 - Monsters get **no** overlay — they appear only as their (tiny) tiles.
 
 ### Button

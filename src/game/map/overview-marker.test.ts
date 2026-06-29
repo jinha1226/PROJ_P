@@ -11,13 +11,16 @@ describe('overviewMarker', () => {
     expect(overviewMarker(cell('<'))?.ch).toBe('<')
   })
 
-  it('gives stairs distinct colours', () => {
-    const down = overviewMarker(cell('>'))!.color
-    const up = overviewMarker(cell('<'))!.color
-    expect(down).not.toBe(up)
+  it('marks shops / gates / portals by the ∩ glyph', () => {
+    expect(overviewMarker(cell('∩'))?.ch).toBe('∩')
   })
 
-  it('ignores non-stair cells and undefined', () => {
+  it('gives stairs and gates distinct colours', () => {
+    const colours = ['>', '<', '∩'].map(g => overviewMarker(cell(g))!.color)
+    expect(new Set(colours).size).toBe(3)
+  })
+
+  it('ignores other cells and undefined', () => {
     expect(overviewMarker(cell('#'))).toBeNull()   // wall
     expect(overviewMarker(cell('@'))).toBeNull()   // player
     expect(overviewMarker(cell('.'))).toBeNull()   // floor
