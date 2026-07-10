@@ -399,10 +399,16 @@ export function buildGameView(
   msgLog.id = 'game-messages'
   msgLog.addEventListener('click', (e) => {
     if (isHarvesting()) return
-    if (uiOverlay.style.display === 'none' && !(e.target as HTMLElement).closest('button, input, .game-text-input-row')) {
-      conn.send({ msg: 'key', keycode: 16 })
-      view.focus({ preventScroll: true })
-    }
+    if (uiOverlay.style.display !== 'none') return
+    if ((e.target as HTMLElement).closest('button, input, .game-text-input-row')) return
+    // Full-log tap target is only the newest line: the box is column-reverse,
+    // so that's the bottom line-height band (plus bottom padding as slack).
+    // Taps on older lines stay inert — no accidental opens while reading.
+    const box = msgLog.getBoundingClientRect()
+    const lineH = parseFloat(getComputedStyle(msgLog).lineHeight) || 16
+    if (box.bottom - e.clientY > lineH + 4) return
+    conn.send({ msg: 'key', keycode: 16 })
+    view.focus({ preventScroll: true })
   })
 
   const mapWrap = document.createElement('div')
