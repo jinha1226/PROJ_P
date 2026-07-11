@@ -9,6 +9,15 @@ formatting and HTML chrome differ. Drift is a bug.
 
 Notable changes to PocketZot, newest first.
 
+## 2026-07-11
+
+- 터치 컨트롤 커스터마이즈: 설정의 "버튼 편집"으로 액션 버튼을 직접
+  구성할 수 있습니다 — 슬롯을 탭해 명령 교체(목록 선택·직접 키 입력·빈 칸),
+  행 추가/삭제(1~4행), 초기화.
+- 디패드 위치(왼쪽/오른쪽)와 크기(작게/보통/크게)도 설정에서 조절.
+- 커스텀 레이아웃은 서버 RC 파일에 자동 백업되어, 시크릿 모드에서도
+  로그인해 게임에 접속하면 복원됩니다.
+
 ## 2026-06-12
 
 - Spellcasters now get a quick-cast row below the message log, with tappable
