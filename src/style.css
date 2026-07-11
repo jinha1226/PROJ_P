@@ -33,7 +33,11 @@
   --fs-overlay:        0.9rem;
   --fs-overlay-chrome: 0.8rem;
 
-  --app-bottom-pad: 25px;
+  /* Clearance above the swipe-up/home-indicator gesture zone so bottom-row
+     taps don't get eaten. Trimmed 25px → 10px (2026-07-11) to give the map
+     the height back when the action grid runs 4 rows; bump it back up if
+     footer taps start triggering the system gesture. */
+  --app-bottom-pad: 10px;
   touch-action: manipulation;
 }
 
