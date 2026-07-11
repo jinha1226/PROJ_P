@@ -2339,6 +2339,37 @@ html, body {
   align-items: stretch;
 }
 
+/* Edit mode: banner between header and grid; picker overlay mirrors the
+   settings overlay's fixed positioning. Dim the parts that aren't editable
+   (tabs stay live so both grids can be edited). */
+.tc-edit-banner {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.2rem 0.1rem;
+}
+.tc-edit-hint { color: var(--tc-label-dim); font-size: 0.75rem; margin-right: auto; }
+#touch-controls.tc-editing .tc-dpad,
+#touch-controls.tc-editing .tc-header,
+#touch-controls.tc-editing .tc-footer { opacity: 0.35; pointer-events: none; }
+#touch-controls.tc-editing .tc-header .tc-tabs { opacity: 1; pointer-events: auto; }
+.tc-btn.tc-btn-empty { border-style: dashed; color: var(--tc-label-dim); }
+.tc-picker-overlay {
+  position: fixed;
+  inset: auto 0 0 0;
+  max-height: 70vh;
+  overflow-y: auto;
+  flex-direction: column;
+  gap: 0.3rem;
+  padding: 0.5rem;
+  background: var(--bg);
+  border-top: 1px solid var(--accent);
+  z-index: 40;
+}
+.tc-picker-group { color: var(--tc-label-dim); font-size: 0.75rem; margin-top: 0.3rem; }
+.tc-picker-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 2px; }
+.tc-picker-grid .tc-btn { min-height: 2.2rem; }
+
 /* User pref: d-pad on the right — mirror the row so the panel takes the left. */
 #touch-controls.dpad-on.dpad-right {
   flex-direction: row-reverse;

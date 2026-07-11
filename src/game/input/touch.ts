@@ -12,8 +12,8 @@ import { createShiftToggle } from './shift-state'
 import { getPref, setPref, type UiLang } from '../../prefs'
 import { actionLabel, ACTION_LABELS, TAB_LABELS, type LabelPair } from './action-labels'
 import type { RcControls } from '../rc/rc-options'
-import { CATALOG, CATALOG_BY_ID, DEFAULT_TAB_IDS, currentLayout, slotToDef, type TabButtonDef } from './touch-catalog'
-import type { TouchLayout } from './custom-layout'
+import { CATALOG, CATALOG_BY_ID, DEFAULT_TAB_IDS, GROUP_LABELS, currentLayout, slotToDef, type TabButtonDef } from './touch-catalog'
+import type { Slot, TouchLayout } from './custom-layout'
 
 type SendFn = (msg: ClientMsg) => void
 type TabKey = 'micro' | 'macro' | 'spells'
@@ -426,6 +426,11 @@ export function buildTouchControls(send: SendFn, opts: { spellTab?: SpellTabConf
   // True while a menu/overlay is open: Tab pages the list there instead of
   // autofighting, so its button is relabelled to match (see renderContent).
   let menuMode = false
+  let editMode = false
+  let resetArmed = false
+  // Replaced by the kbd-overlay capture hook (raw-key task); until then the
+  // 직접 입력 picker item is a no-op.
+  let onRawPick: ((assign: (raw: string) => void) => void) | null = null
   let lang: UiLang = getPref('uiLang')
   const dpadEnabled = getPref('dpadEnabled')
   let layout = currentLayout()
@@ -442,12 +447,6 @@ export function buildTouchControls(send: SendFn, opts: { spellTab?: SpellTabConf
     mut(next)
     setPref('touchLayout', next)
     layout = currentLayout()
-  }
-
-  // Replaced with the full edit-mode implementation in the edit-mode section
-  // below; declared as let so the settings row can reference it early.
-  function enterEditMode(): void {
-    root.classList.add('tc-editing')
   }
 
   // Forward declarations — assigned during DOM construction below
@@ -900,6 +899,128 @@ export function buildTouchControls(send: SendFn, opts: { spellTab?: SpellTabConf
 
   buildSettingsOverlay()
 
+  // --- Edit mode: command picker + banner ---
+
+  // Command picker (edit mode): tap a slot → pick its new command here.
+  const pickerOverlay = document.createElement('div')
+  pickerOverlay.className = 'tc-picker-overlay'
+  pickerOverlay.style.display = 'none'
+  root.appendChild(pickerOverlay)
+
+  function closePicker(): void { pickerOverlay.style.display = 'none' }
+
+  function openPicker(row: number, col: number): void {
+    pickerOverlay.innerHTML = ''
+    const assign = (slot: Slot): void => {
+      updateLayout(l => { l.tabs[activeTab as 'micro' | 'macro'][row][col] = slot })
+      closePicker()
+      renderTab(activeTab)
+    }
+    for (const [group, glabel] of Object.entries(GROUP_LABELS) as Array<[keyof typeof GROUP_LABELS, LabelPair]>) {
+      const h = document.createElement('div')
+      h.className = 'tc-picker-group'
+      h.textContent = glabel[lang]
+      pickerOverlay.appendChild(h)
+      const grid = document.createElement('div')
+      grid.className = 'tc-picker-grid'
+      for (const e of CATALOG.filter(c => c.group === group)) {
+        const b = document.createElement('button')
+        b.className = 'tc-btn named tc-pick'
+        b.dataset.id = e.id
+        b.textContent = actionLabel(e, lang).text
+        b.addEventListener('click', () => assign({ cmd: e.id }))  // click only — edit mode is not latency-critical
+        grid.appendChild(b)
+      }
+      pickerOverlay.appendChild(grid)
+    }
+    const special = document.createElement('div')
+    special.className = 'tc-picker-grid tc-picker-special'
+    const rawBtn = document.createElement('button')
+    rawBtn.className = 'tc-btn tc-pick-raw'
+    rawBtn.textContent = lang === 'ko' ? '직접 입력' : 'Type a key'
+    rawBtn.addEventListener('click', () => {
+      closePicker()
+      onRawPick?.(raw => assign({ raw }))
+    })
+    const emptyBtn = document.createElement('button')
+    emptyBtn.className = 'tc-btn tc-pick-empty'
+    emptyBtn.textContent = lang === 'ko' ? '빈 칸' : 'Empty'
+    emptyBtn.addEventListener('click', () => assign(null))
+    const cancelBtn = document.createElement('button')
+    cancelBtn.className = 'tc-btn tc-pick-cancel'
+    cancelBtn.textContent = lang === 'ko' ? '취소' : 'Cancel'
+    cancelBtn.addEventListener('click', closePicker)
+    special.appendChild(rawBtn)
+    special.appendChild(emptyBtn)
+    special.appendChild(cancelBtn)
+    pickerOverlay.appendChild(special)
+    pickerOverlay.style.display = 'flex'
+  }
+
+  // Edit banner: lives between header and content while editing.
+  const bannerEl = document.createElement('div')
+  bannerEl.className = 'tc-edit-banner'
+  bannerEl.style.display = 'none'
+  panel.insertBefore(bannerEl, contentEl)
+
+  function buildBanner(): void {
+    bannerEl.innerHTML = ''
+    const hint = document.createElement('span')
+    hint.className = 'tc-edit-hint'
+    hint.textContent = lang === 'ko' ? '슬롯을 탭해 교체' : 'Tap a slot to change'
+    bannerEl.appendChild(hint)
+    const mk = (cls: string, text: string, onTap: () => void): HTMLButtonElement => {
+      const b = document.createElement('button')
+      b.className = 'tc-settings-btn ' + cls
+      b.textContent = text
+      b.addEventListener('click', onTap)  // click only — see langToggleBtn
+      bannerEl.appendChild(b)
+      return b
+    }
+    mk('tc-edit-addrow', '＋행', () => {
+      if (layout.tabs[activeTab as 'micro' | 'macro'].length >= 4) return
+      updateLayout(l => { l.tabs[activeTab as 'micro' | 'macro'].push([null, null, null, null]) })
+      renderTab(activeTab)
+    })
+    mk('tc-edit-delrow', '－행', () => {
+      if (layout.tabs[activeTab as 'micro' | 'macro'].length <= 1) return
+      updateLayout(l => { l.tabs[activeTab as 'micro' | 'macro'].pop() })
+      renderTab(activeTab)
+    })
+    const resetBtn = mk('tc-edit-reset', lang === 'ko' ? '초기화' : 'Reset', () => {
+      if (!resetArmed) {
+        resetArmed = true
+        resetBtn.textContent = lang === 'ko' ? '한 번 더 탭' : 'Tap again'
+        return
+      }
+      resetArmed = false
+      setPref('touchLayout', null)
+      layout = currentLayout()
+      buildBanner()
+      renderTab(activeTab)
+    })
+    mk('tc-edit-done', lang === 'ko' ? '완료' : 'Done', exitEditMode)
+  }
+
+  function enterEditMode(): void {
+    editMode = true
+    resetArmed = false
+    root.classList.add('tc-editing')
+    if (activeTab === 'spells') renderTab('micro')
+    buildBanner()
+    bannerEl.style.display = 'flex'
+    renderTab(activeTab)
+  }
+
+  function exitEditMode(): void {
+    editMode = false
+    root.classList.remove('tc-editing')
+    bannerEl.style.display = 'none'
+    closePicker()
+    renderTab(activeTab)
+    opts.onRequestRebuild?.()
+  }
+
   // Gear button replaces the standalone language button
   const settingsBtn = document.createElement('button')
   settingsBtn.className = 'tc-settings'
@@ -1017,8 +1138,22 @@ export function buildTouchControls(send: SendFn, opts: { spellTab?: SpellTabConf
       stripEl.appendChild(btn)
       return true
     }
-    for (const def of rows.flat()) {
-      if (!def.label) { spacer(); continue }
+    const flat = rows.flat()
+    for (let i = 0; i < flat.length; i++) {
+      const def = flat[i]
+      // In edit mode every cell — including empty ones — opens the picker for
+      // its grid position instead of sending its key.
+      const editTap = (): void => openPicker(Math.floor(i / 4), i % 4)
+      if (!def.label) {
+        if (editMode) {
+          const b = document.createElement('button')
+          b.className = 'tc-btn tc-btn-empty'
+          b.textContent = '＋'
+          b.addEventListener('click', editTap)
+          stripEl.appendChild(b)
+        } else spacer()
+        continue
+      }
       const mod = modifierLabel(def)
       if (mod === null) {  // dead key under modifier
         if (fillCtrlSlot()) continue  // surface a Ctrl exit/save command here
@@ -1031,8 +1166,9 @@ export function buildTouchControls(send: SendFn, opts: { spellTab?: SpellTabConf
       else if (/[^\x20-\x7e]/.test(def.label)) btn.classList.add('glyph')
       btn.textContent = text
       if (def.title) { btn.title = def.title; btn.setAttribute('aria-label', def.title) }
-      btn.addEventListener('touchstart', e => { e.preventDefault(); sendTabKey(def) }, { passive: false })
-      btn.addEventListener('click', () => sendTabKey(def))
+      const onTap = (): void => { if (editMode) editTap(); else sendTabKey(def) }
+      btn.addEventListener('touchstart', e => { e.preventDefault(); onTap() }, { passive: false })
+      btn.addEventListener('click', () => onTap())
       stripEl.appendChild(btn)
     }
     contentEl.appendChild(stripEl)
