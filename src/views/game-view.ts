@@ -462,6 +462,7 @@ export function buildGameView(
     overviewActive = false
     overviewBtn.classList.remove('active')
     mapView.setMarkers(false)
+    mapView.setOverviewFit(false)
   }
   function applyZoom(level: number): void {
     clearOverview()
@@ -475,6 +476,9 @@ export function buildGameView(
     overviewActive = !overviewActive
     overviewBtn.classList.toggle('active', overviewActive)
     mapView.setMarkers(overviewActive)
+    // ASCII fits the whole explored floor (bbox-centered); tiles no-op this
+    // and rely on the widest fixed level below.
+    mapView.setOverviewFit(overviewActive)
     const level = overviewActive ? ZOOM_OVERVIEW : currentZoomLevel()
     mapView.setZoomLevel(level)
     mapView.fitToContainer()
@@ -1085,6 +1089,11 @@ export function buildGameView(
         const dirty = store.merge(msg.cells ?? [])
         if (msg.clear || panned) mapView.fullRender()
         else mapView.render(dirty)
+        // Overview fit tracks the explored bbox: exploring (or a floor change)
+        // can move the bbox center without resizing the viewport, so refit and
+        // repaint wholesale — dirty-cell paints against a shifted origin would
+        // garble the grid. Transient mode, so the extra full renders are fine.
+        if (overviewActive) { mapView.fitToContainer(); mapView.fullRender() }
         monsterListView.update(store.getMonsters())
         if (monsterPanelOpen) monsterPanel.update(store.getMonsters())
         updateCoach()

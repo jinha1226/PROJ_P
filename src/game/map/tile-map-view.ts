@@ -389,6 +389,11 @@ export class TileMapView {
     if (this.ready) this.fullRender()
   }
 
+  // No-op: the fit-whole-floor overview is ASCII-only for now (the tile
+  // overview stays at the widest fixed zoom level). Present so game-view can
+  // call setOverviewFit() on either renderer without a type check.
+  setOverviewFit(_on: boolean): void {}
+
   fitToContainer(): void {
     const rect = this.container.getBoundingClientRect()
     if (rect.width === 0 || rect.height === 0) return

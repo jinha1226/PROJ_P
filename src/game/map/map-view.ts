@@ -32,6 +32,11 @@ export class MapView {
   private viewCenter = { x: 0, y: 0 }
   private cursorLoc: { x: number; y: number } | null = null
   private cursorSpan: HTMLSpanElement | null = null
+  // Overview fit: viewport centers on the explored area's bbox center (not the
+  // player) and fitToContainer sizes to show the whole bbox. Transient — the
+  // overview toggle owns it; server vgrdc updates keep flowing into viewCenter
+  // underneath so switching back needs no re-sync.
+  private overviewFit = false
 
   constructor(store: MapStore) {
     this.store = store
@@ -95,6 +100,24 @@ export class MapView {
   // call setMarkers() on either renderer without a type check.
   setMarkers(_on: boolean): void {}
 
+  setOverviewFit(on: boolean): void {
+    this.overviewFit = on
+  }
+
+  // Explored-area viewport: bbox center + dims, or null before anything is
+  // explored (fresh floor) — callers fall back to the player-centered path.
+  private overviewBox(): { cx: number; cy: number; w: number; h: number } | null {
+    const b = this.store.exploredBounds()
+    if (!b) return null
+    return {
+      cx: Math.floor((b.minX + b.maxX) / 2),
+      cy: Math.floor((b.minY + b.maxY) / 2),
+      w: b.maxX - b.minX + 1,
+      h: b.maxY - b.minY + 1,
+    }
+  }
+
+
   // Pick font size + viewport dimensions together to fill the container.
   // Font is sized so a minimum viewport fits (33×21 normally; reduced on the
   // binding axis when zoomMode is on); viewport then expands in whichever
@@ -157,12 +180,16 @@ export class MapView {
     // sizing instead, so the minimum viewport stays at NORMAL.
     const xMode = this.fontScale !== 1.0
     const spec = zoomSpec(this.zoomLevel).ascii
-    const minW = xMode ? NORMAL_W : spec.minW
-    const minH = xMode ? NORMAL_H : spec.minH
+    // Overview fit: the minimum viewport is the explored bbox (+1-cell border)
+    // so the whole floor fits on screen at once. Font floor drops to 7px (the
+    // fit-to-width legibility floor) — a full 80×70 floor needs it on a phone.
+    const ov = !xMode && this.overviewFit ? this.overviewBox() : null
+    const minW = xMode ? NORMAL_W : ov ? ov.w + 2 : spec.minW
+    const minH = xMode ? NORMAL_H : ov ? ov.h + 2 : spec.minH
     const widthFs = availW / (minW * charWPerFs)
     const heightFs = availH / (minH * lineHPerFs)
-    const maxFs = xMode ? 36 : spec.maxFs
-    const fontSize = Math.max(10, Math.min(maxFs, Math.min(widthFs, heightFs))) * this.fontScale
+    const maxFs = xMode ? 36 : ov ? 24 : spec.maxFs
+    const fontSize = Math.max(ov ? 7 : 10, Math.min(maxFs, Math.min(widthFs, heightFs))) * this.fontScale
     this.container.style.fontSize = fontSize + 'px'
 
     // Expand viewport in the slack dimension to fill the container.
@@ -185,7 +212,10 @@ export class MapView {
     // instead; sprites cut by the viewport edge look natural there. See
     // TileMapView.fitToContainer.) With a reserve, availHFit lets whole rows
     // fill on down behind the translucent log, top-anchored by the CSS.
-    const availHFit = availH + reserve
+    // Overview keeps the grid inside the clear area (no reserve expansion):
+    // its symmetric centering would otherwise slide the bbox bottom under the
+    // floating log. The follow-the-player view keeps filling behind the log.
+    const availHFit = ov ? availH : availH + reserve
     const fitH = Math.floor(availHFit / lineH)
     const keepH = this.viewportH > fitH && this.viewportH * lineH - availHFit < lineH / 2
     const h = Math.max(minH, keepH ? this.viewportH : fitH)
@@ -226,8 +256,18 @@ export class MapView {
   // cell (col,row) ↔ dungeon (offX+col, offY+row). One definition each so the
   // centering rule lives in a single place (see CLAUDE.md coordinate system).
   // Vertically the center is `centerRow`, not the middle row — see the field.
-  private get offX(): number { return this.viewCenter.x - Math.floor(this.viewportW / 2) }
-  private get offY(): number { return this.viewCenter.y - this.centerRow }
+  // In overview fit both axes center symmetrically on the explored bbox —
+  // vertical deliberately ignores centerRow (the log-reserve bias serves the
+  // follow-the-player view; overview wants the whole floor centered as one).
+  private get offX(): number {
+    const o = this.overviewFit ? this.overviewBox() : null
+    const cx = o ? o.cx : this.viewCenter.x
+    return cx - Math.floor(this.viewportW / 2)
+  }
+  private get offY(): number {
+    const o = this.overviewFit ? this.overviewBox() : null
+    return o ? o.cy - Math.floor(this.viewportH / 2) : this.viewCenter.y - this.centerRow
+  }
   private inView(col: number, row: number): boolean {
     return col >= 0 && col < this.viewportW && row >= 0 && row < this.viewportH
   }

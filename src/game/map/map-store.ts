@@ -288,6 +288,23 @@ export class MapStore {
     return this.cells.get(cellKey(x, y))
   }
 
+  // Bounding box of everything explored on this floor (cells with a visible
+  // glyph — blanks are erased/unseen padding). Drives the overview map's
+  // fit-whole-floor view. O(cells) per call; callers invoke it on zoom/fit,
+  // not per frame.
+  exploredBounds(): { minX: number; minY: number; maxX: number; maxY: number } | null {
+    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity
+    for (const [key, cell] of this.cells) {
+      if (!cell.g || cell.g === ' ') continue
+      const { x, y } = parseCellKey(key)
+      if (x < minX) minX = x
+      if (x > maxX) maxX = x
+      if (y < minY) minY = y
+      if (y > maxY) maxY = y
+    }
+    return minX === Infinity ? null : { minX, minY, maxX, maxY }
+  }
+
   getMonsters(): ReadonlyMap<string, MonsterCell> {
     return this.monsterMap
   }

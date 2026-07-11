@@ -149,3 +149,28 @@ describe('MapStore.clear', () => {
     expect(store.getMonsters().size).toBe(0)
   })
 })
+
+describe('MapStore.exploredBounds', () => {
+  it('returns null for an empty store', () => {
+    expect(new MapStore().exploredBounds()).toBeNull()
+  })
+
+  it('returns the bounding box of non-blank cells', () => {
+    const store = new MapStore()
+    store.merge([
+      { x: 10, y: 5, g: '#' },
+      { x: 30, y: 20, g: '.' },
+      { x: 15, y: 40, g: '<' },
+    ])
+    expect(store.exploredBounds()).toEqual({ minX: 10, minY: 5, maxX: 30, maxY: 40 })
+  })
+
+  it('ignores blank-glyph cells', () => {
+    const store = new MapStore()
+    store.merge([
+      { x: 10, y: 5, g: '#' },
+      { x: 70, y: 60, g: ' ' },  // erased/unseen padding — not explored
+    ])
+    expect(store.exploredBounds()).toEqual({ minX: 10, minY: 5, maxX: 10, maxY: 5 })
+  })
+})
