@@ -1,4 +1,5 @@
 import { SPECTATE_SERVERS } from './servers'
+import type { TouchLayout } from './game/input/custom-layout'
 
 const KEY = 'pocketzot:prefs'
 
@@ -16,6 +17,9 @@ export interface Prefs {
   mapZoomLevel: number | null
   // Spell titles the user hid from the quick-cast surfaces (rail + z tab).
   hiddenSpells: string[]
+  // User-customized touch HUD layout (slots + dpad side/size). null = default.
+  // Validated on read by touch-catalog.ts, not here.
+  touchLayout: TouchLayout | null
 }
 
 const DEFAULTS: Prefs = {
@@ -27,6 +31,7 @@ const DEFAULTS: Prefs = {
   coachEnabled: false,
   mapZoomLevel: null,
   hiddenSpells: [],
+  touchLayout: null,
 }
 
 // Session fallback for values whose localStorage write failed (private mode,
