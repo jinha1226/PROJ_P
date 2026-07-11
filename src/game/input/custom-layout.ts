@@ -1,6 +1,8 @@
 // User-customized touch layout: pure types, validation, and serialization.
 // No DOM and no prefs access here — touch-catalog.ts binds this to the
 // command catalog and prefs; game-view.ts binds it to the RC backup line.
+// (rc-options is itself pure string manipulation, so no layering violation.)
+import { getRcComment, setRcComment } from '../rc/rc-options'
 
 export type Slot = { cmd: string } | { raw: string } | null
 
@@ -81,4 +83,19 @@ export function decodeLayout(b64: string, knownCmd: (id: string) => boolean): To
 export function planLayoutSync(local: TouchLayout | null, remote: TouchLayout | null): 'backup' | 'restore' | 'none' {
   if (local !== null) return JSON.stringify(local) === JSON.stringify(remote) ? 'none' : 'backup'
   return remote !== null ? 'restore' : 'none'
+}
+
+// One sync pass, run when the RC file arrives. Local (prefs) wins conflicts;
+// restore only fills an empty local — the incognito-new-session case.
+export function applyLayoutSync(
+  rcText: string,
+  local: TouchLayout | null,
+  knownCmd: (id: string) => boolean,
+): { newRcText: string | null; restored: TouchLayout | null } {
+  const b64 = getRcComment(rcText, 'layout')
+  const remote = b64 ? decodeLayout(b64, knownCmd) : null
+  const action = planLayoutSync(local, remote)
+  if (action === 'backup') return { newRcText: setRcComment(rcText, 'layout', encodeLayout(local!)), restored: null }
+  if (action === 'restore') return { newRcText: null, restored: remote }
+  return { newRcText: null, restored: null }
 }

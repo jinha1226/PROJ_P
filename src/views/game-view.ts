@@ -17,6 +17,8 @@ import { MonsterPanelView } from '../game/hud/monster-panel'
 import { fgHaloDngnName } from '../game/hud/monster-style'
 import { InventoryStore } from '../game/inventory-store'
 import { buildTouchControls } from '../game/input/touch'
+import { applyLayoutSync } from '../game/input/custom-layout'
+import { customLayout, CATALOG_BY_ID } from '../game/input/touch-catalog'
 import { handleKeydown, CK_UP, CK_DOWN, CK_PGUP, CK_PGDN, CK_HOME, CK_END } from '../game/input/keyboard'
 import { createShiftToggle } from '../game/input/shift-state'
 import { uiColor, escHtml, dcssToHtml, DCSS_COLOR_MAP } from '../game/dcss-colors'
@@ -792,6 +794,9 @@ export function buildGameView(
     touchControls = buildTouchControls(touchSend, { spellTab, onRequestRebuild: rebuildTouchControls, rc })
     old.replaceWith(touchControls.element)
   }
+  // Fetch the RC as soon as we're in a real game: the touch-layout backup
+  // sync (rcfile_contents handler) and the settings RC rows both need it.
+  if (!spectating && rc.available()) rc.request()
 
   const menuControls = document.createElement('div')
   menuControls.id = 'menu-controls'
@@ -1589,6 +1594,19 @@ export function buildGameView(
         // when unset; the build JSON loads asynchronously, so the first few
         // messages may render untranslated until it arrives.
         void initTranslationFromRc(rcText)
+        // Touch-layout backup sync: back up a local custom layout into an RC
+        // comment, or restore one into prefs on a fresh (incognito) session.
+        if (!spectating) {
+          const sync = applyLayoutSync(rcText, customLayout(), id => CATALOG_BY_ID.has(id))
+          const layoutGameId = getCurrentGameId()
+          if (sync.newRcText !== null && layoutGameId) {
+            rcText = sync.newRcText
+            conn.send({ msg: 'set_rc', game_id: layoutGameId, contents: rcText })
+          } else if (sync.restored !== null) {
+            setPref('touchLayout', sync.restored)
+            rebuildTouchControls()
+          }
+        }
         for (const cb of rcListeners) cb()
         break
     }
