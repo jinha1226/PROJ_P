@@ -51,3 +51,44 @@ export function setRcOption(text: string, key: string, value: string | null): st
   if (out.length > 0) result += '\n'
   return result
 }
+
+// Managed comment lines: `# pocketzot:<key> <value>`. DCSS ignores comments
+// entirely (no unknown-option warning) and the option editor above skips
+// them, so this is a safe side-channel for client-only state — e.g. the
+// custom touch layout backed up for incognito sessions.
+function commentPrefix(key: string): string {
+  return `# pocketzot:${key} `
+}
+
+export function getRcComment(text: string, key: string): string | null {
+  const prefix = commentPrefix(key)
+  for (const line of text.split('\n')) {
+    const t = line.trim()
+    if (t.startsWith(prefix)) return t.slice(prefix.length).trim()
+  }
+  return null
+}
+
+export function setRcComment(text: string, key: string, value: string | null): string {
+  const prefix = commentPrefix(key)
+  const lines = text.split('\n')
+  const hadTrailingNewline = lines.length > 0 && lines[lines.length - 1] === ''
+  if (hadTrailingNewline) lines.pop()
+
+  let replaced = false
+  const out: string[] = []
+  for (const line of lines) {
+    if (line.trim().startsWith(prefix)) {
+      if (value === null) continue
+      out.push(prefix + value)
+      replaced = true
+    } else {
+      out.push(line)
+    }
+  }
+  if (value !== null && !replaced) out.push(prefix + value)
+
+  let result = out.join('\n')
+  if (out.length > 0) result += '\n'
+  return result
+}
