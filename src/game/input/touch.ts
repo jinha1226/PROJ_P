@@ -428,9 +428,6 @@ export function buildTouchControls(send: SendFn, opts: { spellTab?: SpellTabConf
   let menuMode = false
   let editMode = false
   let resetArmed = false
-  // Replaced by the kbd-overlay capture hook (raw-key task); until then the
-  // 직접 입력 picker item is a no-op.
-  let onRawPick: ((assign: (raw: string) => void) => void) | null = null
   let lang: UiLang = getPref('uiLang')
   const dpadEnabled = getPref('dpadEnabled')
   let layout = currentLayout()
@@ -524,8 +521,28 @@ export function buildTouchControls(send: SendFn, opts: { spellTab?: SpellTabConf
   root.classList.toggle('dpad-right', layout.dpad.side === 'right')
   root.style.setProperty('--tc-dpad', DPAD_SIZE_REM[layout.dpad.size])
 
-  // Keyboard overlay (fixed position, renders above everything)
-  const { element: kbdEl, open: openKbdLayer, close: closeKbd } = buildKeyboardOverlay(send)
+  // Keyboard overlay (fixed position, renders above everything).
+  // While capturing (edit mode's 직접 입력), the kbd's output is diverted to
+  // the pending slot assignment instead of the game. Esc cancels.
+  let captureCb: ((raw: string) => void) | null = null
+  let closeKbdRef: () => void = () => {}
+  const kbdSend: SendFn = msg => {
+    if (captureCb) {
+      const cb = captureCb
+      if (msg.msg === 'input' && msg.text.length === 1 && /^[\x20-\x7e]$/.test(msg.text)) {
+        captureCb = null
+        closeKbdRef()
+        cb(msg.text)
+      } else if (msg.msg === 'key' && msg.keycode === 27) {
+        captureCb = null
+        closeKbdRef()
+      }
+      return // swallow everything else (Enter, Tab, multi-char) while capturing
+    }
+    send(msg)
+  }
+  const { element: kbdEl, open: openKbdLayer, close: closeKbd } = buildKeyboardOverlay(kbdSend)
+  closeKbdRef = closeKbd
   root.appendChild(kbdEl)
   // numpad:true opens straight to the numeric grid (travel-depth prompts); the
   // ABC key inside it switches back to the full keyboard if letters are needed.
@@ -940,7 +957,8 @@ export function buildTouchControls(send: SendFn, opts: { spellTab?: SpellTabConf
     rawBtn.textContent = lang === 'ko' ? '직접 입력' : 'Type a key'
     rawBtn.addEventListener('click', () => {
       closePicker()
-      onRawPick?.(raw => assign({ raw }))
+      captureCb = raw => assign({ raw })
+      openKbd()
     })
     const emptyBtn = document.createElement('button')
     emptyBtn.className = 'tc-btn tc-pick-empty'
@@ -1014,6 +1032,7 @@ export function buildTouchControls(send: SendFn, opts: { spellTab?: SpellTabConf
 
   function exitEditMode(): void {
     editMode = false
+    captureCb = null  // disarm a dangling 직접 입력 capture (kbd closed via abc▾)
     root.classList.remove('tc-editing')
     bannerEl.style.display = 'none'
     closePicker()

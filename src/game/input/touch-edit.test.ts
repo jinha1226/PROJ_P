@@ -70,6 +70,34 @@ describe('edit mode', () => {
     expect(localStorage.getItem('pocketzot:prefs')).toContain('"touchLayout":null')
   })
 
+  it('raw capture: one kbd char lands in the slot without sending it', () => {
+    const sent: unknown[] = []
+    const tc = buildTouchControls(m => sent.push(m))
+    enterEdit(tc)
+    ;(tc.element.querySelector('.tc-strip .tc-btn') as HTMLButtonElement).click()
+    ;(tc.element.querySelector('.tc-pick-raw') as HTMLButtonElement).click()
+    const kbd = tc.element.querySelector('#kbd-overlay') as HTMLElement
+    expect(kbd.style.display).not.toBe('none')
+    // Tap the 'q' key on the letters layer.
+    const q = Array.from(kbd.querySelectorAll<HTMLButtonElement>('.kbd-key.letter')).find(b => b.textContent === 'q')!
+    q.click()
+    expect(sent).toEqual([])
+    expect(kbd.style.display).toBe('none')
+    expect(localStorage.getItem('pocketzot:prefs')).toContain('"raw":"q"')
+  })
+
+  it('raw capture: esc cancels without assigning', () => {
+    const tc = buildTouchControls(() => {})
+    enterEdit(tc)
+    ;(tc.element.querySelector('.tc-strip .tc-btn') as HTMLButtonElement).click()
+    ;(tc.element.querySelector('.tc-pick-raw') as HTMLButtonElement).click()
+    const kbd = tc.element.querySelector('#kbd-overlay') as HTMLElement
+    const esc = Array.from(kbd.querySelectorAll<HTMLButtonElement>('.kbd-key')).find(b => b.textContent === '⎋')!
+    esc.click()
+    expect(kbd.style.display).toBe('none')
+    expect(localStorage.getItem('pocketzot:prefs') ?? '').not.toContain('"raw"')
+  })
+
   it('done exits edit mode and taps send again', () => {
     const sent: unknown[] = []
     const tc = buildTouchControls(m => sent.push(m))
