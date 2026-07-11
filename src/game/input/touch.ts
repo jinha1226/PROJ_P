@@ -13,6 +13,7 @@ import { getPref, setPref, type UiLang } from '../../prefs'
 import { actionLabel, ACTION_LABELS, TAB_LABELS, type LabelPair } from './action-labels'
 import type { RcControls } from '../rc/rc-options'
 import { CATALOG, CATALOG_BY_ID, DEFAULT_TAB_IDS, currentLayout, slotToDef, type TabButtonDef } from './touch-catalog'
+import type { TouchLayout } from './custom-layout'
 
 type SendFn = (msg: ClientMsg) => void
 type TabKey = 'micro' | 'macro' | 'spells'
@@ -435,6 +436,20 @@ export function buildTouchControls(send: SendFn, opts: { spellTab?: SpellTabConf
     return layout.tabs[tab].map(row => row.map(slotToDef))
   }
 
+  // Clone-mutate-persist. Reload `layout` so the next render sees the change.
+  function updateLayout(mut: (l: TouchLayout) => void): void {
+    const next = structuredClone(layout)
+    mut(next)
+    setPref('touchLayout', next)
+    layout = currentLayout()
+  }
+
+  // Replaced with the full edit-mode implementation in the edit-mode section
+  // below; declared as let so the settings row can reference it early.
+  function enterEditMode(): void {
+    root.classList.add('tc-editing')
+  }
+
   // Forward declarations — assigned during DOM construction below
   let shiftBtn!: HTMLButtonElement
   let ctrlBtn!: HTMLButtonElement
@@ -741,6 +756,63 @@ export function buildTouchControls(send: SendFn, opts: { spellTab?: SpellTabConf
     dpadRow.appendChild(dpadLabel)
     dpadRow.appendChild(dpadToggleBtn)
     settingsOverlay.appendChild(dpadRow)
+
+    // D-pad side row
+    const sideRow = document.createElement('div')
+    sideRow.className = 'tc-settings-row'
+    const sideLabel = document.createElement('span')
+    sideLabel.className = 'tc-settings-label'
+    sideLabel.textContent = '조이스틱 위치 / D-pad side'
+    const sideBtn = document.createElement('button')
+    sideBtn.className = 'tc-settings-btn tc-set-dpad-side'
+    const sideText = (): string => layout.dpad.side === 'left' ? '왼쪽/Left' : '오른쪽/Right'
+    sideBtn.textContent = sideText()
+    sideBtn.addEventListener('click', () => {  // click only — see langToggleBtn
+      updateLayout(l => { l.dpad.side = l.dpad.side === 'left' ? 'right' : 'left' })
+      sideBtn.textContent = sideText()
+      opts.onRequestRebuild?.()
+    })
+    sideRow.appendChild(sideLabel)
+    sideRow.appendChild(sideBtn)
+    settingsOverlay.appendChild(sideRow)
+
+    // D-pad size row (cycles through the 3 steps)
+    const SIZE_ORDER: Array<TouchLayout['dpad']['size']> = ['sm', 'md', 'lg']
+    const SIZE_TEXT: Record<TouchLayout['dpad']['size'], string> = { sm: '작게/S', md: '보통/M', lg: '크게/L' }
+    const sizeRow = document.createElement('div')
+    sizeRow.className = 'tc-settings-row'
+    const sizeLabel = document.createElement('span')
+    sizeLabel.className = 'tc-settings-label'
+    sizeLabel.textContent = '조이스틱 크기 / D-pad size'
+    const sizeBtn = document.createElement('button')
+    sizeBtn.className = 'tc-settings-btn tc-set-dpad-size'
+    sizeBtn.textContent = SIZE_TEXT[layout.dpad.size]
+    sizeBtn.addEventListener('click', () => {  // click only — see langToggleBtn
+      const next = SIZE_ORDER[(SIZE_ORDER.indexOf(layout.dpad.size) + 1) % SIZE_ORDER.length]
+      updateLayout(l => { l.dpad.size = next })
+      sizeBtn.textContent = SIZE_TEXT[next]
+      opts.onRequestRebuild?.()
+    })
+    sizeRow.appendChild(sizeLabel)
+    sizeRow.appendChild(sizeBtn)
+    settingsOverlay.appendChild(sizeRow)
+
+    // Button-edit entry row
+    const editRow = document.createElement('div')
+    editRow.className = 'tc-settings-row'
+    const editLabel = document.createElement('span')
+    editLabel.className = 'tc-settings-label'
+    editLabel.textContent = '버튼 편집 / Edit buttons'
+    const editBtn = document.createElement('button')
+    editBtn.className = 'tc-settings-btn tc-set-edit'
+    editBtn.textContent = '시작/Start'
+    editBtn.addEventListener('click', () => {  // click only — see langToggleBtn
+      settingsOverlay.style.display = 'none'
+      enterEditMode()
+    })
+    editRow.appendChild(editLabel)
+    editRow.appendChild(editBtn)
+    settingsOverlay.appendChild(editRow)
 
     // Beginner Coach row
     const coachRow = document.createElement('div')
