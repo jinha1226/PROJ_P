@@ -2339,6 +2339,11 @@ html, body {
   align-items: stretch;
 }
 
+/* User pref: d-pad on the right — mirror the row so the panel takes the left. */
+#touch-controls.dpad-on.dpad-right {
+  flex-direction: row-reverse;
+}
+
 /* D-pad: 3×3 CSS grid of large buttons (only present when dpad-on) */
 #touch-controls.dpad-on .tc-dpad {
   display: grid;

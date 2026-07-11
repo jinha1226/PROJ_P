@@ -12,7 +12,7 @@ import { createShiftToggle } from './shift-state'
 import { getPref, setPref, type UiLang } from '../../prefs'
 import { actionLabel, ACTION_LABELS, TAB_LABELS, type LabelPair } from './action-labels'
 import type { RcControls } from '../rc/rc-options'
-import { CATALOG, CATALOG_BY_ID, DEFAULT_TAB_IDS, type TabButtonDef } from './touch-catalog'
+import { CATALOG, CATALOG_BY_ID, DEFAULT_TAB_IDS, currentLayout, slotToDef, type TabButtonDef } from './touch-catalog'
 
 type SendFn = (msg: ClientMsg) => void
 type TabKey = 'micro' | 'macro' | 'spells'
@@ -427,6 +427,13 @@ export function buildTouchControls(send: SendFn, opts: { spellTab?: SpellTabConf
   let menuMode = false
   let lang: UiLang = getPref('uiLang')
   const dpadEnabled = getPref('dpadEnabled')
+  let layout = currentLayout()
+
+  // Resolve the (possibly customized) grid for a tab. Slots resolve through
+  // the catalog; null slots become spacers via slotToDef's empty label.
+  function layoutDefs(tab: Exclude<TabKey, 'spells'>): TabButtonDef[][] {
+    return layout.tabs[tab].map(row => row.map(slotToDef))
+  }
 
   // Forward declarations — assigned during DOM construction below
   let shiftBtn!: HTMLButtonElement
@@ -498,6 +505,10 @@ export function buildTouchControls(send: SendFn, opts: { spellTab?: SpellTabConf
   const root = document.createElement('div')
   root.id = 'touch-controls'
   root.classList.toggle('dpad-on', dpadEnabled)
+
+  const DPAD_SIZE_REM: Record<'sm' | 'md' | 'lg', string> = { sm: '2.1rem', md: '2.55rem', lg: '3rem' }
+  root.classList.toggle('dpad-right', layout.dpad.side === 'right')
+  root.style.setProperty('--tc-dpad', DPAD_SIZE_REM[layout.dpad.size])
 
   // Keyboard overlay (fixed position, renders above everything)
   const { element: kbdEl, open: openKbdLayer, close: closeKbd } = buildKeyboardOverlay(send)
@@ -867,7 +878,7 @@ export function buildTouchControls(send: SendFn, opts: { spellTab?: SpellTabConf
     // tab — stays until the player switches away, so repeat-casting is one tap
     // each. Other tabs render their static button layout.
     if (tab === 'spells') refreshSpellTab()
-    else renderContent(TAB_BUTTONS[tab])
+    else renderContent(layoutDefs(tab))
   }
 
   // Reveal the z tab only when a harvest found spells; hide it otherwise (a
@@ -973,7 +984,7 @@ export function buildTouchControls(send: SendFn, opts: { spellTab?: SpellTabConf
 
   // Initial render
   if (dpadEnabled) buildDpad()
-  renderContent(TAB_BUTTONS.micro)
+  renderContent(layoutDefs('micro'))
 
   return { element: root, enterXMode, exitXMode, openKbd, closeKbd, refreshSpellTab, setMenuMode }
 }
