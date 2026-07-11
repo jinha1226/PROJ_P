@@ -12,6 +12,7 @@ import { createShiftToggle } from './shift-state'
 import { getPref, setPref, type UiLang } from '../../prefs'
 import { actionLabel, ACTION_LABELS, TAB_LABELS, type LabelPair } from './action-labels'
 import type { RcControls } from '../rc/rc-options'
+import { CATALOG, CATALOG_BY_ID, DEFAULT_TAB_IDS, type TabButtonDef } from './touch-catalog'
 
 type SendFn = (msg: ClientMsg) => void
 type TabKey = 'micro' | 'macro' | 'spells'
@@ -22,13 +23,6 @@ type TabKey = 'micro' | 'macro' | 'spells'
 // flip back to true is all it takes to surface it again. Exported so the
 // tab-visibility test asserts whichever mode is current.
 export const ENABLE_SPELL_TAB = false
-
-interface TabButtonDef {
-  label: string
-  title?: string
-  text?: string
-  key?: number
-}
 
 type DpadDef =
   | { label: string; plain: number; shifted: number; ctrled: number }
@@ -87,59 +81,12 @@ export const MENU_BUTTONS: TabButtonDef[][] = [
   ],
 ]
 
+// Derived from the catalog so the shipped grid and the picker share one
+// definition (DEFAULT_TAB_IDS documents the row groupings). Kept exported
+// under the old name/shape for the label tests and KEY_LABELS below.
 export const TAB_BUTTONS: Record<Exclude<TabKey, 'spells'>, TabButtonDef[][]> = {
-  micro: [
-    // Row 1: consumables + rest.
-    [
-      { label: 'q',   title: 'Quaff potion',          text: 'q' },
-      { label: 'r',   title: 'Read scroll',           text: 'r' },
-      { label: 'i',   title: 'Inventory',             text: 'i' },
-      { label: '5',   title: 'Rest until healed',     text: '5' },
-    ],
-    // Row 2: movement / management.
-    [
-      { label: 'G',   title: 'Go to level / branch',  text: 'G' },
-      { label: 'm',   title: 'Skills screen',         text: 'm' },
-      { label: ',',   title: 'Pick up item',          text: ',' },
-      { label: 'I',   title: 'List memorised spells', text: 'I' },
-    ],
-    // Row 3: ability / fire / stairs.
-    [
-      { label: 'a',   title: 'Use ability',           text: 'a' },
-      { label: 'f',   title: 'Fire / quivered',       text: 'f' },
-      { label: '<',   title: 'Ascend stairs',         text: '<' },
-      { label: '>',   title: 'Descend stairs',        text: '>' },
-    ],
-  ],
-  // 운영 + 정보 merged into one compact "기타" tab — just the handful that earn
-  // their slot. The rarely-used gear/admin/info commands were dropped; the ones
-  // that are a modifier away from a remaining letter (R via Shift+r, ^F via
-  // Ctrl+f, A via Shift+a) stay reachable through the in-place relabel (see the
-  // KEY_LABELS extras below), so no empty slots appear under a held modifier.
-  macro: [
-    // Top row: screens you open to check/manage (status, memorise/library, map,
-    // overview) — kept up top per request so they're the first thing reached.
-    [
-      { label: '@',   title: 'Character status',      text: '@' },
-      { label: 'M',   title: 'Spell library',         text: 'M' },
-      { label: 'X',   title: 'Examine level map',     text: 'X' },
-      { label: '^O',  title: 'Dungeon overview (Ctrl+O)', key: 15 },
-    ],
-    // Middle row: things you actively do (fire, evoke, use ability, cast).
-    [
-      { label: 'f',   title: 'Fire / quivered',       text: 'f' },
-      { label: 'v',   title: 'Evoke item',            text: 'v' },
-      { label: 'a',   title: 'Use ability',           text: 'a' },
-      { label: 'z',   title: 'Cast spell',            text: 'z' },
-    ],
-    // Bottom row: secondary info screens (fills the reserved 3rd row).
-    [
-      { label: '%',   title: 'Character overview',    text: '%' },
-      { label: 'A',   title: 'Abilities/mutations',   text: 'A' },
-      { label: '^',   title: 'Religion / deity',      text: '^' },
-      { label: '}',   title: 'Runes collected',       text: '}' },
-    ],
-  ],
+  micro: DEFAULT_TAB_IDS.micro.map(row => row.map(id => CATALOG_BY_ID.get(id)!)),
+  macro: DEFAULT_TAB_IDS.macro.map(row => row.map(id => CATALOG_BY_ID.get(id)!)),
 }
 
 // Reverse map: the key a button sends → its localized label, built from every
@@ -148,14 +95,10 @@ export const TAB_BUTTONS: Record<Exclude<TabKey, 'spells'>, TabButtonDef[][]> = 
 // in place, so each button keeps its position under a modifier.
 const KEY_LABELS: Map<string, LabelPair> = (() => {
   const m = new Map<string, LabelPair>()
-  for (const tab of Object.values(TAB_BUTTONS)) {
-    for (const row of tab) {
-      for (const def of row) {
-        const lp = def.title ? ACTION_LABELS[def.title] : undefined
-        const keyStr = def.text ?? def.label
-        if (lp && keyStr) m.set(keyStr, lp)
-      }
-    }
+  for (const def of CATALOG) {
+    const lp = def.title ? ACTION_LABELS[def.title] : undefined
+    const keyStr = def.text ?? def.label
+    if (lp && keyStr) m.set(keyStr, lp)
   }
   // Modifier-reachable commands with no dedicated button of their own.
   m.set('Q', { ko: '화살집', en: 'Quiver' })          // Shift+q
