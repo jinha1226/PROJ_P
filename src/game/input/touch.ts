@@ -680,9 +680,24 @@ export function buildTouchControls(send: SendFn, opts: { spellTab?: SpellTabConf
   const kbdBtn = document.createElement('button')
   kbdBtn.className = 'tc-kbd'
   kbdBtn.textContent = 'abc▴'
-  kbdBtn.title = 'Open keyboard input'
-  kbdBtn.addEventListener('touchstart', e => { e.preventDefault(); openKbd() }, { passive: false })
-  kbdBtn.addEventListener('click', () => openKbd())
+  kbdBtn.title = 'Open keyboard (long-press: settings / 설정)'
+  // Tap opens the keyboard; long-press opens settings. The ⚙ button is hidden
+  // from the footer (kept in the DOM for the settings API + tests), so this
+  // long-press is the way into settings / layout edit / language.
+  let kbdHold: number | null = null
+  let kbdHeld = false
+  const clearKbdHold = (): void => { if (kbdHold != null) { clearTimeout(kbdHold); kbdHold = null } }
+  kbdBtn.addEventListener('pointerdown', () => {
+    kbdHeld = false
+    kbdHold = window.setTimeout(() => { kbdHeld = true; kbdHold = null; openSettings() }, 500)
+  })
+  kbdBtn.addEventListener('pointerup', e => {
+    e.preventDefault()
+    clearKbdHold()
+    if (!kbdHeld) openKbd()  // a tap, not a long-press
+  })
+  kbdBtn.addEventListener('pointercancel', clearKbdHold)
+  kbdBtn.addEventListener('pointerleave', clearKbdHold)
   footerEl.appendChild(kbdBtn)
 
   // Settings overlay
@@ -1053,6 +1068,9 @@ export function buildTouchControls(send: SendFn, opts: { spellTab?: SpellTabConf
   }
   settingsBtn.addEventListener('touchstart', e => { e.preventDefault(); openSettings() }, { passive: false })
   settingsBtn.addEventListener('click', openSettings)
+  // Hidden from the footer (long-press the ⌨ keyboard button opens settings),
+  // but kept in the DOM so the settings API and tests still reach it.
+  settingsBtn.style.display = 'none'
   footerEl.appendChild(settingsBtn)
 
   // --- Render helpers ---
