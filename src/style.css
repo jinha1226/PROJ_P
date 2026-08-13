@@ -1692,27 +1692,6 @@ html, body {
 .hg-noise-time { margin-left: auto; display: inline-flex; align-items: center; gap: 0.47em; white-space: nowrap; }
 .hg-noise { display: inline-flex; align-items: center; white-space: nowrap; }
 
-/* Noise + Turn on their own line right under the MP bar (compact HUD), left-
-   aligned beneath the bars rather than pinned right like they were on the XL
-   row. */
-.hg-nt-row {
-  display: flex;
-  align-items: center;
-  font-size: 0.7rem;
-  line-height: 1.2;
-  overflow: hidden;
-}
-.hg-nt-row .hg-noise-time { margin-left: 0; }
-/* Status-lights row now sits in the XL row where Noise used to be — pinned
-   right, clipping like the old noise group did. */
-.hg-status-slot {
-  flex: 1 1 auto;
-  min-width: 0;
-  display: flex;
-  justify-content: flex-end;
-  overflow: hidden;
-}
-
 /* Graphical noise bar, mirroring #stats_noise_bar in the reference client.
    Trough is darker than the HP/MP cell (#555753) so the darkgray decrease
    tail stays visible against it. Fixed width (the reference sizes the bar by
