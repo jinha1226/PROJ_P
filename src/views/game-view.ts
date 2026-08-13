@@ -19,7 +19,7 @@ import { InventoryStore } from '../game/inventory-store'
 import { buildTouchControls } from '../game/input/touch'
 import { applyLayoutSync } from '../game/input/custom-layout'
 import { customLayout, CATALOG_BY_ID } from '../game/input/touch-catalog'
-import { handleKeydown, CK_UP, CK_DOWN, CK_PGUP, CK_PGDN, CK_HOME, CK_END } from '../game/input/keyboard'
+import { handleKeydown, CK_UP, CK_DOWN, CK_LEFT, CK_RIGHT, CK_PGUP, CK_PGDN, CK_HOME, CK_END } from '../game/input/keyboard'
 import { createShiftToggle } from '../game/input/shift-state'
 import { uiColor, escHtml, dcssToHtml, DCSS_COLOR_MAP } from '../game/dcss-colors'
 import { parsePromptText, PROMPT_TRIGGER_RE } from './prompt-parse'
@@ -508,69 +508,122 @@ export function buildGameView(
   mapView.setZoomLevel(currentZoomLevel())
   updateZoomButtons(currentZoomLevel())
 
-  // Double-tap the map to toggle zoom. Bypassed while X-mode is active
-  // (font scale is overridden there).
-  // Bound to mapWrap (not mapView.element) so it survives the in-place swap
-  // between MapView and TileMapView.
-  //
-  // Single-tap-to-travel shares the double-tap window: a tap is not confirmed
-  // until the window expires with no second tap. Kept short so movement feels
-  // responsive (the whole window is the felt input delay per step) while still
-  // catching a fast double-tap (which cancels the pending travel and zooms).
-  const TAP_WINDOW_MS = 120
-  let lastTap = { t: 0, x: 0, y: 0 }
-  let pendingTravel: { timer: number; clientX: number; clientY: number } | null = null
-  const cancelPendingTravel = (): void => {
-    if (pendingTravel) { window.clearTimeout(pendingTravel.timer); pendingTravel = null }
+  // Movement joystick overlay: a translucent 3×3 ring shown while dragging on
+  // the map (see the pointer handlers below). The center cell (index 4) is a
+  // hole the player glyph shows through; pointer-events:none keeps it purely a
+  // visual indicator so it never intercepts the drag it is reporting.
+  const moveJoy = document.createElement('div')
+  moveJoy.id = 'move-joy'
+  const JOY_LABELS = ['↖', '↑', '↗', '←', '', '→', '↙', '↓', '↘']
+  const joyCells = JOY_LABELS.map((label, i) => {
+    const c = document.createElement('div')
+    c.className = 'mj-cell' + (i === 4 ? ' mj-hole' : '')
+    c.textContent = label
+    moveJoy.appendChild(c)
+    return c
+  })
+  view.appendChild(moveJoy)
+  const mapWrapCenter = (): { x: number; y: number } => {
+    const r = mapWrap.getBoundingClientRect()
+    return { x: r.left + r.width / 2, y: r.top + r.height / 2 }
   }
+
+  // Map input (Pixel-Dungeon style): a quick tap travels to the tapped cell;
+  // pressing and dragging pops up a translucent 8-way joystick centered on the
+  // player (always the viewport center — the center cell is a hole the @ shows
+  // through) and takes ONE step in the drag direction on release. There is no
+  // double-tap-to-zoom (the +/- buttons zoom), so a tap travels immediately with
+  // no debounce delay. Bound to mapWrap so it survives the MapView/TileMapView
+  // swap. The #move-joy overlay is purely visual (pointer-events:none); these
+  // handlers drive it.
+  //
+  // Drag sector → step keycode, indexed by the 8-way sector atan2 returns
+  // (0=E, then clockwise in screen space: SE, S, SW, W, NW, N, NE). `cell` is
+  // the #move-joy 3×3 child to light (0..8, row-major; 4 is the center hole).
+  const JOY_DIRS = [
+    { cell: 5, key: CK_RIGHT }, // E  →
+    { cell: 8, key: CK_PGDN },  // SE ↘
+    { cell: 7, key: CK_DOWN },  // S  ↓
+    { cell: 6, key: CK_END },   // SW ↙
+    { cell: 3, key: CK_LEFT },  // W  ←
+    { cell: 0, key: CK_HOME },  // NW ↖
+    { cell: 1, key: CK_UP },    // N  ↑
+    { cell: 2, key: CK_PGUP },  // NE ↗
+  ]
+  const JOY_DRAG_MIN = 16       // px of movement before a press becomes a drag
+  const JOY_TAP_MS = 300        // a tap must lift within this to travel
+  let joyStart: { x: number; y: number; t: number; id: number } | null = null
+  let joyActive = false         // the ring is currently shown
+  let joySector = -1            // current 8-way sector, -1 = none
+
+  // Normal-play guard shared by travel and the joystick: no movement while an
+  // overlay, menu, dialog, harvest, monster panel, or examine mode is up.
+  const moveBlocked = (): boolean =>
+    uiStack.length > 0 || crtActive || dialogActive || !!activeMenu ||
+    isHarvesting() || monsterPanelOpen || inXMode
+
+  function hideJoy(): void {
+    if (joySector >= 0) joyCells[JOY_DIRS[joySector].cell].classList.remove('mj-active')
+    joyActive = false
+    joySector = -1
+    moveJoy.classList.remove('mj-on')
+  }
+  function updateJoySector(dx: number, dy: number): void {
+    const sector = ((Math.round(Math.atan2(dy, dx) / (Math.PI / 4)) % 8) + 8) % 8
+    if (sector === joySector) return
+    if (joySector >= 0) joyCells[JOY_DIRS[joySector].cell].classList.remove('mj-active')
+    joySector = sector
+    joyCells[JOY_DIRS[sector].cell].classList.add('mj-active')
+  }
+
   mapWrap.addEventListener('pointerdown', (e) => {
-    if (inXMode || e.button !== 0) return
-    // Ignore the secondary finger of a multi-touch gesture — otherwise two
-    // close-together touches can satisfy the double-tap-zoom check below.
-    if (!e.isPrimary) return
+    if (e.button !== 0 || !e.isPrimary || inXMode) { joyStart = null; return }
     const target = e.target as HTMLElement | null
-    if (!target || !target.closest('#map-grid')) return
-    const now = e.timeStamp
-    const dt = now - lastTap.t
-    const dx = e.clientX - lastTap.x
-    const dy = e.clientY - lastTap.y
-    if (dt < TAP_WINDOW_MS && dx * dx + dy * dy < 30 * 30) {
-      // Double-tap confirmed → zoom. Cancel any pending single-tap travel.
-      // Jumps between the two preset levels (normal ↔ zoomed); the +/- buttons
-      // do fine-grained stepping. Shares the persisted level via applyZoom.
-      cancelPendingTravel()
-      applyZoom(mapView.isZoomMode() ? ZOOM_DEFAULT : ZOOM_TOGGLE)
-      lastTap = { t: 0, x: 0, y: 0 }
+    if (!target || !target.closest('#map-grid')) { joyStart = null; return }
+    joyStart = { x: e.clientX, y: e.clientY, t: e.timeStamp, id: e.pointerId }
+    mapWrap.setPointerCapture(e.pointerId)
+  })
+  mapWrap.addEventListener('pointermove', (e) => {
+    if (!joyStart || e.pointerId !== joyStart.id) return
+    const dx = e.clientX - joyStart.x
+    const dy = e.clientY - joyStart.y
+    if (!joyActive) {
+      if (dx * dx + dy * dy < JOY_DRAG_MIN * JOY_DRAG_MIN) return
+      if (moveBlocked()) { joyStart = null; return }
+      // Anchor the ring on the player; fall back to the map's geometric center
+      // (tile view, or before the first fit).
+      const anchor =
+        ('playerClientCenter' in mapView && mapView.playerClientCenter()) || mapWrapCenter()
+      moveJoy.style.left = `${anchor.x}px`
+      moveJoy.style.top = `${anchor.y}px`
+      moveJoy.classList.add('mj-on')
+      joyActive = true
+    }
+    updateJoySector(dx, dy)
+  })
+  const endGesture = (e: PointerEvent): void => {
+    if (!joyStart || e.pointerId !== joyStart.id) return
+    const wasJoy = joyActive
+    const sector = joySector
+    const dt = e.timeStamp - joyStart.t
+    const dx = e.clientX - joyStart.x
+    const dy = e.clientY - joyStart.y
+    joyStart = null
+    hideJoy()
+    if (wasJoy) {
+      // Drag released → one step in the chosen direction.
+      if (sector >= 0 && !moveBlocked()) conn.send({ msg: 'key', keycode: JOY_DIRS[sector].key })
       return
     }
-    lastTap = { t: now, x: e.clientX, y: e.clientY }
-  })
-  mapWrap.addEventListener('pointerup', (e) => {
-    if (inXMode || e.button !== 0 || !e.isPrimary) return
-    const target = e.target as HTMLElement | null
-    if (!target || !target.closest('#map-grid')) return
-    // Candidate tap: quick (<300 ms from the matching down) and small movement.
-    const dt = e.timeStamp - lastTap.t
-    const dx = e.clientX - lastTap.x
-    const dy = e.clientY - lastTap.y
-    if (dt >= TAP_WINDOW_MS || dx * dx + dy * dy >= 12 * 12) return
-    // Debounce: defer travel until the double-tap window passes. A second
-    // pointerdown that satisfies the zoom check will cancel this timer first.
-    cancelPendingTravel()
-    const { clientX, clientY } = e
-    pendingTravel = {
-      clientX,
-      clientY,
-      timer: window.setTimeout(() => {
-        pendingTravel = null
-        // Normal-play guard: skip when any overlay, menu, dialog, or harvest is active.
-        if (uiStack.length > 0 || crtActive || dialogActive || activeMenu || isHarvesting() || monsterPanelOpen) return
-        // Skip while X-mode (examine) is active.
-        if (inXMode) return
-        const cell = mapView.cellAtClient(clientX, clientY)
-        if (cell) conn.send({ msg: 'click_cell', x: cell.x, y: cell.y, button: 1 })
-      }, TAP_WINDOW_MS),
-    }
+    // Quick tap → travel to the tapped cell (immediate; no double-tap debounce).
+    if (dt >= JOY_TAP_MS || dx * dx + dy * dy >= 12 * 12) return
+    if (moveBlocked()) return
+    const cell = mapView.cellAtClient(e.clientX, e.clientY)
+    if (cell) conn.send({ msg: 'click_cell', x: cell.x, y: cell.y, button: 1 })
+  }
+  mapWrap.addEventListener('pointerup', endGesture)
+  mapWrap.addEventListener('pointercancel', (e) => {
+    if (joyStart && e.pointerId === joyStart.id) { joyStart = null; hideJoy() }
   })
 
   // Two-finger long-press on the map flips between ASCII and tile rendering.
@@ -588,11 +641,10 @@ export function buildGameView(
     if (e.touches.length !== 2) { cancelTileGesture(); return }
     const target = e.target as HTMLElement | null
     if (!target || !target.closest('#map-grid')) { cancelTileGesture(); return }
-    // Suppress any pending single-tap-zoom state so the two-finger landings
-    // can't accidentally satisfy the double-tap-zoom check. Also cancel any
-    // pending single-tap travel — a two-finger gesture isn't a movement tap.
-    lastTap = { t: 0, x: 0, y: 0 }
-    cancelPendingTravel()
+    // A second finger means this is the tile-swap gesture, not a move: abandon
+    // any in-progress single-finger drag so the joystick doesn't also fire.
+    joyStart = null
+    hideJoy()
     const t1 = e.touches[0]; const t2 = e.touches[1]
     tileGestureCenter = { x: (t1.clientX + t2.clientX) / 2, y: (t1.clientY + t2.clientY) / 2 }
     if (tileGestureTimer != null) window.clearTimeout(tileGestureTimer)

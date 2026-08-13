@@ -349,6 +349,25 @@ export class MapView {
     )
   }
 
+  // Client-space pixel center of the player's cell (viewCenter) — the inverse of
+  // cellAtClient at viewCenter. The move joystick anchors its ring here so the
+  // player glyph shows through the ring's center hole. Accounts for the portrait
+  // centerRow/reserve bias automatically via offY. Null before the first fit.
+  playerClientCenter(): { x: number; y: number } | null {
+    if (this.cellCharW <= 0 || this.cellLineH <= 0) return null
+    const rect = this.container.getBoundingClientRect()
+    if (rect.width === 0 || rect.height === 0) return null
+    const cs = getComputedStyle(this.container)
+    const padLeft = parseFloat(cs.paddingLeft)
+    const padTop = parseFloat(cs.paddingTop)
+    const col = this.viewCenter.x - this.offX
+    const row = this.viewCenter.y - this.offY
+    return {
+      x: rect.left + padLeft + (col + 0.5) * this.cellCharW,
+      y: rect.top + padTop + (row + 0.5) * this.cellLineH,
+    }
+  }
+
   // Show or hide the examine cursor.
   // cursor.loc is absolute dungeon coords (same coordinate space as vgrdc/playerPos).
   setCursor(loc?: { x: number; y: number }): void {

@@ -6,10 +6,10 @@ import { setPref } from '../../prefs'
 beforeEach(() => { localStorage.clear() })
 
 describe('d-pad toggle', () => {
-  it('renders the d-pad by default (dpadEnabled true)', () => {
+  it('omits the d-pad by default (dpadEnabled false — movement is the map joystick)', () => {
     const tc = buildTouchControls(() => {})
-    expect(tc.element.querySelector('.tc-dpad')).not.toBeNull()
-    expect(tc.element.classList.contains('dpad-on')).toBe(true)
+    expect(tc.element.querySelector('.tc-dpad')).toBeNull()
+    expect(tc.element.classList.contains('dpad-on')).toBe(false)
   })
 
   it('omits the d-pad when dpadEnabled is explicitly false', () => {

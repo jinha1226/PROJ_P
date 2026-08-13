@@ -27,8 +27,8 @@ describe('settings panel', () => {
     const tc = buildTouchControls(() => {}, { onRequestRebuild: () => { rebuilds++ } })
     ;(tc.element.querySelector('.tc-settings') as HTMLButtonElement).click()
     ;(tc.element.querySelector('.tc-set-dpad') as HTMLButtonElement).click()
-    // d-pad is on by default now, so one toggle turns it off.
-    expect(localStorage.getItem('pocketzot:prefs')).toContain('"dpadEnabled":false')
+    // d-pad is off by default now, so one toggle turns it on.
+    expect(localStorage.getItem('pocketzot:prefs')).toContain('"dpadEnabled":true')
     expect(rebuilds).toBe(1)
   })
 })

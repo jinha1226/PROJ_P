@@ -741,6 +741,52 @@ html, body {
   min-height: 0;
   overflow: hidden;
   display: flex;
+  /* The map is a game surface, not a scroll area: own every touch so a
+     press-drag drives the move joystick (and taps travel) instead of panning
+     or triggering browser touch gestures. */
+  touch-action: none;
+}
+
+/* Movement joystick: a translucent 3×3 ring shown on map press-drag, centered
+   on the player (JS positions it via left/top at the player's screen point).
+   The center cell is a hole the @ shows through. pointer-events:none so it
+   never intercepts the drag that drives it; fixed so left/top take raw client
+   coords. Hidden (opacity 0) until .mj-on. */
+#move-joy {
+  position: fixed;
+  z-index: 6;
+  transform: translate(-50%, -50%);
+  display: grid;
+  grid-template-columns: repeat(3, 2.6rem);
+  grid-template-rows: repeat(3, 2.6rem);
+  gap: 3px;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 90ms ease-out;
+}
+#move-joy.mj-on { opacity: 1; }
+#move-joy .mj-cell {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-mono);
+  font-size: 1.35rem;
+  line-height: 1;
+  color: color-mix(in srgb, var(--text) 65%, transparent);
+  background: color-mix(in srgb, var(--bg) 55%, transparent);
+  border: 1px solid rgba(245, 158, 11, 0.18);
+  border-radius: 0.45rem;
+}
+/* Center hole: no fill/border so the player glyph shows through cleanly. */
+#move-joy .mj-hole {
+  background: transparent;
+  border: none;
+}
+/* The sector the drag currently points at. */
+#move-joy .mj-cell.mj-active {
+  color: var(--accent);
+  background: rgba(245, 158, 11, 0.35);
+  border-color: var(--accent);
 }
 #map-wrap > #map-grid { flex: 1; }
 

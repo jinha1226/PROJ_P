@@ -26,7 +26,9 @@ Obligatory virtual keyboard also available.
 
 ## Gestures
 
-- Double tap on map to toggle zoom level
+- Tap a cell on the map to travel there
+- Press and drag on the map for the center move joystick — one step per drag
+- Zoom with the on-screen +/− buttons
 - Two-finger long press on map to toggle ASCII/tiles
 
 ## Security
