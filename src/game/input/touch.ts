@@ -517,7 +517,7 @@ export function buildTouchControls(send: SendFn, opts: { spellTab?: SpellTabConf
   root.id = 'touch-controls'
   root.classList.toggle('dpad-on', dpadEnabled)
 
-  const DPAD_SIZE_REM: Record<'sm' | 'md' | 'lg', string> = { sm: '2.1rem', md: '2.55rem', lg: '3rem' }
+  const DPAD_SIZE_REM: Record<'sm' | 'md' | 'lg', string> = { sm: '1.7rem', md: '2.55rem', lg: '3rem' }
   root.classList.toggle('dpad-right', layout.dpad.side === 'right')
   root.style.setProperty('--tc-dpad', DPAD_SIZE_REM[layout.dpad.size])
 
