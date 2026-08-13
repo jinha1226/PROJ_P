@@ -623,20 +623,20 @@ export function buildTouchControls(send: SendFn, opts: { spellTab?: SpellTabConf
     btn.addEventListener('click', onTap)
     tabsEl.appendChild(btn)
   }
-  headerEl.appendChild(tabsEl)
-
-  // Pins, then Enter, at the far right. Enter is mandatory in play — it confirms
-  // spell targeting (fire-at-nearest) — so it stays always-visible.
-  headerEl.appendChild(fightBtn)
-  headerEl.appendChild(exploreBtn)
-
+  // Header order: Esc | ⇥ (autofight) | Enter | tabs | O (explore). Enter is
+  // mandatory in play (it confirms fire-at-nearest targeting), kept next to ⇥
+  // for the right thumb. Esc was appended above.
   const enterBtn = document.createElement('button')
   enterBtn.className = 'tc-enter'
   enterBtn.textContent = '⏎'
   enterBtn.title = 'Enter'
   enterBtn.addEventListener('touchstart', e => { e.preventDefault(); send({ msg: 'key', keycode: 13 }); clearOneshot() }, { passive: false })
   enterBtn.addEventListener('click', () => { send({ msg: 'key', keycode: 13 }); clearOneshot() })
+
+  headerEl.appendChild(fightBtn)
   headerEl.appendChild(enterBtn)
+  headerEl.appendChild(tabsEl)
+  headerEl.appendChild(exploreBtn)
 
   // Content area — replaced on tab switch or mode change
   contentEl = document.createElement('div')

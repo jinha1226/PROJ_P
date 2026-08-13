@@ -30,6 +30,7 @@ export class StatsView {
   private oldMp: number | undefined
   private layout: 'compact' | 'square'
   private mql: MediaQueryList | null
+  private statusEl: HTMLElement | null = null
 
   constructor(inv: InventoryStore) {
     this.inv = inv
@@ -51,6 +52,19 @@ export class StatsView {
     return this.el
   }
 
+  // The status-lights row (StatusView) lives in a slot inside the stats layout
+  // — compact: where Noise used to sit (the XL row); square: the bottom — so it
+  // reflows with the template on rotate instead of being a separate #game-hud
+  // child. game-view hands us the element rather than appending it itself.
+  setStatusEl(el: HTMLElement): void {
+    this.statusEl = el
+    this.mountStatus()
+  }
+  private mountStatus(): void {
+    if (!this.statusEl) return
+    ;(this.el.querySelector('#hud-status-slot') ?? this.el).appendChild(this.statusEl)
+  }
+
   // Swap templates on rotate and repaint from the accumulated state — render()
   // re-queries its slots every pass and both templates expose the same slot
   // ids, so the render methods are layout-agnostic. buildGameView creates a
@@ -65,6 +79,7 @@ export class StatsView {
     if (layout === this.layout) return
     this.layout = layout
     this.el.innerHTML = this.template()
+    this.mountStatus()  // the slot was rebuilt — re-insert the status row
     this.render()
   }
 
@@ -444,6 +459,12 @@ export class StatsView {
           <span class="hg-bar-val" id="hud-mp"></span>
         </div>
       </div>
+      <div class="hg-nt-row">
+        <span class="hg-noise-time">
+          <span class="hg-noise"><span class="hg-caption">N</span><span class="hg-noise-cell" id="hud-noise-cell"><span class="hud-bar-seg noise-full"></span><span class="hud-bar-seg noise-decrease"></span></span><span class="hg-noise-status" id="hud-noise-status"></span></span>
+          <span class="hg-time"><span class="hg-caption">T</span><span id="hud-time-val"></span></span>
+        </span>
+      </div>
       <div class="hg-stats-row">
         <div class="hg-inline-stats">
           <span class="hg-grp"><span class="hg-caption">AC</span><span id="hud-ac"></span> <span class="hg-caption">EV</span><span id="hud-ev"></span> <span class="hg-caption">SH</span><span id="hud-sh"></span></span>
@@ -453,10 +474,7 @@ export class StatsView {
       </div>
       <div class="hg-xl-row">
         <span class="hg-xl-place hg-grp" id="hud-xl-place"></span>
-        <span class="hg-noise-time">
-          <span class="hg-noise"><span class="hg-caption">N</span><span class="hg-noise-cell" id="hud-noise-cell"><span class="hud-bar-seg noise-full"></span><span class="hud-bar-seg noise-decrease"></span></span><span class="hg-noise-status" id="hud-noise-status"></span></span>
-          <span class="hg-time"><span class="hg-caption">T</span><span id="hud-time-val"></span></span>
-        </span>
+        <span id="hud-status-slot" class="hg-status-slot"></span>
       </div>
       ${this.wqQuiverRows()}
     `
@@ -496,6 +514,7 @@ export class StatsView {
         <span class="hg-time"><span class="hg-caption">Time:</span><span id="hud-time-val"></span></span>
       </div>
       ${this.wqQuiverRows()}
+      <div id="hud-status-slot"></div>
     `
   }
 }

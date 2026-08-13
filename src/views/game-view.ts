@@ -695,7 +695,9 @@ export function buildGameView(
   let hudRevealed = false
   const showHud = (): void => { if (hudRevealed) hud.style.display = '' }
   hud.appendChild(hudTop)
-  hud.appendChild(statusView.element)
+  // The status-lights row now lives in a slot inside the stats layout (compact:
+  // Noise's old spot; square: the bottom) so it reflows on rotate.
+  statsView.setStatusEl(statusView.element)
 
   // Wire coach dismiss callback and define updateCoach.
   coachHint.onDismiss((id: CoachHintId) => { coachDismissed = id })
