@@ -193,5 +193,32 @@ full-screen and only the reserve grows by the measured `--touch-h`.
 ## Open tuning values (resolve on-device, not in code review)
 
 - `--touch-reserve-frac`: default 0.6.
-- Touch-controls resting-scrim opacity: start near the log's `--msglog-bg`
-  (bg 30%) and adjust.
+- Touch-controls resting-scrim opacity (`--tc-scrim`): started at bg 72%
+  (a touch more opaque than the log's bg 30%, since the control band is tall).
+
+## Implementation notes (refinements found while building)
+
+- **Bottom-stack re-stacking (added).** The floating log, spell rail,
+  `--more--`, and coach hint all float over the map's bottom at `bottom: 0`
+  too, so once the controls also float there they would be hidden behind the
+  panel. Every one of those `bottom` offsets now adds `var(--touch-h)` so the
+  message stack sits *above* the controls — the same idea as the existing
+  `+ var(--spell-rail-h)` offset. When the controls are hidden `--touch-h` is 0,
+  collapsing these back to their original offsets, so no state regresses.
+- **HUD position unchanged.** HUD stays the in-flow grid row directly below the
+  map (grid `1fr auto` / `"map" "hud"`). Because an absolutely-positioned grid
+  item is contained by its grid *area*, the controls' `bottom: 0` pins them to
+  the map cell's bottom edge — i.e. just above the HUD strip — so no HUD move or
+  border flip was needed.
+- **Touch vs. menu controls never co-occur.** The game already alternates them
+  (`display:none` on one whenever the other is shown), so floating both at
+  `bottom: 0` cannot overlap. The reserve tracks `#touch-controls` height only.
+- **X-mode left as-is (known limitation).** `#game-view.x-mode` rules win by
+  specificity, keeping the examine map at `padding-bottom: 2px` (no touch
+  reserve) and `--more--` at `bottom: 0`. So in examine mode the map now extends
+  behind the translucent controls rather than sitting above them as it did when
+  controls were a layout row. Functionally fine (cursor works, controls
+  translucent); flagged for on-device review as a possible follow-up (either add
+  the reserve + flex-start anchoring in x-mode, or hide the controls there).
+- **No `map-view.ts` change.** Confirmed: the reserve flows entirely through the
+  CSS `padding-bottom` that `fitToContainer` already reads.

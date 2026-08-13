@@ -716,20 +716,33 @@ html, body {
      padding. Shared so the rail's height, the log float that sits just above it,
      and the --more-- offset that clears both stay locked together. */
   --spell-rail-h: calc(36px + 0.5rem);
+  /* Overlaid-controls reserve (portrait): the touch controls no longer take a
+     layout row — they float over the map's bottom (see the portrait block), the
+     same trick as the log. --touch-h is the controls' live measured height (a
+     ResizeObserver in game-view.ts writes it; hidden controls report 0). The
+     map reserves --touch-reserve-frac of it as bottom padding so the player
+     reticle clears the controls while the far rows fill in behind them. The
+     fraction (not the full height) is deliberate: the bottom slice of the map
+     showing through the translucent controls is the terrain behind the player,
+     so partial reserve trades a little clearance for a larger clear play area.
+     Tune the fraction on-device. */
+  --touch-h: 0px;
+  --touch-reserve-frac: 0.6;
+  --touch-reserve: calc(var(--touch-h) * var(--touch-reserve-frac));
   position: relative;
   flex: 1;
   display: grid;
-  /* No `msg` row: the message log and spell rail both float over the map
-     (position:absolute, see their rules) so the map's 1fr claims the full
-     height. Keeping them out of flow is what makes the rail's post-harvest
-     arrival a non-event for the map's size — no re-fit, no jump. */
-  grid-template-rows: 1fr auto auto auto;
+  /* No `msg`/`touch`/`menu` rows: the message log, spell rail, AND the touch +
+     menu controls all float over the map (position:absolute, see their rules)
+     so the map's 1fr claims the full height. Keeping them out of flow is what
+     makes the rail's post-harvest arrival a non-event for the map's size — no
+     re-fit, no jump — and is what lets the map be the whole screen. (Landscape
+     redefines this grid entirely; see the landscape block.) */
+  grid-template-rows: 1fr auto;
   grid-template-columns: minmax(0, 1fr);
   grid-template-areas:
     "map"
-    "hud"
-    "touch"
-    "menu";
+    "hud";
   overflow: hidden;
   outline: none;
 }
@@ -943,9 +956,13 @@ html, body {
    and the log/--more-- offsets that clear it. An abspos grid item's containing
    block is its grid area, so bottom:0 = the map cell's bottom edge. */
 @media (orientation: portrait) {
-  #game-messages { bottom: 0; }
+  /* The floating bottom stack (rail → log → --more--) now clears the overlaid
+     touch controls too: every `bottom` is offset by --touch-h so messages are
+     never hidden behind the button panel. --touch-h is 0 when the controls are
+     hidden (x-mode/menus), collapsing these back to the pre-overlay offsets. */
+  #game-messages { bottom: var(--touch-h); }
   /* Rail present: float the log just above it. */
-  #game-view.spell-row #game-messages { bottom: var(--spell-rail-h); }
+  #game-view.spell-row #game-messages { bottom: calc(var(--touch-h) + var(--spell-rail-h)); }
 
   /* Quick-cast rail floats over the map's very bottom edge (casters only —
      hidden via inline display otherwise). */
@@ -954,15 +971,37 @@ html, body {
     position: absolute;
     left: 0;
     right: 0;
-    bottom: 0;
+    bottom: var(--touch-h);
     z-index: 3;
   }
+
+  /* Touch + menu controls float over the map's bottom edge instead of taking
+     their own grid rows — the same grid-area:map + absolute trick as the log
+     above, which is what lets the map be the whole screen. Two-id `#game-view`
+     prefix outranks the single-id base rules (`#touch-controls`,
+     `#menu-controls`), which sit LATER in source. z-index 4 keeps the buttons
+     above the floating log/rail (z 3) so a message line never covers a control,
+     while the kbd overlay (z 50) and full-screen UI overlay still cover them.
+     Hidden states (x-mode, menus) set display:none, which drops the reserve to
+     0 via the ResizeObserver — no extra rules needed. */
+  #game-view #touch-controls,
+  #game-view #menu-controls {
+    grid-area: map;
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 4;
+  }
+  /* Resting touch panel is translucent so the map shows through (the menu
+     controls stay opaque via their base background — menus need legibility). */
+  #game-view #touch-controls { background: var(--tc-scrim); }
 
   /* --more-- (z-index 4) sits above the floating log — and the rail, for
      casters — so it never covers the newest message lines. (`#game-view` prefix
      to outrank the base `#more-btn { bottom: 0 }`, which is later in source.) */
-  #game-view #more-btn { bottom: var(--msglog-h); }
-  #game-view.spell-row #more-btn { bottom: calc(var(--msglog-h) + var(--spell-rail-h)); }
+  #game-view #more-btn { bottom: calc(var(--touch-h) + var(--msglog-h)); }
+  #game-view.spell-row #more-btn { bottom: calc(var(--touch-h) + var(--msglog-h) + var(--spell-rail-h)); }
   /* X-mode hides the log (and drops the rail), so there's nothing to clear —
      --more-- hugs the bottom edge. Equal specificity to the two rules above;
      later in source wins. */
@@ -974,8 +1013,10 @@ html, body {
      around it — under the log). fitToContainer reads this asymmetry and still
      fills rows on down behind the translucent log. Constant (log height only,
      not + rail) so the rail's arrival doesn't re-center the map. `#game-view`
-     prefix outranks the base `#map-grid` padding regardless of source order. */
-  #game-view #map-grid { padding-bottom: calc(2px + var(--msglog-h)); }
+     prefix outranks the base `#map-grid` padding regardless of source order.
+     --touch-reserve adds a fraction of the overlaid touch controls' height so
+     the reticle also clears them (0 when the controls are hidden). */
+  #game-view #map-grid { padding-bottom: calc(2px + var(--msglog-h) + var(--touch-reserve)); }
   /* Top-anchor the ASCII row stack: it deliberately overruns the content box
      DOWNWARD (whole rows filling behind the log — availHFit in
      MapView.fitToContainer), and the base justify-content:center would split
@@ -1266,7 +1307,9 @@ html, body {
   position: absolute;
   left: 0.4rem;
   right: 0.4rem;
-  bottom: calc(var(--msglog-h, 4.5rem) + 0.25rem);
+  /* + --touch-h clears the overlaid touch controls in portrait (0 in
+     landscape, where the controls don't float over the map's bottom). */
+  bottom: calc(var(--touch-h, 0px) + var(--msglog-h, 4.5rem) + 0.25rem);
   z-index: 3;
   display: flex;
   flex-direction: row;
@@ -2322,6 +2365,11 @@ html, body {
   --tc-label: var(--text-dim);
   --tc-label-dim: #78716c;  /* one stone step below --text-dim, for the wait btn */
   --tc-border: rgba(245, 158, 11, 0.07);
+  /* Resting scrim for the overlaid panel (portrait): translucent so the map
+     shows through the gaps between the (opaque) buttons and around the tabs.
+     Same figure/ground role as the log's --msglog-bg, but a touch more opaque
+     since the control band is tall — tune on-device. */
+  --tc-scrim: color-mix(in srgb, var(--bg) 72%, transparent);
   grid-area: touch;
   display: flex;
   flex-direction: column;

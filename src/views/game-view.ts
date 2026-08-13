@@ -881,6 +881,21 @@ export function buildGameView(
   })
   fontScaleObserver.observe(mapView.element)
 
+  // The touch controls float over the map's bottom (portrait) instead of taking
+  // a layout row, so the map reserves a fraction of their height as bottom
+  // padding to keep the player reticle clear (see --touch-reserve in style.css).
+  // Measure their live border-box height into --touch-h; changing it repads
+  // #map-grid, which the observer above catches and refits. getBoundingClientRect
+  // gives the full height incl. padding; a hidden panel (x-mode/menus set
+  // display:none) measures 0, collapsing the reserve. No loop: the padding
+  // change doesn't resize the (absolute) controls. Spectator mode has no touch
+  // controls — --touch-h then stays at its CSS default of 0.
+  const touchReserveObserver = new ResizeObserver(() => {
+    const h = touchControls.element.getBoundingClientRect().height
+    view.style.setProperty('--touch-h', `${Math.round(h)}px`)
+  })
+  if (!spectating) touchReserveObserver.observe(touchControls.element)
+
   // Swaps the active map view in place. Forces zoom on when switching INTO
   // tile mode (tiles at full 33×21 are ~10 px on a phone), and reuses the
   // current view-center so the swap doesn't flicker through an unset position.
