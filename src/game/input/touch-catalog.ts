@@ -78,11 +78,14 @@ export const DEFAULT_TAB_IDS: { micro: string[][]; macro: string[][] } = {
     ['quaff', 'read', 'inventory', 'rest'],
     ['travel', 'skills', 'pickup', 'spells-list'],
     ['ability', 'fire', 'stairs-up', 'stairs-down'],
+    // Moved up from 기타 (info commands + cast). The 4-column grid needs a
+    // multiple of 4, so cast joins the three requested (library/character/
+    // abilities) to fill the row — it's a combat action, so it fits 행동.
+    ['library', 'character', 'abilities', 'cast'],
   ],
   macro: [
-    ['status', 'library', 'map', 'overview'],
-    ['fire', 'evoke', 'ability', 'cast'],
-    ['character', 'abilities', 'religion', 'runes'],
+    ['status', 'map', 'overview', 'fire'],
+    ['evoke', 'ability', 'religion', 'runes'],
   ],
 }
 

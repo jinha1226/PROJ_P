@@ -43,6 +43,6 @@ describe('custom layout rendering', () => {
     const tc = buildTouchControls(() => {})
     expect(tc.element.classList.contains('dpad-right')).toBe(false)
     const cells = tc.element.querySelectorAll('.tc-strip .tc-btn')
-    expect(cells.length).toBe(12)
+    expect(cells.length).toBe(16)  // 행동 tab default is 4 rows of 4
   })
 })

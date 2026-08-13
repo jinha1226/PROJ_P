@@ -46,16 +46,17 @@ describe('edit mode', () => {
     const tc = buildTouchControls(() => {})
     enterEdit(tc)
     const count = (): number => tc.element.querySelectorAll('.tc-strip .tc-btn').length
-    expect(count()).toBe(12)
-    ;(tc.element.querySelector('.tc-edit-addrow') as HTMLButtonElement).click()
-    expect(count()).toBe(16)
-    ;(tc.element.querySelector('.tc-edit-addrow') as HTMLButtonElement).click() // at max 4 → no-op
-    expect(count()).toBe(16)
+    const addrow = (): void => (tc.element.querySelector('.tc-edit-addrow') as HTMLButtonElement).click()
+    expect(count()).toBe(16)         // 행동 default is now 4 rows (the max)
+    addrow()
+    expect(count()).toBe(16)         // at max 4 → no-op
     const del = tc.element.querySelector('.tc-edit-delrow') as HTMLButtonElement
     del.click(); del.click(); del.click()
-    expect(count()).toBe(4)
+    expect(count()).toBe(4)          // down to 1 row
     del.click() // at min 1 → no-op
     expect(count()).toBe(4)
+    addrow()
+    expect(count()).toBe(8)          // adding works again below the max
   })
 
   it('reset needs a confirm tap and restores defaults', () => {
