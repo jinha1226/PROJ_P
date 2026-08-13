@@ -638,9 +638,8 @@ export function buildTouchControls(send: SendFn, opts: { spellTab?: SpellTabConf
   prayBtn.addEventListener('touchstart', e => { e.preventDefault(); send({ msg: 'input', text: 'p' }); clearOneshot() }, { passive: false })
   prayBtn.addEventListener('click', () => { send({ msg: 'input', text: 'p' }); clearOneshot() })
 
-  // Header order: Esc | [행동/기타] | Enter | p | ⇥ (autofight) | O (explore).
-  // Esc was appended above; the tab toggle and pins fill out the row.
-  headerEl.appendChild(tabsEl)
+  // Header order: Esc | Enter | p | ⇥ (autofight) | O (explore). Esc was
+  // appended above. The 행동/기타 tab toggle lives in the footer (below).
   headerEl.appendChild(enterBtn)
   headerEl.appendChild(prayBtn)
   headerEl.appendChild(fightBtn)
@@ -651,10 +650,13 @@ export function buildTouchControls(send: SendFn, opts: { spellTab?: SpellTabConf
   contentEl.className = 'tc-content'
   panel.appendChild(contentEl)
 
-  // Footer row: Shift | Ctrl | Keyboard
+  // Footer row: 행동/기타 tab toggle | Shift | Ctrl | Keyboard | ⊞ d-pad
   const footerEl = document.createElement('div')
   footerEl.className = 'tc-footer'
   panel.appendChild(footerEl)
+
+  // The tab toggle (moved here from the header) leads the footer row.
+  footerEl.appendChild(tabsEl)
 
   shiftBtn = document.createElement('button')
   shiftBtn.className = 'tc-shift'

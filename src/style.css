@@ -2457,7 +2457,10 @@ html, body {
   border: 1px solid var(--tc-border);
   border-radius: 4px;
   color: var(--tc-label);
-  font-size: 1.4rem;
+  /* Scale the arrow glyph with the cell so a small d-pad actually looks small —
+     a fixed 1.4rem glyph overflowed a shrunk cell and hid the size change. */
+  font-size: calc(var(--tc-dpad, 2.55rem) * 0.8);
+  line-height: 1;
   width: var(--tc-dpad, 3.6rem);
   height: var(--tc-dpad, 3.6rem);
   cursor: pointer;
