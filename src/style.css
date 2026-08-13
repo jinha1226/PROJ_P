@@ -2584,6 +2584,38 @@ html, body {
   min-height: 2.2rem;
 }
 
+/* No-dpad layout (the default now that movement lives on the map joystick):
+   lay the action buttons out as the 4-column grid the data model uses — the
+   same columns edit mode addresses via its slot positions — instead of one
+   sideways-scrolling row that clips. The standard 12-action tab becomes rows of
+   4 (three of them; fewer for shorter custom layouts), so nothing is hidden and
+   every target is tall enough to tap. Scoped away from dpad-on, which keeps its
+   own fixed strip above. */
+#touch-controls:not(.dpad-on) .tc-strip {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-auto-rows: minmax(2.6rem, auto);
+  overflow: visible;
+}
+#touch-controls:not(.dpad-on) .tc-strip .tc-btn {
+  flex: none;         /* a grid item now — ignore the scroll-strip sizing */
+  min-width: 0;
+}
+
+/* Header row (Esc | tabs | ⇥ | O | Enter): equal widths — Esc/Enter were fixed
+   width while the tab and pins flexed — and a bit taller so the row isn't flat. */
+#touch-controls:not(.dpad-on) .tc-esc,
+#touch-controls:not(.dpad-on) .tc-enter {
+  flex: 1;
+  min-width: 0;
+}
+#touch-controls:not(.dpad-on) .tc-esc,
+#touch-controls:not(.dpad-on) .tc-enter,
+#touch-controls:not(.dpad-on) .tc-pin,
+#touch-controls:not(.dpad-on) .tc-tab {
+  height: 2rem;
+}
+
 /* With the d-pad on, the action strip sits in the panel to the RIGHT of the
    d-pad as a fixed 4-column grid (NO inner scroll). A grid — not wrapping flex —
    keeps every button the same width and in the same column whether the strip
