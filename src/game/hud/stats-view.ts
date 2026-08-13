@@ -473,8 +473,12 @@ export class StatsView {
           <span class="hg-time"><span class="hg-caption">T</span><span id="hud-time-val"></span></span>
         </span>
       </div>
-      <div id="hud-status-slot" class="hg-status-slot"></div>
-      ${this.wqQuiverRows()}
+      <div class="hg-status-row">
+        <div class="hg-wq" id="hud-wq"></div>
+        <div id="hud-status-slot" class="hg-status-slot"></div>
+      </div>
+      <div class="hg-wq" id="hud-wq-offhand"></div>
+      <div class="hg-quiver" id="hud-quiver"></div>
     `
   }
 
