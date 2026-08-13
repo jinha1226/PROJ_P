@@ -36,7 +36,7 @@ describe('custom layout rendering', () => {
     saveLayout(l => { l.dpad = { side: 'right', size: 'lg' } })
     const tc = buildTouchControls(() => {})
     expect(tc.element.classList.contains('dpad-right')).toBe(true)
-    expect(tc.element.style.getPropertyValue('--tc-dpad')).toBe('3rem')
+    expect(tc.element.style.getPropertyValue('--tc-dpad')).toBe('2.2rem')
   })
 
   it('defaults stay identical with no stored layout', () => {

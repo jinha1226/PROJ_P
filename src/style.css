@@ -2402,7 +2402,7 @@ html, body {
    cap — the panel grows to fit its wrapped action rows + footer (no inner
    scroll); the map (1fr) yields the difference. */
 #touch-controls.dpad-on {
-  --tc-dpad: 2.55rem;
+  --tc-dpad: 1.7rem;
   flex-direction: row;
   align-items: stretch;
 }
