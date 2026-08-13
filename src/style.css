@@ -1692,6 +1692,11 @@ html, body {
 .hg-noise-time { margin-left: auto; display: inline-flex; align-items: center; gap: 0.47em; white-space: nowrap; }
 .hg-noise { display: inline-flex; align-items: center; white-space: nowrap; }
 
+/* Status-lights row sits right below Noise on the XL row, right-aligned so the
+   lights line up under Noise. (Landscape/square puts the slot at the bottom;
+   #hud-status keeps its own left-aligned flex there.) */
+.hg-status-slot { display: flex; justify-content: flex-end; overflow: hidden; }
+
 /* Graphical noise bar, mirroring #stats_noise_bar in the reference client.
    Trough is darker than the HP/MP cell (#555753) so the darkgray decrease
    tail stays visible against it. Fixed width (the reference sizes the bar by

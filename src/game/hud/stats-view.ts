@@ -30,6 +30,7 @@ export class StatsView {
   private oldMp: number | undefined
   private layout: 'compact' | 'square'
   private mql: MediaQueryList | null
+  private statusEl: HTMLElement | null = null
 
   constructor(inv: InventoryStore) {
     this.inv = inv
@@ -51,6 +52,19 @@ export class StatsView {
     return this.el
   }
 
+  // The status-lights row (StatusView) is mounted into a slot in the stats
+  // layout — compact: right below the Noise/Time on the XL row (right-aligned
+  // under Noise); square: the bottom — so it reflows with the template on
+  // rotate. game-view hands us the element rather than appending it itself.
+  setStatusEl(el: HTMLElement): void {
+    this.statusEl = el
+    this.mountStatus()
+  }
+  private mountStatus(): void {
+    if (!this.statusEl) return
+    ;(this.el.querySelector('#hud-status-slot') ?? this.el).appendChild(this.statusEl)
+  }
+
   // Swap templates on rotate and repaint from the accumulated state — render()
   // re-queries its slots every pass and both templates expose the same slot
   // ids, so the render methods are layout-agnostic. buildGameView creates a
@@ -65,6 +79,7 @@ export class StatsView {
     if (layout === this.layout) return
     this.layout = layout
     this.el.innerHTML = this.template()
+    this.mountStatus()  // slot rebuilt — re-insert the status row
     this.render()
   }
 
@@ -458,6 +473,7 @@ export class StatsView {
           <span class="hg-time"><span class="hg-caption">T</span><span id="hud-time-val"></span></span>
         </span>
       </div>
+      <div id="hud-status-slot" class="hg-status-slot"></div>
       ${this.wqQuiverRows()}
     `
   }
@@ -496,6 +512,7 @@ export class StatsView {
         <span class="hg-time"><span class="hg-caption">Time:</span><span id="hud-time-val"></span></span>
       </div>
       ${this.wqQuiverRows()}
+      <div id="hud-status-slot"></div>
     `
   }
 }

@@ -695,7 +695,10 @@ export function buildGameView(
   let hudRevealed = false
   const showHud = (): void => { if (hudRevealed) hud.style.display = '' }
   hud.appendChild(hudTop)
-  hud.appendChild(statusView.element)
+  // Status-lights row mounts into a slot in the stats layout (compact: right
+  // below Noise; square: the bottom) rather than being a separate #game-hud
+  // child.
+  statsView.setStatusEl(statusView.element)
 
   // Wire coach dismiss callback and define updateCoach.
   coachHint.onDismiss((id: CoachHintId) => { coachDismissed = id })
