@@ -555,6 +555,10 @@ export function buildGameView(
   let joyStart: { x: number; y: number; t: number; id: number } | null = null
   let joyActive = false         // the ring is currently shown
   let joySector = -1            // current 8-way sector, -1 = none
+  let joyHold: number | null = null    // initial hold-to-repeat delay timer
+  let joyRepeat: number | null = null  // repeat interval while a direction is held
+  const JOY_REPEAT_DELAY = 350  // ms of holding a direction before auto-repeat
+  const JOY_REPEAT_MS = 130     // repeat cadence once holding
 
   // Normal-play guard shared by travel and the joystick: no movement while an
   // overlay, menu, dialog, harvest, monster panel, or examine mode is up.
@@ -562,7 +566,26 @@ export function buildGameView(
     uiStack.length > 0 || crtActive || dialogActive || !!activeMenu ||
     isHarvesting() || monsterPanelOpen || inXMode
 
+  const clearJoyRepeat = (): void => {
+    if (joyHold != null) { window.clearTimeout(joyHold); joyHold = null }
+    if (joyRepeat != null) { window.clearInterval(joyRepeat); joyRepeat = null }
+  }
+  const fireStep = (sector: number): void => {
+    if (sector >= 0 && !moveBlocked()) conn.send({ msg: 'key', keycode: JOY_DIRS[sector].key })
+  }
+  // One step now, then — if the same direction is still held after a delay —
+  // auto-repeat until release or the direction changes.
+  function startStep(sector: number): void {
+    clearJoyRepeat()
+    fireStep(sector)
+    joyHold = window.setTimeout(() => {
+      joyHold = null
+      joyRepeat = window.setInterval(() => fireStep(joySector), JOY_REPEAT_MS)
+    }, JOY_REPEAT_DELAY)
+  }
+
   function hideJoy(): void {
+    clearJoyRepeat()
     if (joySector >= 0) joyCells[JOY_DIRS[joySector].cell].classList.remove('mj-active')
     joyActive = false
     joySector = -1
@@ -574,6 +597,7 @@ export function buildGameView(
     if (joySector >= 0) joyCells[JOY_DIRS[joySector].cell].classList.remove('mj-active')
     joySector = sector
     joyCells[JOY_DIRS[sector].cell].classList.add('mj-active')
+    startStep(sector)  // step now + (re)start hold-to-repeat for this direction
   }
 
   mapWrap.addEventListener('pointerdown', (e) => {
@@ -604,17 +628,14 @@ export function buildGameView(
   const endGesture = (e: PointerEvent): void => {
     if (!joyStart || e.pointerId !== joyStart.id) return
     const wasJoy = joyActive
-    const sector = joySector
     const dt = e.timeStamp - joyStart.t
     const dx = e.clientX - joyStart.x
     const dy = e.clientY - joyStart.y
     joyStart = null
     hideJoy()
-    if (wasJoy) {
-      // Drag released → one step in the chosen direction.
-      if (sector >= 0 && !moveBlocked()) conn.send({ msg: 'key', keycode: JOY_DIRS[sector].key })
-      return
-    }
+    // Joystick steps already fired on entry (and via hold-to-repeat), so a
+    // release just ends the gesture.
+    if (wasJoy) return
     // Quick tap → travel to the tapped cell (immediate; no double-tap debounce).
     if (dt >= JOY_TAP_MS || dx * dx + dy * dy >= 12 * 12) return
     if (moveBlocked()) return
@@ -1171,6 +1192,10 @@ export function buildGameView(
         if (msg.mp !== undefined) playerStats.mp = msg.mp
         if (msg.mp_max !== undefined) playerStats.mp_max = msg.mp_max
         if (msg.xl !== undefined) currentXL = msg.xl  // for the skill-menu build coach
+        // Low-HP warning: red glow around the play area at ≤30% HP.
+        if (playerStats.hp != null && playerStats.hp_max) {
+          view.classList.toggle('low-hp', playerStats.hp / playerStats.hp_max <= 0.3)
+        }
         mapView.setPlayerStats(playerStats)
         inventoryStore.update(msg.inv)
         statsView.update(msg)

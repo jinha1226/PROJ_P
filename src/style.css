@@ -734,6 +734,23 @@ html, body {
   outline: none;
 }
 
+/* Low-HP warning: a pulsing red glow around the play area (≤30% HP; toggled by
+   the 'player' handler). pointer-events:none and edge-only so it never blocks
+   or hides the map; sits below the keyboard / full-screen overlays. */
+#game-view.low-hp::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 30;
+  box-shadow: inset 0 0 1.6rem 0.4rem rgba(179, 0, 9, 0.6);
+  animation: low-hp-pulse 1.1s ease-in-out infinite;
+}
+@keyframes low-hp-pulse {
+  0%, 100% { opacity: 0.45; }
+  50% { opacity: 1; }
+}
+
 /* Map wrapper */
 #map-wrap {
   grid-area: map;
