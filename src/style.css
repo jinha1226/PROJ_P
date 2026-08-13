@@ -2548,6 +2548,11 @@ html, body {
    flex:1 so they share the row width evenly with the tab — no dead space. */
 .tc-pin { border-color: var(--accent); color: var(--text); font-size: 1rem; flex: 1; }
 
+/* Equal-width header buttons in both modes: Esc/Enter were fixed-width (base
+   min-width + no grow) while the pins flexed, so the row looked uneven. Give
+   them all the same flex so every header button is the same width. */
+.tc-esc, .tc-enter, .tc-pin { flex: 1; min-width: 0; }
+
 .tc-esc:active,
 .tc-enter:active,
 .tc-pin:active { background: var(--tc-press); color: var(--accent); }

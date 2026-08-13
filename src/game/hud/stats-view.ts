@@ -465,13 +465,13 @@ export class StatsView {
           <span class="hg-grp"><span class="hg-caption">St</span><span id="hud-str"></span> <span class="hg-caption">In</span><span id="hud-int"></span> <span class="hg-caption">Dx</span><span id="hud-dex"></span></span>
         </div>
         <span class="hg-warn" id="hud-warn"></span>
-      </div>
-      <div class="hg-xl-row">
-        <span class="hg-xl-place hg-grp" id="hud-xl-place"></span>
         <span class="hg-noise-time">
           <span class="hg-noise"><span class="hg-caption">N</span><span class="hg-noise-cell" id="hud-noise-cell"><span class="hud-bar-seg noise-full"></span><span class="hud-bar-seg noise-decrease"></span></span><span class="hg-noise-status" id="hud-noise-status"></span></span>
           <span class="hg-time"><span class="hg-caption">T</span><span id="hud-time-val"></span></span>
         </span>
+      </div>
+      <div class="hg-xl-row">
+        <span class="hg-xl-place hg-grp" id="hud-xl-place"></span>
       </div>
       <div class="hg-status-row">
         <div class="hg-wq" id="hud-wq"></div>
