@@ -2593,7 +2593,7 @@ html, body {
    own fixed strip above. */
 #touch-controls:not(.dpad-on) .tc-strip {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(5, minmax(0, 1fr));   /* 5 across → the 15-button tab is 3 rows */
   grid-auto-rows: 1.35rem;   /* compact — another ~1/5 shorter */
   gap: 3px;
   overflow: visible;
@@ -2820,6 +2820,10 @@ html, body {
 .tc-shift:active,
 .tc-ctrl:active,
 .tc-kbd:active { background: var(--tc-press); color: var(--accent); }
+
+/* D-pad toggle (footer, where ⚙ used to be): larger glyph; accent when on. */
+.tc-dpad-toggle { font-size: 1rem; }
+.tc-dpad-toggle.active { color: var(--accent); border-color: var(--accent); }
 
 /* Virtual QWERTY keyboard overlay */
 #kbd-overlay {

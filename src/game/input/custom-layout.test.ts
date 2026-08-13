@@ -8,8 +8,8 @@ function goodLayout(): TouchLayout {
     v: 1,
     dpad: { side: 'left', size: 'md' },
     tabs: {
-      micro: [[{ cmd: 'quaff' }, { raw: 'x' }, null, { cmd: 'fire' }]],
-      macro: [[null, null, null, null]],
+      micro: [[{ cmd: 'quaff' }, { raw: 'x' }, null, { cmd: 'fire' }, null]],
+      macro: [[null, null, null, null, null]],
     },
   }
 }
@@ -26,15 +26,16 @@ describe('validateLayout', () => {
     expect(validateLayout({ ...goodLayout(), dpad: { side: 'left', size: 'xl' } }, known)).toBeNull()
   })
 
-  it('rejects row counts outside 1–4 and rows not exactly 4 wide', () => {
+  it('rejects row counts outside 1–4 and rows not exactly 5 wide', () => {
     const l = goodLayout()
     l.tabs.micro = []
     expect(validateLayout(l, known)).toBeNull()
     const l2 = goodLayout()
-    l2.tabs.macro = [[null, null, null, null], [null, null, null, null], [null, null, null, null], [null, null, null, null], [null, null, null, null]]
+    const row5 = (): null[] => [null, null, null, null, null]
+    l2.tabs.macro = [row5(), row5(), row5(), row5(), row5()]  // 5 rows > MAX 4
     expect(validateLayout(l2, known)).toBeNull()
     const l3 = goodLayout()
-    l3.tabs.micro = [[null, null, null]]
+    l3.tabs.micro = [[null, null, null, null]]  // 4 wide, not 5
     expect(validateLayout(l3, known)).toBeNull()
   })
 

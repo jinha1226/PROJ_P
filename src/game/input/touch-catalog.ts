@@ -73,24 +73,26 @@ export const CATALOG_BY_ID: Map<string, CatalogEntry> = new Map(CATALOG.map(e =>
 
 // The shipped grids, expressed as catalog ids. Must reproduce the historical
 // TAB_BUTTONS exactly — touch-catalog.test.ts pins that equivalence.
-export const DEFAULT_TAB_IDS: { micro: string[][]; macro: string[][] } = {
+// 5 columns per row (the grid invariant, see custom-layout COLS); null = an
+// empty slot (renders as a spacer). null is only needed to pad 기타 to a full
+// row — every real command stays reachable.
+export const DEFAULT_TAB_IDS: { micro: (string | null)[][]; macro: (string | null)[][] } = {
   micro: [
-    ['quaff', 'read', 'inventory', 'rest'],
-    ['travel', 'skills', 'pickup', 'spells-list'],
-    ['ability', 'fire', 'stairs-up', 'stairs-down'],
-    // Moved up from 기타 (info commands + cast). The 4-column grid needs a
-    // multiple of 4, so cast joins the three requested (library/character/
-    // abilities) to fill the row — it's a combat action, so it fits 행동.
-    ['library', 'character', 'abilities', 'cast'],
+    ['quaff', 'read', 'inventory', 'rest', 'travel'],
+    ['skills', 'pickup', 'spells-list', 'ability', 'fire'],
+    // Info commands moved up from 기타 at the user's request; Fire sits right of
+    // ability (a) above.
+    ['stairs-up', 'stairs-down', 'library', 'character', 'abilities'],
   ],
   macro: [
-    ['status', 'map', 'overview', 'fire'],
-    ['evoke', 'ability', 'religion', 'runes'],
+    ['status', 'map', 'overview', 'evoke', 'cast'],
+    ['ability', 'fire', 'religion', 'runes', null],
   ],
 }
 
 export function defaultLayout(): TouchLayout {
-  const rows = (ids: string[][]): Slot[][] => ids.map(r => r.map(id => ({ cmd: id })))
+  const rows = (ids: (string | null)[][]): Slot[][] =>
+    ids.map(r => r.map(id => (id === null ? null : { cmd: id })))
   return {
     v: 1,
     dpad: { side: 'left', size: 'md' },

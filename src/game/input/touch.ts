@@ -86,8 +86,8 @@ export const MENU_BUTTONS: TabButtonDef[][] = [
 // definition (DEFAULT_TAB_IDS documents the row groupings). Kept exported
 // under the old name/shape for the label tests and KEY_LABELS below.
 export const TAB_BUTTONS: Record<Exclude<TabKey, 'spells'>, TabButtonDef[][]> = {
-  micro: DEFAULT_TAB_IDS.micro.map(row => row.map(id => CATALOG_BY_ID.get(id)!)),
-  macro: DEFAULT_TAB_IDS.macro.map(row => row.map(id => CATALOG_BY_ID.get(id)!)),
+  micro: DEFAULT_TAB_IDS.micro.map(row => row.map(id => (id === null ? { label: '' } : CATALOG_BY_ID.get(id)!))),
+  macro: DEFAULT_TAB_IDS.macro.map(row => row.map(id => (id === null ? { label: '' } : CATALOG_BY_ID.get(id)!))),
 }
 
 // Reverse map: the key a button sends → its localized label, built from every
@@ -623,9 +623,6 @@ export function buildTouchControls(send: SendFn, opts: { spellTab?: SpellTabConf
     btn.addEventListener('click', onTap)
     tabsEl.appendChild(btn)
   }
-  // Header order: Esc | ⇥ (autofight) | Enter | tabs | O (explore). Enter is
-  // mandatory in play (it confirms fire-at-nearest targeting), kept next to ⇥
-  // for the right thumb. Esc was appended above.
   const enterBtn = document.createElement('button')
   enterBtn.className = 'tc-enter'
   enterBtn.textContent = '⏎'
@@ -633,9 +630,20 @@ export function buildTouchControls(send: SendFn, opts: { spellTab?: SpellTabConf
   enterBtn.addEventListener('touchstart', e => { e.preventDefault(); send({ msg: 'key', keycode: 13 }); clearOneshot() }, { passive: false })
   enterBtn.addEventListener('click', () => { send({ msg: 'key', keycode: 13 }); clearOneshot() })
 
-  headerEl.appendChild(fightBtn)
-  headerEl.appendChild(enterBtn)
+  // Pray (p) — pinned shortcut like ⇥/O.
+  const prayBtn = document.createElement('button')
+  prayBtn.className = 'tc-pin'
+  prayBtn.textContent = 'p'
+  prayBtn.title = 'Pray / 기도'
+  prayBtn.addEventListener('touchstart', e => { e.preventDefault(); send({ msg: 'input', text: 'p' }); clearOneshot() }, { passive: false })
+  prayBtn.addEventListener('click', () => { send({ msg: 'input', text: 'p' }); clearOneshot() })
+
+  // Header order: Esc | [행동/기타] | Enter | p | ⇥ (autofight) | O (explore).
+  // Esc was appended above; the tab toggle and pins fill out the row.
   headerEl.appendChild(tabsEl)
+  headerEl.appendChild(enterBtn)
+  headerEl.appendChild(prayBtn)
+  headerEl.appendChild(fightBtn)
   headerEl.appendChild(exploreBtn)
 
   // Content area — replaced on tab switch or mode change
@@ -699,6 +707,21 @@ export function buildTouchControls(send: SendFn, opts: { spellTab?: SpellTabConf
   kbdBtn.addEventListener('pointercancel', clearKbdHold)
   kbdBtn.addEventListener('pointerleave', clearKbdHold)
   footerEl.appendChild(kbdBtn)
+
+  // D-pad on/off toggle, in the footer slot the ⚙ button used to occupy. Lit
+  // when the d-pad is on; flips the pref and rebuilds (same as the settings
+  // toggle). Click only — a touchstart+click pair would flip twice (see
+  // langToggleBtn).
+  const dpadFooterBtn = document.createElement('button')
+  dpadFooterBtn.className = 'tc-kbd tc-dpad-toggle'
+  dpadFooterBtn.textContent = '⊞'
+  dpadFooterBtn.title = 'Toggle d-pad / 디패드 켜기·끄기'
+  dpadFooterBtn.classList.toggle('active', getPref('dpadEnabled'))
+  dpadFooterBtn.addEventListener('click', () => {
+    setPref('dpadEnabled', !getPref('dpadEnabled'))
+    opts.onRequestRebuild?.()
+  })
+  footerEl.appendChild(dpadFooterBtn)
 
   // Settings overlay
   const settingsOverlay = document.createElement('div')
@@ -1012,7 +1035,7 @@ export function buildTouchControls(send: SendFn, opts: { spellTab?: SpellTabConf
     }
     mk('tc-edit-addrow', '＋행', () => {
       if (layout.tabs[activeTab as 'micro' | 'macro'].length >= 4) return
-      updateLayout(l => { l.tabs[activeTab as 'micro' | 'macro'].push([null, null, null, null]) })
+      updateLayout(l => { l.tabs[activeTab as 'micro' | 'macro'].push([null, null, null, null, null]) })
       renderTab(activeTab)
     })
     mk('tc-edit-delrow', '－행', () => {
@@ -1180,7 +1203,7 @@ export function buildTouchControls(send: SendFn, opts: { spellTab?: SpellTabConf
       const def = flat[i]
       // In edit mode every cell — including empty ones — opens the picker for
       // its grid position instead of sending its key.
-      const editTap = (): void => openPicker(Math.floor(i / 4), i % 4)
+      const editTap = (): void => openPicker(Math.floor(i / 5), i % 5)
       if (!def.label) {
         if (editMode) {
           const b = document.createElement('button')

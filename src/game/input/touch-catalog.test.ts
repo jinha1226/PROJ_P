@@ -25,6 +25,7 @@ describe('catalog', () => {
   it('DEFAULT_TAB_IDS reproduces the shipped TAB_BUTTONS grids', () => {
     for (const tab of ['micro', 'macro'] as const) {
       const derived = DEFAULT_TAB_IDS[tab].map(row => row.map(id => {
+        if (id === null) return { label: '', title: undefined, text: undefined, key: undefined }
         const e = CATALOG_BY_ID.get(id)!
         return { label: e.label, title: e.title, text: e.text, key: e.key }
       }))

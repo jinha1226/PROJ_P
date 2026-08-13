@@ -29,7 +29,7 @@ describe('custom layout rendering', () => {
   it('renders a custom row count', () => {
     saveLayout(l => { l.tabs.micro = [l.tabs.micro[0]] })
     const tc = buildTouchControls(() => {})
-    expect(tc.element.querySelectorAll('.tc-strip .tc-btn').length).toBe(4)
+    expect(tc.element.querySelectorAll('.tc-strip .tc-btn').length).toBe(5)
   })
 
   it('applies dpad side and size', () => {
@@ -43,6 +43,6 @@ describe('custom layout rendering', () => {
     const tc = buildTouchControls(() => {})
     expect(tc.element.classList.contains('dpad-right')).toBe(false)
     const cells = tc.element.querySelectorAll('.tc-strip .tc-btn')
-    expect(cells.length).toBe(16)  // 행동 tab default is 4 rows of 4
+    expect(cells.length).toBe(15)  // 행동 tab default is 3 rows of 5
   })
 })
