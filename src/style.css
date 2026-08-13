@@ -2593,7 +2593,7 @@ html, body {
    own fixed strip above. */
 #touch-controls:not(.dpad-on) .tc-strip {
   display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));   /* 5 across → the 15-button tab is 3 rows */
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   grid-auto-rows: 1.35rem;   /* compact — another ~1/5 shorter */
   gap: 3px;
   overflow: visible;
@@ -2638,7 +2638,7 @@ html, body {
   flex: 1;
   min-width: 0;
 }
-#touch-controls.dpad-on .tc-content { min-height: calc(3 * 2rem + 2 * 2px); width: 100%; }
+#touch-controls.dpad-on .tc-content { min-height: calc(3 * 1.35rem + 2 * 2px); width: 100%; }
 #touch-controls.dpad-on .tc-strip {
   display: grid;
   /* minmax(0,1fr) + width:100% force four equal columns that fill the panel
@@ -2646,7 +2646,7 @@ html, body {
      a tab with short labels (행동) sat narrower than one with long labels
      (기타) and looked left-clustered. */
   grid-template-columns: repeat(4, minmax(0, 1fr));
-  grid-auto-rows: 2rem;
+  grid-auto-rows: 1.35rem;   /* compact — matches the no-dpad grid height */
   gap: 2px;
   align-content: start;
   overflow: visible;
@@ -2660,7 +2660,7 @@ html, body {
 #touch-controls.dpad-on .tc-esc,
 #touch-controls.dpad-on .tc-enter,
 #touch-controls.dpad-on .tc-pin,
-#touch-controls.dpad-on .tc-tab { height: 2rem; }
+#touch-controls.dpad-on .tc-tab { height: 1.35rem; }
 .tc-panel { min-height: 0; }
 .tc-header, .tc-footer { flex-shrink: 0; }
 

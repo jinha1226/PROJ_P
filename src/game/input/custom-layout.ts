@@ -15,9 +15,9 @@ export interface TouchLayout {
 const SIDES = ['left', 'right']
 const SIZES = ['sm', 'md', 'lg']
 
-// Rows are capped at 4 (screen height); columns fixed at 5 (grid invariant).
+// Rows are capped at 4 (screen height); columns fixed at 4 (grid invariant).
 const MAX_ROWS = 4
-const COLS = 5
+const COLS = 4
 
 // Raw slots hold exactly one printable-ASCII char — that keeps the base64
 // backup line btoa-safe and matches what the capture keyboard can produce.

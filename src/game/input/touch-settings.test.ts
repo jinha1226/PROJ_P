@@ -27,8 +27,8 @@ describe('settings panel', () => {
     const tc = buildTouchControls(() => {}, { onRequestRebuild: () => { rebuilds++ } })
     ;(tc.element.querySelector('.tc-settings') as HTMLButtonElement).click()
     ;(tc.element.querySelector('.tc-set-dpad') as HTMLButtonElement).click()
-    // d-pad is off by default now, so one toggle turns it on.
-    expect(localStorage.getItem('pocketzot:prefs')).toContain('"dpadEnabled":true')
+    // d-pad is on by default, so one toggle turns it off.
+    expect(localStorage.getItem('pocketzot:prefs')).toContain('"dpadEnabled":false')
     expect(rebuilds).toBe(1)
   })
 })
@@ -56,10 +56,10 @@ describe('layout settings rows', () => {
     const tc = buildTouchControls(() => {}, { onRequestRebuild: () => { rebuilds++ } })
     ;(tc.element.querySelector('.tc-settings') as HTMLButtonElement).click()
     const btn = tc.element.querySelector('.tc-set-dpad-size') as HTMLButtonElement
+    btn.click() // sm → md (default is sm)
+    expect(localStorage.getItem('pocketzot:prefs')).toContain('"size":"md"')
     btn.click() // md → lg
     expect(localStorage.getItem('pocketzot:prefs')).toContain('"size":"lg"')
-    btn.click() // lg → sm
-    expect(localStorage.getItem('pocketzot:prefs')).toContain('"size":"sm"')
     expect(rebuilds).toBe(2)
   })
 

@@ -27,10 +27,9 @@ const DEFAULTS: Prefs = {
   monsterListCollapsed: false,
   mapRenderMode: 'ascii',
   uiLang: 'ko',
-  // Off by default: movement now lives on the map itself (tap = travel,
-  // press-drag = the center move joystick), so the bottom d-pad is redundant.
-  // Left as a toggle for anyone who still wants the physical d-pad too.
-  dpadEnabled: false,
+  // On by default: the left d-pad is the primary movement control (the map
+  // joystick / tap-travel still work). Toggle it off with the footer ⊞ button.
+  dpadEnabled: true,
   coachEnabled: false,
   mapZoomLevel: null,
   hiddenSpells: [],

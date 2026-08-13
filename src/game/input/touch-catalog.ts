@@ -73,29 +73,25 @@ export const CATALOG_BY_ID: Map<string, CatalogEntry> = new Map(CATALOG.map(e =>
 
 // The shipped grids, expressed as catalog ids. Must reproduce the historical
 // TAB_BUTTONS exactly — touch-catalog.test.ts pins that equivalence.
-// 5 columns per row (the grid invariant, see custom-layout COLS); null = an
-// empty slot (renders as a spacer). null is only needed to pad 기타 to a full
-// row — every real command stays reachable.
-export const DEFAULT_TAB_IDS: { micro: (string | null)[][]; macro: (string | null)[][] } = {
+// 4 columns per row (the grid invariant, see custom-layout COLS).
+export const DEFAULT_TAB_IDS: { micro: string[][]; macro: string[][] } = {
   micro: [
-    ['quaff', 'read', 'inventory', 'rest', 'travel'],
-    ['skills', 'pickup', 'spells-list', 'ability', 'fire'],
-    // Info commands moved up from 기타 at the user's request; Fire sits right of
-    // ability (a) above.
-    ['stairs-up', 'stairs-down', 'library', 'character', 'abilities'],
+    ['quaff', 'read', 'inventory', 'rest'],
+    ['travel', 'skills', 'pickup', 'spells-list'],
+    ['ability', 'fire', 'stairs-up', 'stairs-down'],
   ],
   macro: [
-    ['status', 'map', 'overview', 'evoke', 'cast'],
-    ['ability', 'fire', 'religion', 'runes', null],
+    ['status', 'library', 'map', 'overview'],
+    ['fire', 'evoke', 'ability', 'cast'],
+    ['character', 'abilities', 'religion', 'runes'],
   ],
 }
 
 export function defaultLayout(): TouchLayout {
-  const rows = (ids: (string | null)[][]): Slot[][] =>
-    ids.map(r => r.map(id => (id === null ? null : { cmd: id })))
+  const rows = (ids: string[][]): Slot[][] => ids.map(r => r.map(id => ({ cmd: id })))
   return {
     v: 1,
-    dpad: { side: 'left', size: 'md' },
+    dpad: { side: 'left', size: 'sm' },
     tabs: { micro: rows(DEFAULT_TAB_IDS.micro), macro: rows(DEFAULT_TAB_IDS.macro) },
   }
 }

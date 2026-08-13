@@ -86,8 +86,8 @@ export const MENU_BUTTONS: TabButtonDef[][] = [
 // definition (DEFAULT_TAB_IDS documents the row groupings). Kept exported
 // under the old name/shape for the label tests and KEY_LABELS below.
 export const TAB_BUTTONS: Record<Exclude<TabKey, 'spells'>, TabButtonDef[][]> = {
-  micro: DEFAULT_TAB_IDS.micro.map(row => row.map(id => (id === null ? { label: '' } : CATALOG_BY_ID.get(id)!))),
-  macro: DEFAULT_TAB_IDS.macro.map(row => row.map(id => (id === null ? { label: '' } : CATALOG_BY_ID.get(id)!))),
+  micro: DEFAULT_TAB_IDS.micro.map(row => row.map(id => CATALOG_BY_ID.get(id)!)),
+  macro: DEFAULT_TAB_IDS.macro.map(row => row.map(id => CATALOG_BY_ID.get(id)!)),
 }
 
 // Reverse map: the key a button sends → its localized label, built from every
@@ -1035,7 +1035,7 @@ export function buildTouchControls(send: SendFn, opts: { spellTab?: SpellTabConf
     }
     mk('tc-edit-addrow', '＋행', () => {
       if (layout.tabs[activeTab as 'micro' | 'macro'].length >= 4) return
-      updateLayout(l => { l.tabs[activeTab as 'micro' | 'macro'].push([null, null, null, null, null]) })
+      updateLayout(l => { l.tabs[activeTab as 'micro' | 'macro'].push([null, null, null, null]) })
       renderTab(activeTab)
     })
     mk('tc-edit-delrow', '－행', () => {
@@ -1203,7 +1203,7 @@ export function buildTouchControls(send: SendFn, opts: { spellTab?: SpellTabConf
       const def = flat[i]
       // In edit mode every cell — including empty ones — opens the picker for
       // its grid position instead of sending its key.
-      const editTap = (): void => openPicker(Math.floor(i / 5), i % 5)
+      const editTap = (): void => openPicker(Math.floor(i / 4), i % 4)
       if (!def.label) {
         if (editMode) {
           const b = document.createElement('button')
