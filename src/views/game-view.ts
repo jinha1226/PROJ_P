@@ -215,7 +215,7 @@ export function buildGameView(
   // Running HP/MP snapshot (merged across player deltas) for the tile view's
   // under-tile mini-bars. Kept here so a render-mode swap can seed the freshly
   // created view, which otherwise starts at zero until the next player message.
-  const playerStats: { hp?: number; hp_max?: number; mp?: number; mp_max?: number } = {}
+  const playerStats: { species?: string; hp?: number; hp_max?: number; mp?: number; mp_max?: number } = {}
   // Latest experience level, for the skill-menu build coach (recommend()).
   let currentXL = 1
   // Latest player fields needed for coach evaluation (accumulated across deltas).
@@ -1187,6 +1187,7 @@ export function buildGameView(
         // Feed HP/MP to the renderer (tile mode draws under-tile mini-bars).
         // After any fullRender above, so the player cell repaints with fresh
         // values; merged into playerStats so a later tile-mode swap can seed.
+        if (msg.species !== undefined) playerStats.species = msg.species
         if (msg.hp !== undefined) playerStats.hp = msg.hp
         if (msg.hp_max !== undefined) playerStats.hp_max = msg.hp_max
         if (msg.mp !== undefined) playerStats.mp = msg.mp

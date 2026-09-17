@@ -5,6 +5,7 @@
 // Reused under the "or later" option as part of this AGPL-3.0-or-later
 // work. See ATTRIBUTION.md and LICENSE.
 
+import { PawnSprite } from './pawn-sprite'
 import type { Cell, MapStore } from './map-store'
 import { parseCellKey } from './map-store'
 import { cellFromPoint } from './cell-hit'
@@ -201,6 +202,7 @@ export class TileMapView {
   private canvas: HTMLCanvasElement
   private ctx: CanvasRenderingContext2D
   private store: MapStore
+  private pawn: PawnSprite
   private viewportW = NORMAL_AXIS
   private viewportH = NORMAL_AXIS
   // Cell that viewCenter (the player, in normal play) renders on. The canvas
@@ -299,6 +301,7 @@ export class TileMapView {
     this.ctx = ctx
     this.ctx.imageSmoothingEnabled = false
     this.container.appendChild(this.canvas)
+    this.pawn = new PawnSprite(() => this.fullRender())
 
     // Note: the constructor does NOT preload. game-view drives preloadAtlases()
     // explicitly, passing this game's per-version loader once it knows the
@@ -599,8 +602,8 @@ export class TileMapView {
   // update (player messages are deltas), so values carry forward like
   // StatsView's merged state. Repaints the player cell on a change so the bar
   // refreshes even when the turn brought no movement (e.g. damage in place).
-  setPlayerStats(p: { hp?: number; hp_max?: number; mp?: number; mp_max?: number }): void {
-    let changed = false
+  setPlayerStats(p: { species?: string; hp?: number; hp_max?: number; mp?: number; mp_max?: number }): void {
+    let changed = p.species !== undefined ? this.pawn.setSpecies(p.species) : false
     if (p.hp !== undefined && p.hp !== this.hp) { this.hp = p.hp; changed = true }
     if (p.hp_max !== undefined && p.hp_max !== this.hpMax) { this.hpMax = p.hp_max; changed = true }
     if (p.mp !== undefined && p.mp !== this.mp) { this.mp = p.mp; changed = true }
@@ -609,7 +612,6 @@ export class TileMapView {
   }
 
   private redrawPlayerCell(): void {
-    if (!this.ready) return
     const p = this.store.playerPos
     const col = p.x - this.offX
     const row = p.y - this.offY
@@ -703,7 +705,7 @@ export class TileMapView {
     if (!cell) return
 
     if (!this.ready) {
-      this.drawAsciiFallback(cell, px, py)
+      this.drawAsciiFallback(cell, px, py, mx === this.store.playerPos.x && my === this.store.playerPos.y)
       return
     }
 
@@ -740,7 +742,7 @@ export class TileMapView {
       } else {
         // Nothing else to draw — render the feature's ASCII glyph so the
         // explored cell stays visible instead of black.
-        this.drawAsciiFallback(cell, px, py)
+        this.drawAsciiFallback(cell, px, py, mx === this.store.playerPos.x && my === this.store.playerPos.y)
         return
       }
     }
@@ -874,6 +876,8 @@ export class TileMapView {
     const hasDoll = cell.doll && cell.doll.length > 0
     const hasMcache = cell.mcache && cell.mcache.length > 0
     const drawActor = (): void => {
+      if (mx === this.store.playerPos.x && my === this.store.playerPos.y
+          && this.pawn.draw(this.ctx, px, py, ATLAS_CELL)) return
       if (hasDoll || hasMcache) {
         if (cell.doll) {
           const offsetMap = hasMcache
@@ -1127,7 +1131,7 @@ export class TileMapView {
     if (id !== undefined) this.paintTile(TEX.ICONS, id, px, py, xofs, yofs)
   }
 
-  private drawAsciiFallback(cell: Cell, px: number, py: number): void {
+  private drawAsciiFallback(cell: Cell, px: number, py: number, player = false): void {
     const c = decodeColor(cell.col)
     if (c.bg) {
       this.ctx.fillStyle = c.bg
@@ -1138,7 +1142,9 @@ export class TileMapView {
     this.ctx.font = `bold ${fontPx}px ui-monospace, SFMono-Regular, Menlo, monospace`
     this.ctx.textBaseline = 'middle'
     this.ctx.textAlign = 'center'
-    this.ctx.fillText(cell.g || ' ', px + ATLAS_CELL / 2, py + ATLAS_CELL / 2)
+    if (!player || !this.pawn.draw(this.ctx, px, py, ATLAS_CELL)) {
+      this.ctx.fillText(cell.g || ' ', px + ATLAS_CELL / 2, py + ATLAS_CELL / 2)
+    }
     const flash = flashColor(cell.flc, cell.fla)
     if (flash) {
       this.ctx.fillStyle = flash
