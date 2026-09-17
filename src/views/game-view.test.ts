@@ -485,7 +485,14 @@ describe('hold surroundings map', () => {
   it('holds a client-only overview and restores on release without sending any command', () => {
     const h = ready(), btn = h.view.querySelector<HTMLButtonElement>('.tc-surroundings')!
     expect(btn).toBeTruthy()
-    expect(h.view.querySelector('#zoom-controls')).toBeNull()
+    const axis = vi.spyOn(MapView.prototype, 'setSightAxis')
+    const zoom = h.view.querySelectorAll<HTMLButtonElement>('#zoom-controls button')
+    expect(zoom).toHaveLength(2)
+    zoom[0].click()
+    expect(axis).toHaveBeenLastCalledWith(15)
+    zoom[1].click()
+    expect(axis).toHaveBeenLastCalledWith(17)
+    zoom[0].click()
     btn.dispatchEvent(new PointerEvent('pointerdown', { pointerId: 1, button: 0, bubbles: true }))
     expect(btn.classList.contains('active')).toBe(true)
     const fight = [...h.view.querySelectorAll<HTMLButtonElement>('.tc-pin')].find(b => b.textContent === '⇥')!
@@ -493,6 +500,8 @@ describe('hold surroundings map', () => {
     document.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true }))
     expect(h.send).not.toHaveBeenCalled()
     btn.dispatchEvent(new PointerEvent('pointerup', { pointerId: 1 }))
+    expect(axis).toHaveBeenLastCalledWith(15)
+    axis.mockRestore()
     btn.click() // browser compatibility click must not latch overview
     expect(btn.classList.contains('active')).toBe(false)
     expect(h.send).not.toHaveBeenCalled()

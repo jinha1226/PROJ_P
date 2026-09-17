@@ -3411,3 +3411,5 @@ html, body {
 .hg-equipment-row #hud-quiver { min-width: 0; overflow-x: auto; white-space: nowrap; text-overflow: clip; font-size: inherit; scrollbar-width: none; }
 .hg-alert-row { display: flex; align-items: center; gap: .4em; min-width: 0; }
 .hg-alert-row:has(#hud-status:empty):has(#hud-warn:empty) { display: none; }
+
+#zoom-controls[hidden] { display: none; }

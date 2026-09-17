@@ -460,13 +460,43 @@ export function buildGameView(
   let sightSpecies = ''
   let currentSightAxis = sightAxis(sightSpecies)
   let overviewActive = false
-  mapView.setSightAxis(currentSightAxis)
+  let zoomOffset = 0
+  const displaySightAxis = (): number => Math.max(5, Math.min(41, currentSightAxis + zoomOffset))
+  const zoomControls = document.createElement('div')
+  zoomControls.id = 'zoom-controls'
+  const zoomInBtn = document.createElement('button')
+  const zoomOutBtn = document.createElement('button')
+  function updateZoomButtons(): void {
+    zoomInBtn.disabled = overviewActive || displaySightAxis() <= 5
+    zoomOutBtn.disabled = overviewActive || displaySightAxis() >= 41
+  }
+  for (const [button, label, title, delta] of [
+    [zoomInBtn, '+', 'Zoom in / 확대', -2],
+    [zoomOutBtn, '−', 'Zoom out / 축소', 2],
+  ] as const) {
+    button.type = 'button'; button.className = 'zoom-btn'
+    button.textContent = label; button.title = title
+    button.setAttribute('aria-label', title)
+    button.addEventListener('click', e => {
+      e.preventDefault(); e.stopPropagation()
+      if (overviewActive) return
+      zoomOffset = Math.max(5, Math.min(41, displaySightAxis() + delta)) - currentSightAxis
+      mapView.setSightAxis(displaySightAxis())
+      mapView.fitToContainer(); mapView.fullRender()
+      updateZoomButtons()
+    })
+    zoomControls.appendChild(button)
+  }
+  mapWrap.appendChild(zoomControls)
+  updateZoomButtons()
+  mapView.setSightAxis(displaySightAxis())
   function updateSightFit(): void {
     const next = sightAxis(sightSpecies, store.visibleRadius())
     if (next === currentSightAxis) return
     currentSightAxis = next
     if (!overviewActive) {
-      mapView.setSightAxis(next); mapView.fitToContainer(); mapView.fullRender()
+      mapView.setSightAxis(displaySightAxis()); mapView.fitToContainer(); mapView.fullRender()
+      updateZoomButtons()
     }
   }
   const overviewHold = {
@@ -475,6 +505,7 @@ export function buildGameView(
       joyStart = null; hideJoy()
       combatEffects.clear()
       overviewActive = true
+      updateZoomButtons()
       mapView.setSightAxis(null)
       mapView.setOverviewFit(true); mapView.setMarkers(true)
       mapView.setZoomLevel(ZOOM_OVERVIEW)
@@ -485,7 +516,8 @@ export function buildGameView(
       if (!overviewActive) return
       overviewActive = false
       mapView.setOverviewFit(false); mapView.setMarkers(false)
-      mapView.setSightAxis(currentSightAxis)
+      mapView.setSightAxis(displaySightAxis())
+      updateZoomButtons()
       mapView.fitToContainer(); mapView.fullRender()
     },
   }
@@ -964,7 +996,7 @@ export function buildGameView(
     const next: MapView | TileMapView = mode === 'tiles' ? new TileMapView(store) : new MapView(store)
     next.setViewCenter(center)
     // Preserve species framing when switching ASCII/tile renderers.
-    next.setSightAxis(currentSightAxis)
+    next.setSightAxis(displaySightAxis())
     // Carry the X-mode scale across the swap: the new view starts at 1.0
     // by default, which would visibly un-zoom the map mid-X-mode. inXMode
     // is the source of truth (global flag), so re-apply directly.
@@ -1722,6 +1754,7 @@ export function buildGameView(
 
   function enterXMode(): void {
     inXMode = true
+    zoomControls.hidden = true
     view.classList.add('x-mode')  // drops the map's log-strip padding (style.css)
     touchControls.cancelOverview()
     msgLog.style.display = 'none'
@@ -1748,6 +1781,7 @@ export function buildGameView(
 
   function exitXMode(): void {
     inXMode = false
+    zoomControls.hidden = false
     view.classList.remove('x-mode')
     touchControls.exitXMode()
     mapView.setFontScale(1.0)

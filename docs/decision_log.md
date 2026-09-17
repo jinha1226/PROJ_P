@@ -223,3 +223,12 @@ are gated on the single `coachEnabled` toggle.
   return ownership to native UI without automatic Escape or confirmation.
 - Validation: TypeScript, 470 tests passed (2 skipped), Vite production build.
   Browser/live-server interaction was not exercised in this change.
+
+### Restore map zoom controls
+
+- Restored floating +/− buttons at the map's upper right. Each tap changes the
+  displayed span by two cells (5–41), starting from the species sight framing.
+- The lower hold-to-view magnifier restores the selected scale on release;
+  renderer switches also retain it. Zoom buttons never send server commands.
+- Zoom adjustment lasts for the current game view; a reload starts at the
+  species-based default. Examine mode hides the buttons.
