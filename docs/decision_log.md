@@ -232,3 +232,15 @@ are gated on the single `coachEnabled` toggle.
   renderer switches also retain it. Zoom buttons never send server commands.
 - Zoom adjustment lasts for the current game view; a reload starts at the
   species-based default. Examine mode hides the buttons.
+
+### Align the lower touch controls
+
+- Removed the obsolete three-row minimum for two-row action layouts. Reserve
+  the maximum configured tab row count instead, so menu/tab switches stay stable
+  and custom layouts can still grow.
+- Equalized header columns and grid gaps. Portrait utility controls use six
+  aligned columns, with the tab toggle spanning two, at the existing compact
+  button height. All shortcuts and d-pad preferences are retained.
+- At the default two-row layout the removed reserved row saves approximately
+  24 CSS pixels when the d-pad does not determine the overall height. Actual
+  device layout has not been measured in a browser.

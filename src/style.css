@@ -2519,8 +2519,9 @@ html, body {
 
 /* Header: Esc | tabs | Enter */
 .tc-header {
-  display: flex;
-  flex-direction: row;
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(0, 1fr);
   align-items: center;
   gap: 2px;
 }
@@ -2597,6 +2598,7 @@ html, body {
   display: flex;
   flex-direction: column;
   gap: 2px;
+  min-height: calc(var(--tc-action-rows, 2) * 1.35rem + (var(--tc-action-rows, 2) - 1) * 2px);
 }
 
 .tc-row {
@@ -2638,7 +2640,7 @@ html, body {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
   grid-auto-rows: 1.35rem;   /* compact — another ~1/5 shorter */
-  gap: 3px;
+  gap: 2px;
   overflow: visible;
 }
 #touch-controls:not(.dpad-on) .tc-strip .tc-btn {
@@ -2666,7 +2668,7 @@ html, body {
    d-pad as a fixed 4-column grid (NO inner scroll). A grid — not wrapping flex —
    keeps every button the same width and in the same column whether the strip
    holds 8 (기타), 11 (행동) or 3 (a menu's meta-keys) buttons, so the layout
-   never reflows. The content area reserves 3 rows so the panel height is
+   never reflows. The content area reserves the configured number of rows so its height is
    identical across tabs and when a menu (inventory / spell list) opens — the
    d-pad and map stay put instead of jumping. The footer flows directly below
    the reserved area, pinned to the panel's bottom. */
@@ -2681,7 +2683,7 @@ html, body {
   flex: 1;
   min-width: 0;
 }
-#touch-controls.dpad-on .tc-content { min-height: calc(3 * 1.35rem + 2 * 2px); width: 100%; }
+#touch-controls.dpad-on .tc-content { width: 100%; }
 #touch-controls.dpad-on .tc-strip {
   display: grid;
   /* minmax(0,1fr) + width:100% force four equal columns that fill the panel
@@ -3413,3 +3415,11 @@ html, body {
 .hg-alert-row:has(#hud-status:empty):has(#hud-warn:empty) { display: none; }
 
 #zoom-controls[hidden] { display: none; }
+
+/* Portrait utility row: tab toggle spans two of the six header columns. */
+@media (orientation: portrait) {
+  .tc-footer { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); }
+  .tc-footer .tc-tabs { grid-column: span 2; min-width: 0; }
+  .tc-footer > button { min-width: 0; height: 1.35rem; }
+  .tc-footer .tc-tab { height: 1.35rem; }
+}

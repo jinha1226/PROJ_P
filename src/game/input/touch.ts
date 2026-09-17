@@ -1186,6 +1186,9 @@ export function buildTouchControls(send: SendFn, opts: { overview?: HoldAction; 
   }
 
   function renderContent(rows: TabButtonDef[][]): void {
+    // Reserve only the configured rows, keeping tab/menu switches stable.
+    const reservedRows = Math.max(layout.tabs.micro.length, layout.tabs.macro.length)
+    contentEl.style.setProperty('--tc-action-rows', String(reservedRows))
     contentEl.innerHTML = ''
     const stripEl = document.createElement('div')
     stripEl.className = 'tc-row tc-strip'
