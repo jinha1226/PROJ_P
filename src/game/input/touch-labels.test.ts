@@ -28,11 +28,11 @@ describe('semantic labels in the touch HUD', () => {
 
   it('relabels each button in place under Shift (q → 화살집, same slot)', () => {
     const tc = buildTouchControls(() => {})
-    expect(labels(tc.element)).toContain('물약(q)')   // q = quaff in play
+    expect(labels(tc.element)).toContain('사용(q)')   // q = quaff in play
     ;(tc.element.querySelector('.tc-shift') as HTMLButtonElement).click()
     const l = labels(tc.element)
     expect(l).toContain('화살집(Q)')     // Shift+q → Q = quiver (in q's slot)
-    expect(l).not.toContain('물약(q)')   // q's slot is now 화살집
+    expect(l).not.toContain('사용(q)')   // q's slot is now 화살집
   })
 
   it('relabels in place under Ctrl (f → 지형찾기)', () => {
@@ -40,7 +40,7 @@ describe('semantic labels in the touch HUD', () => {
     ;(tc.element.querySelector('.tc-ctrl') as HTMLButtonElement).click()
     const l = labels(tc.element)
     expect(l).toContain('지형찾기(^F)')  // Ctrl+f → ^F = find feature
-    expect(l).not.toContain('물약(q)')   // Ctrl+q is a dead key → empty slot
+    expect(l).not.toContain('사용(q)')   // Ctrl+q is a dead key → empty slot
   })
 
   it('backfills dead Ctrl slots with the exit/save commands', () => {
@@ -64,14 +64,14 @@ describe('semantic labels in the touch HUD', () => {
 
   it('swaps to menu meta-keys (페이지 / !) in menu mode', () => {
     const tc = buildTouchControls(() => {})
-    expect(labels(tc.element)).toContain('물약(q)')      // a play action
+    expect(labels(tc.element)).toContain('사용(q)')      // a play action
     expect(labels(tc.element)).not.toContain('페이지(⇥)')
     tc.setMenuMode(true)
     expect(labels(tc.element)).toContain('페이지(⇥)')   // Tab = page in a menu
     expect(labels(tc.element)).toContain('!')           // describe/toggle button (unnamed key)
-    expect(labels(tc.element)).not.toContain('물약(q)')
+    expect(labels(tc.element)).not.toContain('사용(q)')
     tc.setMenuMode(false)
-    expect(labels(tc.element)).toContain('물약(q)')
+    expect(labels(tc.element)).toContain('사용(q)')
     expect(labels(tc.element)).not.toContain('!')
   })
 

@@ -29,6 +29,7 @@ export const GROUP_LABELS: Record<CatalogGroup, { ko: string; en: string }> = {
 }
 
 export const CATALOG: CatalogEntry[] = [
+  { id: 'use', group: 'consume', label: 'q', title: 'Use items', text: 'q' },
   // consume / rest
   { id: 'quaff',       group: 'consume', label: 'q',  title: 'Quaff potion',          text: 'q' },
   { id: 'read',        group: 'consume', label: 'r',  title: 'Read scroll',           text: 'r' },
@@ -42,7 +43,7 @@ export const CATALOG: CatalogEntry[] = [
   // combat / cast
   { id: 'ability',     group: 'combat',  label: 'a',  title: 'Use ability',           text: 'a' },
   { id: 'fire',        group: 'combat',  label: 'f',  title: 'Fire / quivered',       text: 'f' },
-  { id: 'evoke',       group: 'combat',  label: 'v',  title: 'Evoke item',            text: 'v' },
+  { id: 'evoke',       group: 'combat',  label: 'V',  title: 'Evoke item',            text: 'V' },
   { id: 'cast',        group: 'combat',  label: 'z',  title: 'Cast spell',            text: 'z' },
   { id: 'autofight',   group: 'combat',  label: '⇥',  title: 'Auto-fight nearest',    key: 9 },
   { id: 'wield',       group: 'combat',  label: 'w',  title: 'Wield weapon',          text: 'w' },
@@ -73,24 +74,31 @@ export const CATALOG_BY_ID: Map<string, CatalogEntry> = new Map(CATALOG.map(e =>
 
 // Detail menus now live in the character panel. Keep legacy catalog IDs so
 // saved layouts can be normalized without invalidating unrelated custom slots.
+export const USE_MENU_IDS = new Set(['quaff', 'read', 'evoke', 'use'])
 export const PANEL_MENU_IDS = new Set(['inventory', 'skills', 'spells-list', 'status', 'library', 'abilities', 'character'])
 export const DEFAULT_TAB_IDS: { micro: string[][]; macro: string[][] } = {
   micro: [
-    ['quaff', 'read', 'character', 'rest'],
-    ['pickup', 'fire', 'stairs-up', 'stairs-down'],
+    ['use', 'character', 'rest', 'pickup'],
+    ['fire', 'ability', 'stairs-up', 'stairs-down'],
   ],
   macro: [
-    ['travel', 'ability', 'map', 'overview'],
-    ['evoke', 'cast', 'religion', 'runes'],
+    ['travel', 'wield', 'map', 'overview'],
+    ['drop', 'cast', 'religion', 'runes'],
   ],
 }
 
 export function consolidatePanelMenus(layout: TouchLayout): TouchLayout {
   let found = false
+  let foundUse = false
   const rawMenus = new Set(['%', '@', 'A', 'm', 'i', 'I', 'M'])
   const tabs = { micro: [] as Slot[][], macro: [] as Slot[][] }
   for (const tab of ['micro', 'macro'] as const) {
     tabs[tab] = layout.tabs[tab].map(row => row.map(slot => {
+      const isUse = slot && ('cmd' in slot ? USE_MENU_IDS.has(slot.cmd) : ['q', 'r', 'V', 'F'].includes(slot.raw))
+      if (isUse) {
+        if (foundUse) return null
+        foundUse = true; return { cmd: 'use' }
+      }
       const isMenu = slot && ('cmd' in slot ? PANEL_MENU_IDS.has(slot.cmd) : rawMenus.has(slot.raw))
       if (!isMenu) return slot === null ? null : { ...slot }
       if (found) return null

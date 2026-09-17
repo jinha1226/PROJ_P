@@ -209,3 +209,17 @@ are gated on the single `coachEnabled` toggle.
   write, so `getPref` kept returning the old value). The setting now applies for
   the session even with blocked storage; cross-restart persistence still
   requires working storage (else the only durable fix is changing a default).
+
+## 2026-09-17 — Compact HUD and item-use tabs
+
+- HP/MP remain visible. Defenses, XP level/progress and dungeon location share
+  one line; equipped main/offhand weapons and the quivered action share the next.
+  Long equipment text scrolls horizontally. STR/INT/DEX and identity details
+  remain available through the character panel; danger status lights stay visible.
+- One Use button opens potion (q), scroll (r), evoke (V), throw (F) tabs using
+  native server menus. V includes miscellaneous evocables, not only wands.
+  Current DCSS cmd-keys.h maps lowercase v to primary attack, so evoke uses V.
+- Tab changes wait for menu closure and command mode. Targeting and confirmation
+  return ownership to native UI without automatic Escape or confirmation.
+- Validation: TypeScript, 470 tests passed (2 skipped), Vite production build.
+  Browser/live-server interaction was not exercised in this change.

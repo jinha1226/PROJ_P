@@ -3399,3 +3399,15 @@ html, body {
 
 .tc-surroundings { touch-action: none; user-select: none; -webkit-touch-callout: none; font-size: 1.5rem; }
 .tc-surroundings.active { color: #ffe3a7; background: #4b3a24; border-color: #d1a465; }
+
+.use-panel .character-tabs { grid-template-columns: repeat(4, minmax(0, 1fr)) 36px; }
+
+/* Compact HUD: defenses/XP/place, then equipment/quiver; core stats live in %. */
+.hg-summary-row { display: flex; gap: .6em; align-items: baseline; white-space: nowrap; overflow-x: auto; font-size: clamp(10px, 2.9vw, 12px); line-height: 1.35; scrollbar-width: none; }
+.hg-summary-row .hg-defense, .hg-summary-row .hg-xl-place { flex: 0 0 auto; }
+.hg-equipment-row { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: .6em; font-size: 11px; line-height: 1.35; }
+.hg-equipped { display: flex; gap: .6em; min-width: 0; overflow-x: auto; white-space: nowrap; scrollbar-width: none; }
+.hg-equipped .hg-wq { flex: 0 0 auto; overflow: visible; font-size: inherit; }
+.hg-equipment-row #hud-quiver { min-width: 0; overflow-x: auto; white-space: nowrap; text-overflow: clip; font-size: inherit; scrollbar-width: none; }
+.hg-alert-row { display: flex; align-items: center; gap: .4em; min-width: 0; }
+.hg-alert-row:has(#hud-status:empty):has(#hud-warn:empty) { display: none; }

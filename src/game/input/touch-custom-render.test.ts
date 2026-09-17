@@ -14,14 +14,14 @@ function saveLayout(mut: (l: ReturnType<typeof defaultLayout>) => void): void {
 describe('custom layout rendering', () => {
   it('renders a replaced slot, a raw slot, and an empty slot', () => {
     saveLayout(l => {
-      l.tabs.micro[0][0] = { cmd: 'evoke' }   // default was quaff
+      l.tabs.micro[0][0] = { cmd: 'wield' } // replace the default Use button
       l.tabs.micro[0][1] = { raw: '&' }
-      l.tabs.micro[0][2] = null                // default was inventory
+      l.tabs.micro[0][2] = null                // clear the rest slot
     })
     const tc = buildTouchControls(() => {})
     const strip = tc.element.querySelector('.tc-strip')!
     const cells = strip.querySelectorAll('.tc-btn')
-    expect(cells[0].textContent).toContain('(v)')          // 발동(v)/Evoke(v)
+    expect(cells[0].textContent).toContain('(w)')
     expect(cells[1].textContent).toBe('&')
     expect(cells[2].classList.contains('tc-btn-spacer')).toBe(true)
   })

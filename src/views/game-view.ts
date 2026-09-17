@@ -1,4 +1,4 @@
-import { CharacterPanel, CHARACTER_COMMANDS, type CharacterCommand } from './character-panel'
+import { CharacterPanel, CHARACTER_COMMANDS, USE_COMMANDS, type CharacterCommand } from './character-panel'
 import { CombatEffects, wounds, worsened, hpLoss } from '../game/hud/combat-effects'
 import type { WsConnection } from '../ws/connection'
 import type { ClientMsg, ServerMsg, GameExit } from '../ws/types'
@@ -400,20 +400,35 @@ export function buildGameView(
   uiOverlay.id = 'ui-overlay'
   uiOverlay.style.display = 'none'
 
-  const characterPanel = new CharacterPanel(uiOverlay, view, {
+  const characterPanel: CharacterPanel = new CharacterPanel(uiOverlay, view, {
     send: msg => conn.send(msg),
-    idle: () => !spectating && currentInputMode === 1 && commandChannelIdle() && !monsterPanelOpen,
+    idle: () => !spectating && currentInputMode === 1 && commandChannelIdle() && !monsterPanelOpen && !usePanel.isOpen,
     hasOverlay: () => uiStack.length > 0 || crtActive || dialogActive || !!activeMenu,
     depth: () => uiStack.length + menuStack.length + Number(crtActive) + Number(dialogActive),
     restore: () => hideOverlay(),
     language: () => getPref('uiLang'),
   })
+  const usePanel: CharacterPanel = new CharacterPanel(uiOverlay, view, {
+    send: msg => conn.send(msg),
+    idle: () => !spectating && currentInputMode === 1 && commandChannelIdle() && !monsterPanelOpen && !characterPanel.isOpen,
+    hasOverlay: () => uiStack.length > 0 || crtActive || dialogActive || !!activeMenu,
+    depth: () => uiStack.length + menuStack.length + Number(crtActive) + Number(dialogActive),
+    restore: () => hideOverlay(),
+    language: () => getPref('uiLang'),
+  }, 'use')
   function panelInput(msg: ClientMsg): boolean {
+    if (usePanel.isOpen && msg.msg === 'key' && msg.keycode === 27) {
+      usePanel.close(); return true
+    }
+    if (usePanel.busy) return true
+    if (!usePanel.isOpen && !characterPanel.isOpen && msg.msg === 'input' && USE_COMMANDS.includes(msg.text)) {
+      return usePanel.select(msg.text as CharacterCommand)
+    }
     if (characterPanel.isOpen && msg.msg === 'key' && msg.keycode === 27) {
       characterPanel.close(); return true
     }
     if (characterPanel.busy) return true
-    if (!characterPanel.isOpen && msg.msg === 'input' && CHARACTER_COMMANDS.includes(msg.text)) {
+    if (!usePanel.isOpen && !characterPanel.isOpen && msg.msg === 'input' && CHARACTER_COMMANDS.includes(msg.text)) {
       return characterPanel.select(msg.text as CharacterCommand)
     }
     return false
@@ -456,7 +471,7 @@ export function buildGameView(
   }
   const overviewHold = {
     start: (): boolean => {
-      if (overviewActive || currentInputMode !== 1 || !commandChannelIdle() || monsterPanelOpen || characterPanel.isOpen) return false
+      if (overviewActive || currentInputMode !== 1 || !commandChannelIdle() || monsterPanelOpen || characterPanel.isOpen || usePanel.isOpen) return false
       joyStart = null; hideJoy()
       combatEffects.clear()
       overviewActive = true
@@ -531,7 +546,7 @@ export function buildGameView(
   // overlay, menu, dialog, harvest, monster panel, or examine mode is up.
   const moveBlocked = (): boolean =>
     uiStack.length > 0 || crtActive || dialogActive || !!activeMenu ||
-    isHarvesting() || monsterPanelOpen || inXMode || characterPanel.isOpen || overviewActive
+    isHarvesting() || monsterPanelOpen || inXMode || characterPanel.isOpen || usePanel.isOpen || overviewActive
 
   const clearJoyRepeat = (): void => {
     if (joyHold != null) { window.clearTimeout(joyHold); joyHold = null }
@@ -858,6 +873,7 @@ export function buildGameView(
 
   view.appendChild(uiOverlay)
   view.appendChild(characterPanel.element)
+  view.appendChild(usePanel.element)
   view.appendChild(mapWrap)
   // Direct grid child (not inside #map-wrap) so each orientation can place
   // it: portrait floats it over the map cell (grid-area:map + abspos, same
@@ -1019,6 +1035,10 @@ export function buildGameView(
       if (e.key === 'Escape') touchControls.cancelOverview()
       e.preventDefault(); return
     }
+    if (usePanel.busy) {
+      e.preventDefault(); if (e.key === 'Escape') usePanel.close(); return
+    }
+    if (usePanel.isOpen && e.key === 'Escape') { e.preventDefault(); usePanel.close(); return }
     if (characterPanel.busy) {
       e.preventDefault(); if (e.key === 'Escape') characterPanel.close(); return
     }
@@ -1067,6 +1087,7 @@ export function buildGameView(
   function handleMsg(msg: ServerMsg): void {
     handleGameMsg(msg)
     characterPanel.observe(msg)
+    usePanel.observe(msg)
   }
 
   function handleGameMsg(msg: ServerMsg): void {
@@ -3093,7 +3114,7 @@ export function buildGameView(
     // mode, so it needs its own gate: in landscape the rail stays visible in
     // the sidebar beside the panel, and a tap here bypasses the touch-input
     // swallow (the rail sends via conn.send, not that callback).
-    if (overviewActive || characterPanel.isOpen || monsterPanelOpen || currentInputMode !== 1 || !commandChannelIdle()) {
+    if (overviewActive || characterPanel.isOpen || usePanel.isOpen || monsterPanelOpen || currentInputMode !== 1 || !commandChannelIdle()) {
       // Queue only when our own cast is plausibly still in flight and the
       // player isn't in a real context (menu/overlay/X-mode/panel) — there a
       // deferred cast would be the exact stray the guard exists to stop.
@@ -3247,7 +3268,7 @@ export function buildGameView(
   // Returns true if the harvest actually started (so the auto-trigger only
   // marks itself done when it really fired, not when the guard bailed).
   function harvestSpells(): boolean {
-    if (overviewActive || characterPanel.isOpen || !commandChannelIdle()) return false
+    if (overviewActive || characterPanel.isOpen || usePanel.isOpen || !commandChannelIdle()) return false
     harvestPhase = 'base'
     conn.send({ msg: 'input', text: 'I' })
     armHarvestTimeout()

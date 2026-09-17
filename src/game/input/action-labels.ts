@@ -5,6 +5,7 @@ export interface LabelPair { ko: string; en: string }
 // Keyed by the English `title` string used in touch.ts TAB_BUTTONS. Labels are
 // kept short so they fit a touch button; the full `title` remains the tooltip.
 export const ACTION_LABELS: Record<string, LabelPair> = {
+  'Use items': { ko: '사용', en: 'Use' },
   // menu mode (! and ? keep their literal key glyph — matches DCSS footer hints)
   'Page down':            { ko: '페이지',   en: 'Page' },
   // modifier strips

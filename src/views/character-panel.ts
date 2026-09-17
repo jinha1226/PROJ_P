@@ -1,6 +1,7 @@
 import type { ClientMsg, ServerMsg } from '../ws/types'
 
-export type CharacterCommand = '%' | 'A' | 'm' | 'i' | 'I' | 'M'
+export type CharacterCommand = '%' | 'A' | 'm' | 'i' | 'I' | 'M' | 'q' | 'r' | 'V' | 'F'
+export const USE_COMMANDS: readonly string[] = ['q', 'r', 'V', 'F']
 export const CHARACTER_COMMANDS: readonly string[] = ['%', 'A', 'm', 'i', 'I', 'M']
 interface Hooks {
   send: (msg: ClientMsg) => void
@@ -32,18 +33,21 @@ export class CharacterPanel {
   private responseText = ''
   private timer: ReturnType<typeof setTimeout> | undefined
 
-  constructor(private overlay: HTMLElement, private home: HTMLElement, private hooks: Hooks) {
-    this.element.className = 'character-panel'
+  constructor(private overlay: HTMLElement, private home: HTMLElement, private hooks: Hooks, private kind: 'character' | 'use' = 'character') {
+    this.element.className = 'character-panel' + (kind === 'use' ? ' use-panel' : '')
     this.element.hidden = true
-    this.element.setAttribute('aria-label', 'Character / 캐릭터')
+    this.element.setAttribute('aria-label', kind === 'use' ? 'Use items / 아이템 사용' : 'Character / 캐릭터')
     this.openButton.className = 'character-open'
     this.openButton.textContent = this.ko ? '상태창' : 'Character'
-    this.openButton.addEventListener('click', () => this.select('%'))
+    this.openButton.addEventListener('click', () => this.select(kind === 'use' ? 'q' : '%'))
     this.tabs.className = 'character-tabs'
     this.tabs.setAttribute('aria-label', 'Character sections')
-    const names = this.ko ? ['상태 %', '능력·변이 A', '스킬 m', '가방 i', '주문']
-      : ['Status %', 'Traits A', 'Skills m', 'Bag i', 'Spells']
-    ;(['%', 'A', 'm', 'i', 'I'] as CharacterCommand[]).forEach((key, i) => {
+    const names = kind === 'use'
+      ? (this.ko ? ['물약', '스크롤', '완드', '투척'] : ['Potions', 'Scrolls', 'Wands', 'Throw'])
+      : (this.ko ? ['상태 %', '능력·변이 A', '스킬 m', '가방 i', '주문']
+        : ['Status %', 'Traits A', 'Skills m', 'Bag i', 'Spells'])
+    const keys: CharacterCommand[] = kind === 'use' ? ['q', 'r', 'V', 'F'] : ['%', 'A', 'm', 'i', 'I']
+    keys.forEach((key, i) => {
       const b = document.createElement('button')
       b.textContent = names[i]; b.dataset.command = key
       b.addEventListener('click', () => this.select(key))
@@ -51,7 +55,7 @@ export class CharacterPanel {
     })
     const close = document.createElement('button')
     close.className = 'character-close'; close.textContent = '×'
-    close.setAttribute('aria-label', this.ko ? '캐릭터 창 닫기' : 'Close character panel')
+    close.setAttribute('aria-label', this.ko ? '창 닫기' : 'Close panel')
     close.addEventListener('click', () => this.close())
     this.tabs.appendChild(close)
     this.notice.className = 'character-notice'; this.notice.setAttribute('role', 'status')
@@ -76,6 +80,7 @@ export class CharacterPanel {
   get busy(): boolean { return this.phase === 'opening' || this.phase === 'closing' }
 
   select(key: CharacterCommand): boolean {
+    if (!(this.kind === 'use' ? USE_COMMANDS : CHARACTER_COMMANDS).includes(key)) return false
     if (!this.isOpen) {
       if (!this.hooks.idle()) return false
       this.snapshots.clear()
@@ -165,6 +170,11 @@ export class CharacterPanel {
   observe(msg: ServerMsg): void {
     if (!this.isOpen) return
     if (['go_lobby', 'close', 'game_ended'].includes(msg.msg)) { this.reset(false); return }
+    // Item selection can lead straight to targeting or a confirmation. Hand
+    // ownership back without Escape, tab commands, or automatic confirmation.
+    if (this.kind === 'use' && msg.msg === 'input_mode' && [2, 3, 4, 8].includes(msg.mode)) {
+      this.reset(!this.hooks.hasOverlay()); return
+    }
     const closeAck = ['close_menu', 'ui-pop', 'close_all_menus'].includes(msg.msg)
       || ((msg.msg === 'layer' || msg.msg === 'set_layer') && msg.layer === 'game')
     if (this.phase === 'opening') {
@@ -181,7 +191,7 @@ export class CharacterPanel {
         const text = this.responseText || (this.ko ? '표시할 목록이 없습니다.' : 'No list available.')
         // These commands can return a message instead of a menu. Never infer
         // an empty menu merely from elapsed time or an unrelated message.
-        if ((msg.msg === 'input_mode' && msg.mode === 1) || /don't know any spells|no spells|not carrying anything|memorise any|memorize any|주문.*없|마법.*없/.test(text)) {
+        if ((msg.msg === 'input_mode' && msg.mode === 1) || (this.kind === 'use' && /aren.t carrying|don.t have|have no|cannot (drink|read|evoke)|nothing to|없/.test(text)) || /don't know any spells|no spells|not carrying anything|memorise any|memorize any|주문.*없|마법.*없/.test(text)) {
           const empty = document.createElement('div'); empty.className = 'character-snapshot'
           empty.textContent = text; this.snapshots.set(this.active, empty)
           if (this.cancelOpening) { this.reset(); return }

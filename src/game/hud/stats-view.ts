@@ -36,10 +36,7 @@ export class StatsView {
     this.inv = inv
     this.el = document.createElement('div')
     this.el.id = 'hud-stats'
-    // Portrait gets the compact HUD (single nowrap rows); landscape gets the
-    // square two-column HUD, which fits the 15rem sidebar without clipping.
-    // Same query string as the style.css landscape block so JS and CSS can
-    // never disagree about which mode is active.
+    // Keep the compact HUD in both orientations; remount status on rotation.
     this.mql = typeof window.matchMedia === 'function'
       ? window.matchMedia('(orientation: landscape)')
       : null
@@ -180,14 +177,10 @@ export class StatsView {
     const goldAura = (s.status ?? []).some(st => st.text === 'gold aura')
     const xlEl = this.el.querySelector<HTMLElement>('#hud-xl-place')
     if (xlEl) {
-      // compact: XL/progress/place/gold composed onto one line
-      let html = `<span class="hg-caption">XL</span><span>${escHtml(String(xl))}</span>`
-      if (s.progress != null) html += ` ${escHtml(String(s.progress))}%`
+      // Level, experience progress, and dungeon location share the defense row.
+      let html = `<span class="hg-caption">XP </span><span>${escHtml(String(xl))}</span>`
+      if (s.progress != null) html += ` (${escHtml(String(s.progress))}%)`
       if (placeStr) html += ` <span class="hg-caption">@</span><span>${escHtml(placeStr)}</span>`
-      if (god === 'Gozag' && s.gold != null) {
-        const valClass = goldAura ? ' class="stat-boosted"' : ''
-        html += ` <span class="hg-caption">$</span><span${valClass}>${escHtml(String(s.gold))}</span>`
-      }
       xlEl.innerHTML = html
     } else {
       // square: XL+Next pair with Place across the grid row (reference rows)
@@ -219,7 +212,7 @@ export class StatsView {
     // Noise bar (graphical, mirrors update_bar_noise in player.js)
     this.renderNoiseBar(s.adjusted_noise ?? 0, hasStatus(/silenced?/i))
 
-    // Weapon row (own line, ellipsis if too long)
+    // Equipped weapons share a scrollable line with the quivered action.
     const wqRow = this.el.querySelector<HTMLElement>('#hud-wq')
     const weaponHtml = this.buildWeapon(false)
     if (wqRow) {
@@ -235,7 +228,7 @@ export class StatsView {
       offhandRow.style.display = offhandHtml ? '' : 'none'
     }
 
-    // Quiver gets its own row directly below the weapon (console-style pairing)
+    // The quivered action occupies the second cell of the equipment line.
     const quiverEl = this.el.querySelector<HTMLElement>('#hud-quiver')
     if (quiverEl) {
       const quiverHtml = dcssToHtml(s.quiver_desc ?? '')
@@ -435,20 +428,11 @@ export class StatsView {
   }
 
   private template(): string {
-    return this.layout === 'square' ? this.squareTemplate() : this.compactTemplate()
-  }
-
-  private wqQuiverRows(): string {
-    return `
-      <div class="hg-wq" id="hud-wq"></div>
-      <div class="hg-wq" id="hud-wq-offhand"></div>
-      <div class="hg-quiver" id="hud-quiver"></div>
-    `
+    return this.compactTemplate()
   }
 
   private compactTemplate(): string {
     return `
-      <div class="hs-id fg14"><span id="hud-id"></span><span class="hg-piety" id="hud-piety"></span></div>
       <div class="hg-bar-pair">
         <div class="hg-bar-row hg-hp">
           <div class="hg-bar-cell"><span class="hud-bar-seg hp-full"></span><span class="hud-bar-seg hp-poison"></span><span class="hud-bar-seg hp-decrease"></span><span class="hud-bar-seg hp-increase"></span></div>
@@ -459,64 +443,16 @@ export class StatsView {
           <span class="hg-bar-val" id="hud-mp"></span>
         </div>
       </div>
-      <div class="hg-stats-row">
-        <div class="hg-inline-stats">
-          <span class="hg-grp"><span class="hg-caption">AC</span><span id="hud-ac"></span> <span class="hg-caption">EV</span><span id="hud-ev"></span> <span class="hg-caption">SH</span><span id="hud-sh"></span></span>
-          <span class="hg-grp"><span class="hg-caption">St</span><span id="hud-str"></span> <span class="hg-caption">In</span><span id="hud-int"></span> <span class="hg-caption">Dx</span><span id="hud-dex"></span></span>
-        </div>
-        <span class="hg-warn" id="hud-warn"></span>
-        <span class="hg-noise-time">
-          <span class="hg-noise"><span class="hg-caption">N</span><span class="hg-noise-cell" id="hud-noise-cell"><span class="hud-bar-seg noise-full"></span><span class="hud-bar-seg noise-decrease"></span></span><span class="hg-noise-status" id="hud-noise-status"></span></span>
-          <span class="hg-time"><span class="hg-caption">T</span><span id="hud-time-val"></span></span>
-        </span>
+      <div class="hg-summary-row">
+        <span class="hg-defense"><span class="hg-caption">AC </span><span id="hud-ac"></span> <span class="hg-caption">EV </span><span id="hud-ev"></span> <span class="hg-caption">SH </span><span id="hud-sh"></span></span>
+        <span class="hg-xl-place" id="hud-xl-place"></span>
       </div>
-      <div class="hg-xl-row">
-        <span class="hg-xl-place hg-grp" id="hud-xl-place"></span>
+      <div class="hg-equipment-row">
+        <div class="hg-equipped" aria-label="장착 무기"><span class="hg-wq" id="hud-wq"></span><span class="hg-wq" id="hud-wq-offhand"></span></div>
+        <div class="hg-quiver" id="hud-quiver" aria-label="발사 대상"></div>
       </div>
-      <div class="hg-status-row">
-        <div class="hg-wq" id="hud-wq"></div>
-        <div id="hud-status-slot" class="hg-status-slot"></div>
-      </div>
-      <div class="hg-wq" id="hud-wq-offhand"></div>
-      <div class="hg-quiver" id="hud-quiver"></div>
+      <div class="hg-alert-row"><span class="hg-warn" id="hud-warn"></span><div id="hud-status-slot"></div></div>
     `
   }
 
-  // Square HUD for the landscape sidebar, mirroring the reference stats panel
-  // (game.html #stats): title and species/god/gold lines, Health/Magic
-  // caption lines with right-anchored bars, then a 45/55 two-column block
-  // pairing AC|Str, EV|Int, SH|Dex, XL+Next|Place, Noise|Time — Doom and
-  // Contam ride the Str/Int rows as in the reference — and full-width
-  // weapon/quiver rows. Every readout owns a cell, so nothing clips at
-  // sidebar width the way the compact template's nowrap rows do.
-  private squareTemplate(): string {
-    return `
-      <div class="hs-id fg14"><span id="hud-title"></span></div>
-      <div class="hs-species fg14"><span id="hud-species"></span><span class="hg-piety" id="hud-piety"></span><span class="hud-sq-gold" id="hud-gold-ui" style="display:none"><span class="hg-caption">Gold:</span><span id="hud-gold"></span></span></div>
-      <div class="hg-bar-row hud-sq-barline">
-        <span class="hg-caption" id="hud-hp-caption">Health:</span>
-        <span class="hg-bar-val" id="hud-hp"></span>
-        <div class="hg-bar-cell"><span class="hud-bar-seg hp-full"></span><span class="hud-bar-seg hp-poison"></span><span class="hud-bar-seg hp-decrease"></span><span class="hud-bar-seg hp-increase"></span></div>
-      </div>
-      <div class="hg-bar-row hud-sq-barline" id="hud-mp-line">
-        <span class="hg-caption">Magic:</span>
-        <span class="hg-bar-val" id="hud-mp"></span>
-        <div class="hg-bar-cell"><span class="hud-bar-seg mp-full"></span><span class="hud-bar-seg mp-decrease"></span><span class="hud-bar-seg mp-increase"></span></div>
-      </div>
-      <div class="hud-grid">
-        <span><span class="hg-caption">AC:</span><span id="hud-ac"></span></span>
-        <span><span class="hg-caption">Str:</span><span id="hud-str"></span><span class="hud-sq-warn" id="hud-doom-ui" style="display:none"><span class="hg-caption">Doom:</span><span id="hud-doom"></span></span></span>
-        <span><span class="hg-caption">EV:</span><span id="hud-ev"></span></span>
-        <span><span class="hg-caption">Int:</span><span id="hud-int"></span><span class="hud-sq-warn" id="hud-contam-ui" style="display:none"><span class="hg-caption">Contam:</span><span id="hud-contam"></span></span></span>
-        <span><span class="hg-caption">SH:</span><span id="hud-sh"></span></span>
-        <span><span class="hg-caption">Dex:</span><span id="hud-dex"></span></span>
-        <span><span class="hg-caption">XL:</span><span id="hud-xl"></span> <span class="hg-caption">Next:</span><span id="hud-prog"></span></span>
-        <span><span class="hg-caption">Place:</span><span id="hud-place"></span></span>
-        <span class="hg-noise"><span class="hg-caption">Noise:</span><span class="hg-noise-cell" id="hud-noise-cell"><span class="hud-bar-seg noise-full"></span><span class="hud-bar-seg noise-decrease"></span></span><span class="hg-noise-status" id="hud-noise-status"></span></span>
-        <span class="hg-time"><span class="hg-caption">Time:</span><span id="hud-time-val"></span></span>
-      </div>
-      ${this.wqQuiverRows()}
-      <div id="hud-status-slot"></div>
-    `
-  }
 }

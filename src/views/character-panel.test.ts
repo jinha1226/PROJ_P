@@ -3,7 +3,7 @@ import { describe, it, expect, vi, afterEach } from 'vitest'
 import { CharacterPanel } from './character-panel'
 import type { ServerMsg } from '../ws/types'
 
-function setup() {
+function setup(kind: 'character' | 'use' = 'character') {
   const home = document.createElement('div'), overlay = document.createElement('div')
   home.appendChild(overlay); document.body.appendChild(home)
   const state = { idle: true, depth: 0 }
@@ -11,7 +11,7 @@ function setup() {
   const panel = new CharacterPanel(overlay, home, {
     send, restore, idle: () => state.idle, depth: () => state.depth,
     hasOverlay: () => state.depth > 0, language: () => 'ko',
-  })
+  }, kind)
   home.appendChild(panel.element)
   const menu = (text = 'Menu') => {
     state.idle = false; state.depth = 1; overlay.textContent = text
@@ -112,5 +112,37 @@ describe('character panel command ownership', () => {
     expect(h.panel.isOpen).toBe(false)
     expect(vi.getTimerCount()).toBe(0)
     expect(h.restore).not.toHaveBeenCalled()
+  })
+})
+
+
+describe('item-use panel', () => {
+  it('switches filtered item menus only after the server returns to command mode', () => {
+    const h = setup('use'); h.panel.select('q'); h.menu('Potions')
+    h.panel.select('V')
+    expect(h.send.mock.calls).toEqual([[{ msg: 'input', text: 'q' }], [{ msg: 'key', keycode: 27 }]])
+    h.closed()
+    expect(h.send).toHaveBeenLastCalledWith({ msg: 'input', text: 'V' })
+    h.menu('Wands'); h.panel.select('F'); h.closed()
+    expect(h.send).toHaveBeenLastCalledWith({ msg: 'input', text: 'F' })
+    h.panel.reset()
+  })
+  it.each([2, 3, 4, 8])('releases mode %i without cancelling targeting or confirming an item', mode => {
+    const h = setup('use'); h.panel.select('V'); h.menu()
+    h.state.depth = mode === 8 ? 1 : 0
+    h.panel.observe({ msg: 'input_mode', mode })
+    expect(h.panel.isOpen).toBe(false)
+    expect(h.overlay.parentElement).toBe(h.home)
+    expect(h.send).toHaveBeenCalledTimes(1)
+    expect(h.restore).toHaveBeenCalledTimes(mode === 8 ? 0 : 1)
+  })
+  it('allows another category after an empty inventory response', () => {
+    const h = setup('use'); h.panel.select('q')
+    h.panel.observe({ msg: 'msgs', messages: [{ text: "You aren't carrying any potions." }] })
+    expect(h.panel.busy).toBe(false)
+    h.panel.select('r')
+    expect(h.send).toHaveBeenLastCalledWith({ msg: 'input', text: 'r' })
+    expect(h.send.mock.calls.some(([m]) => m.msg === 'key')).toBe(false)
+    h.panel.reset()
   })
 })

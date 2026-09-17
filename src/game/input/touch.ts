@@ -13,7 +13,7 @@ import { createShiftToggle } from './shift-state'
 import { getPref, setPref, type UiLang } from '../../prefs'
 import { actionLabel, ACTION_LABELS, TAB_LABELS, type LabelPair } from './action-labels'
 import type { RcControls } from '../rc/rc-options'
-import { CATALOG, CATALOG_BY_ID, DEFAULT_TAB_IDS, PANEL_MENU_IDS, GROUP_LABELS, currentLayout, slotToDef, type TabButtonDef } from './touch-catalog'
+import { CATALOG, CATALOG_BY_ID, DEFAULT_TAB_IDS, PANEL_MENU_IDS, USE_MENU_IDS, GROUP_LABELS, currentLayout, slotToDef, type TabButtonDef } from './touch-catalog'
 import type { Slot, TouchLayout } from './custom-layout'
 
 type SendFn = (msg: ClientMsg) => void
@@ -994,7 +994,7 @@ export function buildTouchControls(send: SendFn, opts: { overview?: HoldAction; 
       pickerOverlay.appendChild(h)
       const grid = document.createElement('div')
       grid.className = 'tc-picker-grid'
-      for (const e of CATALOG.filter(c => c.group === group && (!PANEL_MENU_IDS.has(c.id) || c.id === 'character'))) {
+      for (const e of CATALOG.filter(c => c.group === group && (!PANEL_MENU_IDS.has(c.id) || c.id === 'character') && (!USE_MENU_IDS.has(c.id) || c.id === 'use'))) {
         const b = document.createElement('button')
         b.className = 'tc-btn named tc-pick'
         b.dataset.id = e.id

@@ -25,11 +25,11 @@ describe('edit mode', () => {
   it('picking a command reassigns the slot and persists', () => {
     const tc = buildTouchControls(() => {})
     enterEdit(tc)
-    ;(tc.element.querySelector('.tc-strip .tc-btn') as HTMLButtonElement).click() // slot 0,0 (quaff)
-    ;(tc.element.querySelector('.tc-pick[data-id="evoke"]') as HTMLButtonElement).click()
-    expect(localStorage.getItem('pocketzot:prefs')).toContain('"cmd":"evoke"')
+    ;(tc.element.querySelector('.tc-strip .tc-btn') as HTMLButtonElement).click() // slot 0,0 (use)
+    ;(tc.element.querySelector('.tc-pick[data-id="wield"]') as HTMLButtonElement).click()
+    expect(localStorage.getItem('pocketzot:prefs')).toContain('"cmd":"wield"')
     const first = tc.element.querySelector('.tc-strip .tc-btn') as HTMLElement
-    expect(first.textContent).toContain('(v)')
+    expect(first.textContent).toContain('(w)')
   })
 
   it('picking empty clears the slot', () => {
@@ -64,10 +64,10 @@ describe('edit mode', () => {
     const tc = buildTouchControls(() => {})
     enterEdit(tc)
     ;(tc.element.querySelector('.tc-strip .tc-btn') as HTMLButtonElement).click()
-    ;(tc.element.querySelector('.tc-pick[data-id="evoke"]') as HTMLButtonElement).click()
+    ;(tc.element.querySelector('.tc-pick[data-id="wield"]') as HTMLButtonElement).click()
     const reset = tc.element.querySelector('.tc-edit-reset') as HTMLButtonElement
     reset.click()
-    expect(localStorage.getItem('pocketzot:prefs')).toContain('"cmd":"evoke"') // armed, not yet
+    expect(localStorage.getItem('pocketzot:prefs')).toContain('"cmd":"wield"') // armed, not yet
     reset.click()
     expect(localStorage.getItem('pocketzot:prefs')).toContain('"touchLayout":null')
   })
