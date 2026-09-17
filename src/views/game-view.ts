@@ -1,3 +1,4 @@
+import { CharacterPanel, CHARACTER_COMMANDS, type CharacterCommand } from './character-panel'
 import { CombatEffects, wounds, worsened, hpLoss } from '../game/hud/combat-effects'
 import type { WsConnection } from '../ws/connection'
 import type { ClientMsg, ServerMsg, GameExit } from '../ws/types'
@@ -398,6 +399,25 @@ export function buildGameView(
   uiOverlay.id = 'ui-overlay'
   uiOverlay.style.display = 'none'
 
+  const characterPanel = new CharacterPanel(uiOverlay, view, {
+    send: msg => conn.send(msg),
+    idle: () => !spectating && currentInputMode === 1 && commandChannelIdle() && !monsterPanelOpen,
+    hasOverlay: () => uiStack.length > 0 || crtActive || dialogActive || !!activeMenu,
+    depth: () => uiStack.length + menuStack.length + Number(crtActive) + Number(dialogActive),
+    restore: () => hideOverlay(),
+    language: () => getPref('uiLang'),
+  })
+  function panelInput(msg: ClientMsg): boolean {
+    if (characterPanel.isOpen && msg.msg === 'key' && msg.keycode === 27) {
+      characterPanel.close(); return true
+    }
+    if (characterPanel.busy) return true
+    if (!characterPanel.isOpen && msg.msg === 'input' && CHARACTER_COMMANDS.includes(msg.text)) {
+      return characterPanel.select(msg.text as CharacterCommand)
+    }
+    return false
+  }
+
   const msgLog = document.createElement('div')
   msgLog.id = 'game-messages'
   msgLog.addEventListener('click', (e) => {
@@ -566,7 +586,7 @@ export function buildGameView(
   // overlay, menu, dialog, harvest, monster panel, or examine mode is up.
   const moveBlocked = (): boolean =>
     uiStack.length > 0 || crtActive || dialogActive || !!activeMenu ||
-    isHarvesting() || monsterPanelOpen || inXMode
+    isHarvesting() || monsterPanelOpen || inXMode || characterPanel.isOpen
 
   const clearJoyRepeat = (): void => {
     if (joyHold != null) { window.clearTimeout(joyHold); joyHold = null }
@@ -704,6 +724,7 @@ export function buildGameView(
   const hudTop = document.createElement('div')
   hudTop.id = 'hud-top'
   hudTop.appendChild(statsView.element)
+  if (!spectating) hudTop.appendChild(characterPanel.openButton)
 
   const hud = document.createElement('div')
   hud.id = 'game-hud'
@@ -847,6 +868,7 @@ export function buildGameView(
 
   const spellTab = spectating ? undefined : { render: renderSpellGrid, hasSpells: () => spellCache.length > 0 }
   const touchSend = (msg: ClientMsg): void => {
+    if (panelInput(msg)) return
     if (isHarvesting()) return  // suppress d-pad/macro input during silent harvest
     // The monster panel is a client-only overlay. In landscape it covers just
     // the map, so the sidebar keyboard stays visible (the display:none hide
@@ -889,6 +911,7 @@ export function buildGameView(
   numpadInput.style.display = 'none'
 
   view.appendChild(uiOverlay)
+  view.appendChild(characterPanel.element)
   view.appendChild(mapWrap)
   // Direct grid child (not inside #map-wrap) so each orientation can place
   // it: portrait floats it over the map cell (grid-area:map + abspos, same
@@ -1051,6 +1074,10 @@ export function buildGameView(
 
   const docKeyHandler = (e: KeyboardEvent) => {
     if (!view.isConnected) { document.removeEventListener('keydown', docKeyHandler); return }
+    if (characterPanel.busy) {
+      e.preventDefault(); if (e.key === 'Escape') characterPanel.close(); return
+    }
+    if (characterPanel.isOpen && e.key === 'Escape') { e.preventDefault(); characterPanel.close(); return }
     if (isHarvesting()) { e.preventDefault(); return }  // suppress during silent harvest
     if (spectating) {
       if (e.key === 'Escape') {
@@ -1068,7 +1095,7 @@ export function buildGameView(
     }
     if (handleMenuNavKey(e)) return
     if (handleScrollerKey(e)) return
-    handleKeydown(e, (msg) => { conn.send(msg); afterUserSend(msg) })
+    handleKeydown(e, (msg) => { if (panelInput(msg)) return; conn.send(msg); afterUserSend(msg) })
   }
   document.addEventListener('keydown', docKeyHandler)
 
@@ -1093,6 +1120,11 @@ export function buildGameView(
   conn.onMessage = handleMsg
 
   function handleMsg(msg: ServerMsg): void {
+    handleGameMsg(msg)
+    characterPanel.observe(msg)
+  }
+
+  function handleGameMsg(msg: ServerMsg): void {
     switch (msg.msg) {
       // Both 0.34 and trunk send bare `layer` (client.js: "layer":
       // do_set_layer). `set_layer` is a defensive alias the server never
@@ -3112,7 +3144,7 @@ export function buildGameView(
     // mode, so it needs its own gate: in landscape the rail stays visible in
     // the sidebar beside the panel, and a tap here bypasses the touch-input
     // swallow (the rail sends via conn.send, not that callback).
-    if (monsterPanelOpen || currentInputMode !== 1 || !commandChannelIdle()) {
+    if (characterPanel.isOpen || monsterPanelOpen || currentInputMode !== 1 || !commandChannelIdle()) {
       // Queue only when our own cast is plausibly still in flight and the
       // player isn't in a real context (menu/overlay/X-mode/panel) — there a
       // deferred cast would be the exact stray the guard exists to stop.
@@ -3266,7 +3298,7 @@ export function buildGameView(
   // Returns true if the harvest actually started (so the auto-trigger only
   // marks itself done when it really fired, not when the guard bailed).
   function harvestSpells(): boolean {
-    if (!commandChannelIdle()) return false
+    if (characterPanel.isOpen || !commandChannelIdle()) return false
     harvestPhase = 'base'
     conn.send({ msg: 'input', text: 'I' })
     armHarvestTimeout()
