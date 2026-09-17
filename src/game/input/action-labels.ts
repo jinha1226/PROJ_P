@@ -38,7 +38,7 @@ export const ACTION_LABELS: Record<string, LabelPair> = {
   'Descend stairs':            { ko: '계단↓',   en: 'Down' },
   // info
   'Character status':                  { ko: '상태',     en: 'Status' },
-  'Character overview':                { ko: '캐릭터',   en: 'Character' },
+  'Character overview':                { ko: '상태창',   en: 'Character' },
   'Religion / deity':                  { ko: '신앙',     en: 'Religion' },
   'Reassign inventory/spell letters':  { ko: '글자정리', en: 'Reassign' },
   'Abilities/mutations':               { ko: '능력·변이', en: 'Abilities' },

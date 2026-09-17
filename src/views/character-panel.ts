@@ -37,7 +37,7 @@ export class CharacterPanel {
     this.element.hidden = true
     this.element.setAttribute('aria-label', 'Character / 캐릭터')
     this.openButton.className = 'character-open'
-    this.openButton.textContent = this.ko ? '캐릭터' : 'Character'
+    this.openButton.textContent = this.ko ? '상태창' : 'Character'
     this.openButton.addEventListener('click', () => this.select('%'))
     this.tabs.className = 'character-tabs'
     this.tabs.setAttribute('aria-label', 'Character sections')

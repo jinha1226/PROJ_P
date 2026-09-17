@@ -504,6 +504,7 @@ describe('dungeon-travel numpad', () => {
 
   it('opens the numpad for the destination prompt after G', () => {
     const h = setup()
+    ;(h.view.querySelector('.tc-tab[data-tab="macro"]') as HTMLButtonElement).click()
     const travel = [...h.view.querySelectorAll('.tc-content .tc-btn')]
       .find(b => b.textContent === '이동(G)') as HTMLButtonElement
     travel.click()

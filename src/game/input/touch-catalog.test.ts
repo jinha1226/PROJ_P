@@ -2,7 +2,7 @@
 import { describe, it, expect, beforeEach } from 'vitest'
 import {
   CATALOG, CATALOG_BY_ID, DEFAULT_TAB_IDS,
-  defaultLayout, validateStoredLayout, customLayout, currentLayout, slotToDef,
+  consolidatePanelMenus, defaultLayout, validateStoredLayout, customLayout, currentLayout, slotToDef,
 } from './touch-catalog'
 import { ACTION_LABELS } from './action-labels'
 import { TAB_BUTTONS } from './touch'
@@ -64,5 +64,27 @@ describe('slotToDef', () => {
     expect(slotToDef({ cmd: 'quaff' })).toEqual(CATALOG_BY_ID.get('quaff'))
     expect(slotToDef({ raw: '&' })).toEqual({ label: '&', text: '&' })
     expect(slotToDef(null)).toEqual({ label: '' })
+  })
+})
+
+
+describe('consolidated character entry', () => {
+  it('ships one character entry and no duplicate panel commands across both tabs', () => {
+    const ids = [...DEFAULT_TAB_IDS.micro.flat(), ...DEFAULT_TAB_IDS.macro.flat()]
+    expect(ids.filter(id => id === 'character')).toHaveLength(1)
+    for (const id of ['inventory', 'skills', 'spells-list', 'status', 'library', 'abilities']) expect(ids).not.toContain(id)
+    expect(DEFAULT_TAB_IDS.micro).toHaveLength(2)
+    expect(DEFAULT_TAB_IDS.macro).toHaveLength(2)
+  })
+  it('normalizes legacy and raw menu shortcuts without changing saved data or combat commands', () => {
+    const l = defaultLayout()
+    l.tabs.micro = [[{ cmd: 'inventory' }, { cmd: 'skills' }, { raw: 'I' }, { cmd: 'fire' }]]
+    l.tabs.macro = [[{ cmd: 'character' }, { cmd: 'abilities' }, { cmd: 'library' }, { raw: 'p' }]]
+    const before = JSON.stringify(l)
+    const next = consolidatePanelMenus(l)
+    expect(next.tabs.micro[0]).toEqual([{ cmd: 'character' }, null, null, { cmd: 'fire' }])
+    expect(next.tabs.macro[0]).toEqual([null, null, null, { raw: 'p' }])
+    expect(JSON.stringify(l)).toBe(before)
+    expect(consolidatePanelMenus(next)).toEqual(next)
   })
 })

@@ -71,20 +71,34 @@ export const CATALOG: CatalogEntry[] = [
 
 export const CATALOG_BY_ID: Map<string, CatalogEntry> = new Map(CATALOG.map(e => [e.id, e]))
 
-// The shipped grids, expressed as catalog ids. Must reproduce the historical
-// TAB_BUTTONS exactly — touch-catalog.test.ts pins that equivalence.
-// 4 columns per row (the grid invariant, see custom-layout COLS).
+// Detail menus now live in the character panel. Keep legacy catalog IDs so
+// saved layouts can be normalized without invalidating unrelated custom slots.
+export const PANEL_MENU_IDS = new Set(['inventory', 'skills', 'spells-list', 'status', 'library', 'abilities', 'character'])
 export const DEFAULT_TAB_IDS: { micro: string[][]; macro: string[][] } = {
   micro: [
-    ['quaff', 'read', 'inventory', 'rest'],
-    ['travel', 'skills', 'pickup', 'spells-list'],
-    ['ability', 'fire', 'stairs-up', 'stairs-down'],
+    ['quaff', 'read', 'character', 'rest'],
+    ['pickup', 'fire', 'stairs-up', 'stairs-down'],
   ],
   macro: [
-    ['status', 'library', 'map', 'overview'],
-    ['fire', 'evoke', 'ability', 'cast'],
-    ['character', 'abilities', 'religion', 'runes'],
+    ['travel', 'ability', 'map', 'overview'],
+    ['evoke', 'cast', 'religion', 'runes'],
   ],
+}
+
+export function consolidatePanelMenus(layout: TouchLayout): TouchLayout {
+  let found = false
+  const rawMenus = new Set(['%', '@', 'A', 'm', 'i', 'I', 'M'])
+  const tabs = { micro: [] as Slot[][], macro: [] as Slot[][] }
+  for (const tab of ['micro', 'macro'] as const) {
+    tabs[tab] = layout.tabs[tab].map(row => row.map(slot => {
+      const isMenu = slot && ('cmd' in slot ? PANEL_MENU_IDS.has(slot.cmd) : rawMenus.has(slot.raw))
+      if (!isMenu) return slot === null ? null : { ...slot }
+      if (found) return null
+      found = true
+      return { cmd: 'character' }
+    }))
+  }
+  return { ...layout, dpad: { ...layout.dpad }, tabs }
 }
 
 export function defaultLayout(): TouchLayout {
@@ -105,7 +119,7 @@ export function customLayout(): TouchLayout | null {
 }
 
 export function currentLayout(): TouchLayout {
-  return customLayout() ?? defaultLayout()
+  return consolidatePanelMenus(customLayout() ?? defaultLayout())
 }
 
 // null → `{ label: '' }`: renderContent's existing `!def.label` check renders

@@ -724,7 +724,6 @@ export function buildGameView(
   const hudTop = document.createElement('div')
   hudTop.id = 'hud-top'
   hudTop.appendChild(statsView.element)
-  if (!spectating) hudTop.appendChild(characterPanel.openButton)
 
   const hud = document.createElement('div')
   hud.id = 'game-hud'

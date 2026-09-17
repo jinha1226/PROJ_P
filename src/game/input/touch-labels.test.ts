@@ -14,7 +14,7 @@ describe('semantic labels in the touch HUD', () => {
   it('renders Korean action labels by default (uiLang default ko)', () => {
     const tc = buildTouchControls(() => {})
     const texts = labels(tc.element)
-    expect(texts).toContain('기술(m)')  // Skills (m) — name + key
+    expect(texts).toContain('상태창(%)')  // Skills (m) — name + key
     expect(texts).toContain('휴식(5)')  // Rest (5)
     expect(texts).not.toContain('m')    // bare raw key never shown alone
   })
@@ -32,7 +32,6 @@ describe('semantic labels in the touch HUD', () => {
     ;(tc.element.querySelector('.tc-shift') as HTMLButtonElement).click()
     const l = labels(tc.element)
     expect(l).toContain('화살집(Q)')     // Shift+q → Q = quiver (in q's slot)
-    expect(l).toContain('능력·변이(A)')  // Shift+a → A = abilities/mutations
     expect(l).not.toContain('물약(q)')   // q's slot is now 화살집
   })
 
@@ -79,7 +78,7 @@ describe('semantic labels in the touch HUD', () => {
   it('named buttons get the "named" class for text styling', () => {
     const tc = buildTouchControls(() => {})
     const skills = [...tc.element.querySelectorAll('.tc-content .tc-btn')]
-      .find(b => b.textContent === '기술(m)')!
+      .find(b => b.textContent === '상태창(%)')!
     expect(skills.classList.contains('named')).toBe(true)
   })
 
@@ -87,9 +86,9 @@ describe('semantic labels in the touch HUD', () => {
     const sent: unknown[] = []
     const tc = buildTouchControls(m => sent.push(m))
     const skills = [...tc.element.querySelectorAll('.tc-content .tc-btn')]
-      .find(b => b.textContent === '기술(m)') as HTMLButtonElement
+      .find(b => b.textContent === '상태창(%)') as HTMLButtonElement
     skills.click()
-    expect(sent).toContainEqual({ msg: 'input', text: 'm' })
+    expect(sent).toContainEqual({ msg: 'input', text: '%' })
   })
 })
 
@@ -132,8 +131,8 @@ describe('language toggle', () => {
     expect(toggle).toBeTruthy()
     toggle.click()
     const texts = [...tc.element.querySelectorAll('.tc-content .tc-btn')].map(b => b.textContent)
-    expect(texts).toContain('Skills(m)')
-    expect(texts).not.toContain('기술(m)')
+    expect(texts).toContain('Character(%)')
+    expect(texts).not.toContain('상태창(%)')
   })
 
   it('persists the chosen language to prefs', () => {

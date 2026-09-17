@@ -46,6 +46,8 @@ describe('edit mode', () => {
     const tc = buildTouchControls(() => {})
     enterEdit(tc)
     const count = (): number => tc.element.querySelectorAll('.tc-strip .tc-btn').length
+    expect(count()).toBe(8)
+    ;(tc.element.querySelector('.tc-edit-addrow') as HTMLButtonElement).click()
     expect(count()).toBe(12)
     ;(tc.element.querySelector('.tc-edit-addrow') as HTMLButtonElement).click()
     expect(count()).toBe(16)
