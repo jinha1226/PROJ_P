@@ -24,6 +24,8 @@ export class MapView {
   // the log. See the reserve > 0 branch in fitToContainer.
   private centerRow = Math.floor(NORMAL_H / 2)
   private fontScale = 1.0
+  private sightAxis: number | null = null
+  setSightAxis(axis: number | null): void { this.sightAxis = axis }
   private zoomLevel = ZOOM_DEFAULT
   // Cell dimensions computed by fitToContainer, used by cellAtClient.
   private cellCharW = 0
@@ -179,7 +181,8 @@ export class MapView {
     // (fontScale ≠ 1) bypasses the level entirely — its scale override drives
     // sizing instead, so the minimum viewport stays at NORMAL.
     const xMode = this.fontScale !== 1.0
-    const spec = zoomSpec(this.zoomLevel).ascii
+    const spec = this.sightAxis === null ? zoomSpec(this.zoomLevel).ascii
+      : { minW: this.sightAxis, minH: this.sightAxis, maxFs: 96 }
     // Overview fit: the minimum viewport is the explored bbox (+1-cell border)
     // so the whole floor fits on screen at once. Font floor drops to 7px (the
     // fit-to-width legibility floor) — a full 80×70 floor needs it on a phone.
@@ -189,7 +192,7 @@ export class MapView {
     const widthFs = availW / (minW * charWPerFs)
     const heightFs = availH / (minH * lineHPerFs)
     const maxFs = xMode ? 36 : ov ? 24 : spec.maxFs
-    const fontSize = Math.max(ov ? 7 : 10, Math.min(maxFs, Math.min(widthFs, heightFs))) * this.fontScale
+    const fontSize = Math.max(1, Math.min(maxFs, Math.min(widthFs, heightFs))) * this.fontScale
     this.container.style.fontSize = fontSize + 'px'
 
     // Expand viewport in the slack dimension to fill the container.

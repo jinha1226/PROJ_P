@@ -3396,3 +3396,6 @@ html, body {
 .character-snapshot .overlay-list { overflow: visible; }
 .character-panel #ui-overlay[inert] { opacity: .55; pointer-events: none; }
 @media (orientation: landscape) { .character-panel { grid-area: map; } }
+
+.tc-surroundings { touch-action: none; user-select: none; -webkit-touch-callout: none; font-size: 1.5rem; }
+.tc-surroundings.active { color: #ffe3a7; background: #4b3a24; border-color: #d1a465; }

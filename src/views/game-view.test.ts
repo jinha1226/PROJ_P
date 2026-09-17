@@ -474,28 +474,38 @@ describe('X-mode (eXamine level map) via cursor', () => {
   })
 })
 
-describe('overview map toggle', () => {
-  const overviewBtn = (h: Harness) => h.view.querySelector<HTMLButtonElement>('.zoom-overview')!
-
-  it('renders the overview button and toggles its active state on tap', () => {
+describe('hold surroundings map', () => {
+  const ready = () => {
     const h = setup()
-    const btn = overviewBtn(h)
+    h.dispatch({ msg: 'input_mode', mode: 1 })
+    h.dispatch({ msg: 'msgs', messages: [{ text: "You don't know any spells." }] })
+    h.send.mockClear()
+    return h
+  }
+  it('holds a client-only overview and restores on release without sending any command', () => {
+    const h = ready(), btn = h.view.querySelector<HTMLButtonElement>('.tc-surroundings')!
     expect(btn).toBeTruthy()
-    expect(btn.classList.contains('active')).toBe(false)
-    btn.click()
+    expect(h.view.querySelector('#zoom-controls')).toBeNull()
+    btn.dispatchEvent(new PointerEvent('pointerdown', { pointerId: 1, button: 0, bubbles: true }))
     expect(btn.classList.contains('active')).toBe(true)
-    btn.click()
+    const fight = [...h.view.querySelectorAll<HTMLButtonElement>('.tc-pin')].find(b => b.textContent === '⇥')!
+    fight.click()
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true }))
+    expect(h.send).not.toHaveBeenCalled()
+    btn.dispatchEvent(new PointerEvent('pointerup', { pointerId: 1 }))
+    btn.click() // browser compatibility click must not latch overview
     expect(btn.classList.contains('active')).toBe(false)
+    expect(h.send).not.toHaveBeenCalled()
   })
-
-  it('a manual zoom step exits overview', () => {
-    const h = setup()
-    const btn = overviewBtn(h)
-    btn.click()
-    expect(btn.classList.contains('active')).toBe(true)
-    const zoomIn = h.view.querySelector<HTMLButtonElement>('#zoom-controls .zoom-btn')! // first child = +
-    zoomIn.click()
+  it('restores on cancellation and refuses to start inside targeting', () => {
+    const h = ready(), btn = h.view.querySelector<HTMLButtonElement>('.tc-surroundings')!
+    btn.dispatchEvent(new PointerEvent('pointerdown', { pointerId: 1, button: 0 }))
+    btn.dispatchEvent(new PointerEvent('pointercancel', { pointerId: 1 }))
     expect(btn.classList.contains('active')).toBe(false)
+    h.dispatch({ msg: 'input_mode', mode: 2 })
+    btn.dispatchEvent(new PointerEvent('pointerdown', { pointerId: 2, button: 0 }))
+    expect(btn.classList.contains('active')).toBe(false)
+    expect(h.send).not.toHaveBeenCalled()
   })
 })
 

@@ -214,6 +214,8 @@ export class TileMapView {
   // Last CSS display width applied to the canvas, kept as a number for the
   // setViewportSize early-exit (see the comment there).
   private lastCssW = 0
+  private sightAxis: number | null = null
+  setSightAxis(axis: number | null): void { this.sightAxis = axis }
   private zoomLevel = ZOOM_DEFAULT
   // Overview map markers: when on, a final pass overlays a large, readable
   // stair glyph on each stair cell (see drawMarkers). Driven by the overview
@@ -389,10 +391,11 @@ export class TileMapView {
     if (this.ready) this.fullRender()
   }
 
-  // No-op: the fit-whole-floor overview is ASCII-only for now (the tile
-  // overview stays at the widest fixed zoom level). Present so game-view can
-  // call setOverviewFit() on either renderer without a type check.
-  setOverviewFit(_on: boolean): void {}
+  // Temporary overview fits only the explored bounding box, including one-cell padding.
+  private overviewFit = false
+  private overviewCenter: { x: number; y: number } | null = null
+  setOverviewFit(on: boolean): void { this.overviewFit = on }
+
 
   fitToContainer(): void {
     const rect = this.container.getBoundingClientRect()
@@ -413,15 +416,22 @@ export class TileMapView {
     // the same code: HUD/log are hidden by game-view, availH grows, and the
     // renderScale<1 (set via setFontScale) shrinks each cell so the
     // full-bleed fill turns the freed area into still more cells.
-    const baseAxis = zoomSpec(this.zoomLevel).tileAxis
+    const baseAxis = this.sightAxis ?? zoomSpec(this.zoomLevel).tileAxis
+    const bounds = this.overviewFit ? this.store.exploredBounds() : null
+    this.overviewCenter = bounds ? {
+      x: Math.floor((bounds.minX + bounds.maxX) / 2),
+      y: Math.floor((bounds.minY + bounds.maxY) / 2),
+    } : null
+    const minW = bounds ? bounds.maxX - bounds.minX + 3 : baseAxis
+    const minH = bounds ? bounds.maxY - bounds.minY + 3 : baseAxis
 
     // Float cell size — fills the binding axis exactly. The backing canvas
     // renders at ATLAS_CELL per cell and CSS scales to this size, so we don't
     // have to round to whole (or even) pixels to keep sprites aligned.
     // renderScale (X-mode) shrinks the result further; clamp stays in [8,96]
     // so tiny containers can't underflow.
-    const baseCell = Math.min(availW / baseAxis, availH / baseAxis)
-    const cell = Math.max(8, Math.min(96, baseCell * this.renderScale))
+    const baseCell = Math.min(availW / minW, availH / minH)
+    const cell = Math.max(1, Math.min(96, baseCell * this.renderScale))
     this.cellPx = cell
 
     // Full-bleed: cover the ENTIRE element on both axes, partial cells
@@ -435,8 +445,8 @@ export class TileMapView {
     // clear area's vertical center (see pinAxis). No fit hysteresis: a ±1
     // cell change only adds/removes a clipped partial at an edge, so there's
     // no visible cell-drop to dampen.
-    const x = pinAxis(padLeft + availW / 2, cell, rect.width, baseAxis)
-    const y = pinAxis(padTop + availH / 2, cell, rect.height, baseAxis)
+    const x = pinAxis(padLeft + availW / 2, cell, rect.width, minW)
+    const y = pinAxis(padTop + availH / 2, cell, rect.height, minH)
 
     const prevCenterCol = this.centerCol
     const prevCenterRow = this.centerRow
@@ -494,8 +504,8 @@ export class TileMapView {
   // cell (col,row) ↔ dungeon (offX+col, offY+row). One definition each so the
   // centering rule lives in a single place (see CLAUDE.md coordinate system).
   // The center is `centerCol`/`centerRow`, not the middle cell — see the fields.
-  private get offX(): number { return this.viewCenter.x - this.centerCol }
-  private get offY(): number { return this.viewCenter.y - this.centerRow }
+  private get offX(): number { return (this.overviewFit && this.overviewCenter ? this.overviewCenter.x : this.viewCenter.x) - this.centerCol }
+  private get offY(): number { return (this.overviewFit && this.overviewCenter ? this.overviewCenter.y : this.viewCenter.y) - this.centerRow }
   private inView(col: number, row: number): boolean {
     return col >= 0 && col < this.viewportW && row >= 0 && row < this.viewportH
   }

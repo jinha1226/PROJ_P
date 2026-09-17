@@ -305,6 +305,18 @@ export class MapStore {
     return minX === Infinity ? null : { minX, minY, maxX, maxY }
   }
 
+  // Only server-marked, currently visible cells; explored memory cannot enlarge LOS.
+  visibleRadius(): number {
+    let radius = 0
+    for (const [key, cell] of this.cells) {
+      if (cell.t_bg === undefined || (bgLo(cell.t_bg) & UNSEEN_MASK) !== 0 || !cell.g?.trim()) continue
+      const p = parseCellKey(key)
+      const distance = Math.max(Math.abs(p.x - this.playerPos.x), Math.abs(p.y - this.playerPos.y))
+      if (distance <= 12) radius = Math.max(radius, distance)
+    }
+    return radius
+  }
+
   getMonsters(): ReadonlyMap<string, MonsterCell> {
     return this.monsterMap
   }

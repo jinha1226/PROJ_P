@@ -1,3 +1,4 @@
+import { bindHold, type HoldAction } from './hold-button'
 import type { ClientMsg } from '../../ws/types'
 import {
   CK_UP, CK_DOWN, CK_LEFT, CK_RIGHT,
@@ -59,6 +60,8 @@ export interface SpellTabConfig {
 }
 
 export interface TouchControls {
+  cancelOverview: () => void
+  dispose: () => void
   element: HTMLElement
   enterXMode(): void
   exitXMode(): void
@@ -420,7 +423,7 @@ const RC_TOGGLES: { key: string; on: string; ko: string; en: string }[] = [
   { key: 'autofight_stop', on: '50', ko: '자동전투 50% 정지',  en: 'Autofight stop 50%' },
 ]
 
-export function buildTouchControls(send: SendFn, opts: { spellTab?: SpellTabConfig; onRequestRebuild?: () => void; rc?: RcControls } = {}): TouchControls {
+export function buildTouchControls(send: SendFn, opts: { overview?: HoldAction; spellTab?: SpellTabConfig; onRequestRebuild?: () => void; rc?: RcControls } = {}): TouchControls {
   let ctrlActive = false
   let activeTab: TabKey = 'micro'
   // True while a menu/overlay is open: Tab pages the list there instead of
@@ -644,6 +647,17 @@ export function buildTouchControls(send: SendFn, opts: { spellTab?: SpellTabConf
   headerEl.appendChild(prayBtn)
   headerEl.appendChild(fightBtn)
   headerEl.appendChild(exploreBtn)
+
+  let overviewHold: ReturnType<typeof bindHold> | undefined
+  if (opts.overview) {
+    const magnify = document.createElement('button')
+    magnify.className = 'tc-pin tc-surroundings'
+    magnify.textContent = '⌕'
+    magnify.title = lang === 'ko' ? '누르는 동안 주변 지형 보기' : 'Hold to view surroundings'
+    magnify.setAttribute('aria-label', magnify.title)
+    headerEl.appendChild(magnify)
+    overviewHold = bindHold(magnify, opts.overview)
+  }
 
   // Content area — replaced on tab switch or mode change
   contentEl = document.createElement('div')
@@ -1241,6 +1255,7 @@ export function buildTouchControls(send: SendFn, opts: { spellTab?: SpellTabConf
 
   function setMenuMode(on: boolean): void {
     if (menuMode === on) return
+    overviewHold?.cancel()
     menuMode = on
     renderTab(activeTab)  // swap between menu meta-keys and the tab's play actions
   }
@@ -1259,5 +1274,5 @@ export function buildTouchControls(send: SendFn, opts: { spellTab?: SpellTabConf
   if (dpadEnabled) buildDpad()
   renderContent(layoutDefs('micro'))
 
-  return { element: root, enterXMode, exitXMode, openKbd, closeKbd, refreshSpellTab, setMenuMode }
+  return { cancelOverview: () => overviewHold?.cancel(), dispose: () => overviewHold?.dispose(), element: root, enterXMode, exitXMode, openKbd, closeKbd, refreshSpellTab, setMenuMode }
 }

@@ -11,7 +11,8 @@ import { fitToWidth } from './fit-terminal'
 import { MapStore } from '../game/map/map-store'
 import { MapView } from '../game/map/map-view'
 import { TileMapView } from '../game/map/tile-map-view'
-import { ZOOM_MIN, ZOOM_MAX, ZOOM_DEFAULT, ZOOM_TOGGLE, ZOOM_OVERVIEW, clampZoom } from '../game/map/zoom'
+import { ZOOM_OVERVIEW } from '../game/map/zoom'
+import { sightAxis } from '../game/map/sight-fit'
 import { StatsView } from '../game/hud/stats-view'
 import { StatusView } from '../game/hud/status-view'
 import { MonsterListView } from '../game/hud/monster-list'
@@ -439,96 +440,40 @@ export function buildGameView(
   mapWrap.appendChild(mapView.element)
   const combatEffects = new CombatEffects(mapWrap, p => mapView.cellClientCenter(p))
 
-  // --- Map zoom (floating +/- controls + double-tap; persisted) ---
-  // Both renderers share a discrete zoom level (see zoom.ts). The level is
-  // persisted across sessions; until the user touches it, each mode falls back
-  // to its default — ASCII normal, tiles zoomed-in (21 cells are ~10px on a
-  // phone). renderMode is mutable, so resolve the default lazily.
-  const modeDefaultZoom = (): number => (renderMode === 'tiles' ? ZOOM_TOGGLE : ZOOM_DEFAULT)
-  const currentZoomLevel = (): number => {
-    const p = getPref('mapZoomLevel')
-    return p === null ? modeDefaultZoom() : clampZoom(p)
-  }
-
-  const zoomControls = document.createElement('div')
-  zoomControls.id = 'zoom-controls'
-  const zoomOutBtn = document.createElement('button')
-  zoomOutBtn.className = 'zoom-btn'
-  zoomOutBtn.textContent = '−' // minus sign (wider than hyphen)
-  zoomOutBtn.title = 'Zoom out / 축소'
-  const zoomInBtn = document.createElement('button')
-  zoomInBtn.className = 'zoom-btn'
-  zoomInBtn.textContent = '+'
-  zoomInBtn.title = 'Zoom in / 확대'
-  // One-tap overview: jump to the widest zoom + stair/shop markers, tap again
-  // to return to the user's zoom. Handy for finding the stairs after clearing
-  // a floor. Transient — it never persists to mapZoomLevel, so a reload comes
-  // back at the real zoom, and any manual +/- exits it (see applyZoom).
-  const overviewBtn = document.createElement('button')
-  overviewBtn.className = 'zoom-btn zoom-overview'
-  overviewBtn.textContent = '▣'
-  overviewBtn.title = 'Overview / 전체보기'
-  zoomControls.append(zoomInBtn, zoomOutBtn, overviewBtn)
-  mapWrap.appendChild(zoomControls)
-
+  // Default framing uses species LOS + one cell. Server-visible cells can
+  // enlarge it; walls and transient occlusion never shrink the camera.
+  let sightSpecies = ''
+  let currentSightAxis = sightAxis(sightSpecies)
   let overviewActive = false
-
-  function updateZoomButtons(level: number): void {
-    zoomOutBtn.disabled = level <= ZOOM_MIN
-    zoomInBtn.disabled = level >= ZOOM_MAX
+  mapView.setSightAxis(currentSightAxis)
+  function updateSightFit(): void {
+    const next = sightAxis(sightSpecies, store.visibleRadius())
+    if (next === currentSightAxis) return
+    currentSightAxis = next
+    if (!overviewActive) {
+      mapView.setSightAxis(next); mapView.fitToContainer(); mapView.fullRender()
+    }
   }
-  // Leave overview without changing zoom (markers off, button un-lit). Called
-  // when a manual zoom or a render-mode swap supersedes the overview view.
-  function clearOverview(): void {
-    if (!overviewActive) return
-    overviewActive = false
-    overviewBtn.classList.remove('active')
-    mapView.setMarkers(false)
-    mapView.setOverviewFit(false)
+  const overviewHold = {
+    start: (): boolean => {
+      if (overviewActive || currentInputMode !== 1 || !commandChannelIdle() || monsterPanelOpen || characterPanel.isOpen) return false
+      joyStart = null; hideJoy()
+      combatEffects.clear()
+      overviewActive = true
+      mapView.setSightAxis(null)
+      mapView.setOverviewFit(true); mapView.setMarkers(true)
+      mapView.setZoomLevel(ZOOM_OVERVIEW)
+      mapView.fitToContainer(); mapView.fullRender()
+      return true
+    },
+    end: (): void => {
+      if (!overviewActive) return
+      overviewActive = false
+      mapView.setOverviewFit(false); mapView.setMarkers(false)
+      mapView.setSightAxis(currentSightAxis)
+      mapView.fitToContainer(); mapView.fullRender()
+    },
   }
-  function applyZoom(level: number): void {
-    clearOverview()
-    const next = clampZoom(level)
-    mapView.setZoomLevel(next)
-    mapView.fitToContainer()
-    setPref('mapZoomLevel', next)
-    updateZoomButtons(next)
-  }
-  function toggleOverview(): void {
-    overviewActive = !overviewActive
-    overviewBtn.classList.toggle('active', overviewActive)
-    mapView.setMarkers(overviewActive)
-    // ASCII fits the whole explored floor (bbox-centered); tiles no-op this
-    // and rely on the widest fixed level below.
-    mapView.setOverviewFit(overviewActive)
-    const level = overviewActive ? ZOOM_OVERVIEW : currentZoomLevel()
-    mapView.setZoomLevel(level)
-    mapView.fitToContainer()
-    updateZoomButtons(level)
-  }
-  const overviewTap = (e: Event): void => {
-    e.preventDefault()
-    e.stopPropagation()
-    toggleOverview()
-  }
-  overviewBtn.addEventListener('touchstart', overviewTap, { passive: false })
-  overviewBtn.addEventListener('click', overviewTap)
-  // preventDefault on touchstart suppresses the synthesized click (so the step
-  // fires once on touch); stopPropagation keeps the tap off the map's
-  // travel/double-tap handlers underneath. Desktop uses the click path.
-  const zoomTap = (delta: number) => (e: Event): void => {
-    e.preventDefault()
-    e.stopPropagation()
-    applyZoom(currentZoomLevel() + delta)
-  }
-  zoomOutBtn.addEventListener('touchstart', zoomTap(-1), { passive: false })
-  zoomOutBtn.addEventListener('click', zoomTap(-1))
-  zoomInBtn.addEventListener('touchstart', zoomTap(1), { passive: false })
-  zoomInBtn.addEventListener('click', zoomTap(1))
-
-  // Seed the initial (ASCII) view + button states from the persisted level.
-  mapView.setZoomLevel(currentZoomLevel())
-  updateZoomButtons(currentZoomLevel())
 
   // Movement joystick overlay: a translucent 3×3 ring shown while dragging on
   // the map (see the pointer handlers below). The center cell (index 4) is a
@@ -586,7 +531,7 @@ export function buildGameView(
   // overlay, menu, dialog, harvest, monster panel, or examine mode is up.
   const moveBlocked = (): boolean =>
     uiStack.length > 0 || crtActive || dialogActive || !!activeMenu ||
-    isHarvesting() || monsterPanelOpen || inXMode || characterPanel.isOpen
+    isHarvesting() || monsterPanelOpen || inXMode || characterPanel.isOpen || overviewActive
 
   const clearJoyRepeat = (): void => {
     if (joyHold != null) { window.clearTimeout(joyHold); joyHold = null }
@@ -867,6 +812,7 @@ export function buildGameView(
 
   const spellTab = spectating ? undefined : { render: renderSpellGrid, hasSpells: () => spellCache.length > 0 }
   const touchSend = (msg: ClientMsg): void => {
+    if (overviewActive) return
     if (panelInput(msg)) return
     if (isHarvesting()) return  // suppress d-pad/macro input during silent harvest
     // The monster panel is a client-only overlay. In landscape it covers just
@@ -891,10 +837,11 @@ export function buildGameView(
     conn.send(msg)
     afterUserSend(msg)
   }
-  let touchControls = buildTouchControls(touchSend, { spellTab, onRequestRebuild: rebuildTouchControls, rc })
+  let touchControls = buildTouchControls(touchSend, { overview: overviewHold, spellTab, onRequestRebuild: rebuildTouchControls, rc })
   function rebuildTouchControls(): void {
+    touchControls.dispose()
     const old = touchControls.element
-    touchControls = buildTouchControls(touchSend, { spellTab, onRequestRebuild: rebuildTouchControls, rc })
+    touchControls = buildTouchControls(touchSend, { overview: overviewHold, spellTab, onRequestRebuild: rebuildTouchControls, rc })
     old.replaceWith(touchControls.element)
   }
   // Fetch the RC as soon as we're in a real game: the touch-layout backup
@@ -991,8 +938,7 @@ export function buildGameView(
     setPref('mapRenderMode', mode)
     // The swap builds a fresh view (markers default off) at the user's real
     // zoom, so drop any active overview state to match — no setMarkers needed.
-    overviewActive = false
-    overviewBtn.classList.remove('active')
+    touchControls.cancelOverview()
     // CSS hook for mode-dependent chrome (e.g. the floating log's scrim
     // lightens over tiles — see --msglog-bg in style.css).
     view.classList.toggle('tiles-mode', mode === 'tiles')
@@ -1001,11 +947,8 @@ export function buildGameView(
     const oldEl = mapView.element
     const next: MapView | TileMapView = mode === 'tiles' ? new TileMapView(store) : new MapView(store)
     next.setViewCenter(center)
-    // Restore the user's zoom level on the new view (persisted, or each mode's
-    // default — tiles default to zoomed-in since 21 cells are ~10px on a phone).
-    // renderMode is already the new mode here, so currentZoomLevel() resolves
-    // the right default; tile X-mode then shrinks each cell by X_MODE_SCALE.
-    next.setZoomLevel(currentZoomLevel())
+    // Preserve species framing when switching ASCII/tile renderers.
+    next.setSightAxis(currentSightAxis)
     // Carry the X-mode scale across the swap: the new view starts at 1.0
     // by default, which would visibly un-zoom the map mid-X-mode. inXMode
     // is the source of truth (global flag), so re-apply directly.
@@ -1014,7 +957,6 @@ export function buildGameView(
     next.setPlayerStats(playerStats)
     oldEl.replaceWith(next.element)
     mapView = next
-    updateZoomButtons(currentZoomLevel())
     fontScaleObserver.observe(mapView.element)
     // Only preload once we hold this game's loader. If we're switching to tiles
     // before that — e.g. the persisted-pref application at build, or a gesture
@@ -1072,7 +1014,11 @@ export function buildGameView(
   if (!spectating && rc.available()) rc.request()
 
   const docKeyHandler = (e: KeyboardEvent) => {
-    if (!view.isConnected) { document.removeEventListener('keydown', docKeyHandler); return }
+    if (!view.isConnected) { touchControls.dispose(); document.removeEventListener('keydown', docKeyHandler); return }
+    if (overviewActive) {
+      if (e.key === 'Escape') touchControls.cancelOverview()
+      e.preventDefault(); return
+    }
     if (characterPanel.busy) {
       e.preventDefault(); if (e.key === 'Escape') characterPanel.close(); return
     }
@@ -1124,6 +1070,8 @@ export function buildGameView(
   }
 
   function handleGameMsg(msg: ServerMsg): void {
+    if (['go_lobby', 'close', 'game_ended'].includes(msg.msg)) touchControls.dispose()
+    else if (['menu', 'ui-push', 'show_dialog'].includes(msg.msg) || (msg.msg === 'input_mode' && msg.mode !== 1)) touchControls.cancelOverview()
     switch (msg.msg) {
       // Both 0.34 and trunk send bare `layer` (client.js: "layer":
       // do_set_layer). `set_layer` is a defensive alias the server never
@@ -1191,6 +1139,7 @@ export function buildGameView(
 
       case 'map': {
         const beforeWounds = wounds(store)
+        if (msg.clear) touchControls.cancelOverview()
         if (msg.clear) store.clear()
         // vgrdc is resent on every map message even when it equals the
         // current view center; setViewCenter returns true only on a real
@@ -1198,6 +1147,7 @@ export function buildGameView(
         const panned = msg.vgrdc ? mapView.setViewCenter(msg.vgrdc) : false
         if (msg.clear || panned) combatEffects.clear()
         const dirty = store.merge(msg.cells ?? [])
+        updateSightFit()
         if (msg.clear || panned) mapView.fullRender()
         else mapView.render(dirty)
         // Overview fit tracks the explored bbox: exploring (or a floor change)
@@ -1220,6 +1170,7 @@ export function buildGameView(
       }
 
       case 'player': {
+        if (msg.species !== undefined) { sightSpecies = msg.species; updateSightFit() }
         const lostHp = hpLoss(playerStats, msg)
         if (msg.pos) {
           store.playerPos = { x: msg.pos.x, y: msg.pos.y }
@@ -1751,7 +1702,7 @@ export function buildGameView(
   function enterXMode(): void {
     inXMode = true
     view.classList.add('x-mode')  // drops the map's log-strip padding (style.css)
-    zoomControls.style.display = 'none'  // examine map drives its own sizing
+    touchControls.cancelOverview()
     msgLog.style.display = 'none'
     hud.style.display = 'none'
     renderSpellRail()  // drop the rail row (and the log's map overlay) for the examine map
@@ -1777,7 +1728,6 @@ export function buildGameView(
   function exitXMode(): void {
     inXMode = false
     view.classList.remove('x-mode')
-    zoomControls.style.display = ''
     touchControls.exitXMode()
     mapView.setFontScale(1.0)
     requestAnimationFrame(() => mapView.fitToContainer())
@@ -3143,7 +3093,7 @@ export function buildGameView(
     // mode, so it needs its own gate: in landscape the rail stays visible in
     // the sidebar beside the panel, and a tap here bypasses the touch-input
     // swallow (the rail sends via conn.send, not that callback).
-    if (characterPanel.isOpen || monsterPanelOpen || currentInputMode !== 1 || !commandChannelIdle()) {
+    if (overviewActive || characterPanel.isOpen || monsterPanelOpen || currentInputMode !== 1 || !commandChannelIdle()) {
       // Queue only when our own cast is plausibly still in flight and the
       // player isn't in a real context (menu/overlay/X-mode/panel) — there a
       // deferred cast would be the exact stray the guard exists to stop.
@@ -3297,7 +3247,7 @@ export function buildGameView(
   // Returns true if the harvest actually started (so the auto-trigger only
   // marks itself done when it really fired, not when the guard bailed).
   function harvestSpells(): boolean {
-    if (characterPanel.isOpen || !commandChannelIdle()) return false
+    if (overviewActive || characterPanel.isOpen || !commandChannelIdle()) return false
     harvestPhase = 'base'
     conn.send({ msg: 'input', text: 'I' })
     armHarvestTimeout()
