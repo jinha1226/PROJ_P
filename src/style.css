@@ -3363,3 +3363,16 @@ html, body {
   opacity: 0.75;
 }
 /* .tc-set-rc shares .tc-settings-btn styles — no extra rules needed */
+
+/* Server-confirmed HP/condition feedback; never intercept touch or delay turns. */
+.combat-effects { position: absolute; inset: 0; pointer-events: none; overflow: hidden; z-index: 7; }
+.combat-impact { position: absolute; width: 30px; height: 30px; transform: translate(-50%, -50%); color: #ffe4a1; }
+.combat-impact::before { content: ''; position: absolute; inset: 1px; border: 2px solid currentColor; border-radius: 50%; animation: combat-ring 180ms ease-out both; }
+.combat-impact-player { color: #ff8585; }
+.combat-number { position: absolute; left: 50%; top: -12px; white-space: nowrap; font: bold 14px/1.2 system-ui, sans-serif; text-shadow: 0 1px 2px #000, 1px 0 2px #000, -1px 0 2px #000; animation: combat-float 450ms ease-out both; }
+@keyframes combat-ring { from { opacity: 1; transform: scale(.4); } to { opacity: 0; transform: scale(1.3); } }
+@keyframes combat-float { from { opacity: 1; transform: translate(-50%, 0); } to { opacity: 0; transform: translate(-50%, -16px); } }
+@media (prefers-reduced-motion: reduce) {
+  .combat-impact::before { animation: none; display: none; }
+  .combat-number { animation: none; transform: translateX(-50%); }
+}

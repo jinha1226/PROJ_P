@@ -1,3 +1,4 @@
+import { CombatEffects, wounds, worsened, hpLoss } from '../game/hud/combat-effects'
 import type { WsConnection } from '../ws/connection'
 import type { ClientMsg, ServerMsg, GameExit } from '../ws/types'
 import { getCurrentGameId } from '../game/current-game'
@@ -215,7 +216,7 @@ export function buildGameView(
   // Running HP/MP snapshot (merged across player deltas) for the tile view's
   // under-tile mini-bars. Kept here so a render-mode swap can seed the freshly
   // created view, which otherwise starts at zero until the next player message.
-  const playerStats: { species?: string; hp?: number; hp_max?: number; mp?: number; mp_max?: number } = {}
+  const playerStats: { hp?: number; hp_max?: number; mp?: number; mp_max?: number } = {}
   // Latest experience level, for the skill-menu build coach (recommend()).
   let currentXL = 1
   // Latest player fields needed for coach evaluation (accumulated across deltas).
@@ -416,6 +417,7 @@ export function buildGameView(
   const mapWrap = document.createElement('div')
   mapWrap.id = 'map-wrap'
   mapWrap.appendChild(mapView.element)
+  const combatEffects = new CombatEffects(mapWrap, p => mapView.cellClientCenter(p))
 
   // --- Map zoom (floating +/- controls + double-tap; persisted) ---
   // Both renderers share a discrete zoom level (see zoom.ts). The level is
@@ -1157,11 +1159,13 @@ export function buildGameView(
       }
 
       case 'map': {
+        const beforeWounds = wounds(store)
         if (msg.clear) store.clear()
         // vgrdc is resent on every map message even when it equals the
         // current view center; setViewCenter returns true only on a real
         // pan, so we can keep the dirty-render path live in steady state.
         const panned = msg.vgrdc ? mapView.setViewCenter(msg.vgrdc) : false
+        if (msg.clear || panned) combatEffects.clear()
         const dirty = store.merge(msg.cells ?? [])
         if (msg.clear || panned) mapView.fullRender()
         else mapView.render(dirty)
@@ -1170,6 +1174,14 @@ export function buildGameView(
         // repaint wholesale — dirty-cell paints against a shifted origin would
         // garble the grid. Transient mode, so the extra full renders are fine.
         if (overviewActive) { mapView.fitToContainer(); mapView.fullRender() }
+        if (!msg.clear) {
+          for (const target of worsened(beforeWounds, wounds(store))) {
+            const labels = getPref('uiLang') === 'ko'
+              ? ['', '경상', '부상', '중상', '심각', '빈사']
+              : ['', 'Light wound', 'Wounded', 'Badly hurt', 'Severe', 'Near death']
+            combatEffects.show(target, labels[target.tier])
+          }
+        }
         monsterListView.update(store.getMonsters())
         if (monsterPanelOpen) monsterPanel.update(store.getMonsters())
         updateCoach()
@@ -1177,6 +1189,7 @@ export function buildGameView(
       }
 
       case 'player': {
+        const lostHp = hpLoss(playerStats, msg)
         if (msg.pos) {
           store.playerPos = { x: msg.pos.x, y: msg.pos.y }
           // setViewCenter reports whether the center actually moved; reuse that
@@ -1187,7 +1200,6 @@ export function buildGameView(
         // Feed HP/MP to the renderer (tile mode draws under-tile mini-bars).
         // After any fullRender above, so the player cell repaints with fresh
         // values; merged into playerStats so a later tile-mode swap can seed.
-        if (msg.species !== undefined) playerStats.species = msg.species
         if (msg.hp !== undefined) playerStats.hp = msg.hp
         if (msg.hp_max !== undefined) playerStats.hp_max = msg.hp_max
         if (msg.mp !== undefined) playerStats.mp = msg.mp
@@ -1198,6 +1210,7 @@ export function buildGameView(
           view.classList.toggle('low-hp', playerStats.hp / playerStats.hp_max <= 0.3)
         }
         mapView.setPlayerStats(playerStats)
+        if (lostHp > 0) combatEffects.show(store.playerPos, `−${lostHp} HP`, true)
         inventoryStore.update(msg.inv)
         statsView.update(msg)
         if (msg.status !== undefined) statusView.update(msg.status)

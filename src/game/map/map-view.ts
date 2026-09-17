@@ -354,14 +354,19 @@ export class MapView {
   // player glyph shows through the ring's center hole. Accounts for the portrait
   // centerRow/reserve bias automatically via offY. Null before the first fit.
   playerClientCenter(): { x: number; y: number } | null {
+    return this.cellClientCenter(this.viewCenter)
+  }
+
+  cellClientCenter(point: { x: number; y: number }): { x: number; y: number } | null {
     if (this.cellCharW <= 0 || this.cellLineH <= 0) return null
     const rect = this.container.getBoundingClientRect()
     if (rect.width === 0 || rect.height === 0) return null
     const cs = getComputedStyle(this.container)
     const padLeft = parseFloat(cs.paddingLeft)
     const padTop = parseFloat(cs.paddingTop)
-    const col = this.viewCenter.x - this.offX
-    const row = this.viewCenter.y - this.offY
+    const col = point.x - this.offX
+    const row = point.y - this.offY
+    if (col < 0 || row < 0 || col >= this.viewportW || row >= this.viewportH) return null
     return {
       x: rect.left + padLeft + (col + 0.5) * this.cellCharW,
       y: rect.top + padTop + (row + 0.5) * this.cellLineH,

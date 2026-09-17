@@ -1,3 +1,4 @@
+import { MapView } from '../game/map/map-view'
 // @vitest-environment happy-dom
 
 import { describe, it, expect, vi, afterEach } from 'vitest'
@@ -1135,5 +1136,23 @@ describe('spell harvest (silent I → Esc) + preface parsing', () => {
       h.dispatch({ msg: 'input_mode', mode: 1 })
       expect(castsSent(h)).toBe(1)
     })
+  })
+})
+
+
+describe('combat feedback wiring', () => {
+  it('shows confirmed HP loss and keeps it through unchanged map-center updates', () => {
+    const h = setup()
+    vi.spyOn(MapView.prototype, 'cellClientCenter').mockReturnValue({ x: 100, y: 100 })
+    const host = h.view.querySelector<HTMLElement>('#map-wrap')!
+    vi.spyOn(host, 'getBoundingClientRect').mockReturnValue({ left: 0, top: 0, width: 300, height: 500 } as DOMRect)
+    h.dispatch({ msg: 'player', pos: { x: 0, y: 0 }, hp: 20, hp_max: 30 })
+    expect(host.querySelector('.combat-number')).toBeNull()
+    h.dispatch({ msg: 'player', hp: 13 })
+    expect(host.querySelector('.combat-number')?.textContent).toBe('−7 HP')
+    h.dispatch({ msg: 'map', vgrdc: { x: 0, y: 0 }, cells: [] })
+    expect(host.querySelector('.combat-number')?.textContent).toBe('−7 HP')
+    h.dispatch({ msg: 'map', clear: true, cells: [] })
+    expect(host.querySelector('.combat-number')).toBeNull()
   })
 })
