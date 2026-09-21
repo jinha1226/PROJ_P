@@ -1218,6 +1218,15 @@ export function buildTouchControls(send: SendFn, opts: { overview?: HoldAction; 
       return true
     }
     const flat = rows.flat()
+    // Outside edit mode, cleared slots are dropped rather than held open as
+    // spacers, and the grid narrows to however many columns the remaining
+    // buttons need to fill the reserved rows (capped at the 4 the data model
+    // uses). A layout trimmed to 6 buttons thus renders as 3×2 with wider
+    // targets instead of a 4×2 grid with two holes. Edit mode keeps the full
+    // 4-column addressing so every slot position stays tappable.
+    const kept = editMode ? flat.length : flat.filter(d => d.label).length
+    const cols = editMode ? 4 : Math.min(4, Math.max(1, Math.ceil(kept / Math.max(1, reservedRows))))
+    stripEl.style.setProperty('--tc-cols', String(cols))
     for (let i = 0; i < flat.length; i++) {
       const def = flat[i]
       // In edit mode every cell — including empty ones — opens the picker for
@@ -1230,7 +1239,7 @@ export function buildTouchControls(send: SendFn, opts: { overview?: HoldAction; 
           b.textContent = '＋'
           b.addEventListener('click', editTap)
           stripEl.appendChild(b)
-        } else spacer()
+        }
         continue
       }
       const mod = modifierLabel(def)

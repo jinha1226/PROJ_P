@@ -2403,6 +2403,11 @@ html, body {
   --tc-label: var(--text-dim);
   --tc-label-dim: #78716c;  /* one stone step below --text-dim, for the wait btn */
   --tc-border: rgba(245, 158, 11, 0.07);
+  /* Shared button heights: --tc-key-h for the header/footer keys (⎋ ⏎ p ⇥ O,
+     tab toggle, ⇧ ⌃ abc ⊞), --tc-action-h for the action grid rows. Both were
+     1.35rem "compact" values that left the keys hard to hit. */
+  --tc-key-h: 1.9rem;
+  --tc-action-h: 1.9rem;
   grid-area: touch;
   display: flex;
   flex-direction: column;
@@ -2533,8 +2538,8 @@ html, body {
   border: 1px solid var(--tc-border);
   border-radius: 3px;
   color: var(--tc-label);
-  font-size: 0.8rem;
-  height: 1.4rem;
+  font-size: 1rem;
+  height: var(--tc-key-h);
   min-width: 2.6rem;
   flex-shrink: 0;
   cursor: pointer;
@@ -2547,7 +2552,7 @@ html, body {
 }
 /* Pinned actions get the accent border so they read as always-on shortcuts.
    flex:1 so they share the row width evenly with the tab — no dead space. */
-.tc-pin { border-color: var(--accent); color: var(--text); font-size: 1rem; flex: 1; }
+.tc-pin { border-color: var(--accent); color: var(--text); font-size: 1.2rem; flex: 1; }
 
 /* Equal-width header buttons in both modes: Esc/Enter were fixed-width (base
    min-width + no grow) while the pins flexed, so the row looked uneven. Give
@@ -2573,8 +2578,8 @@ html, body {
   border: 1px solid var(--tc-border);
   border-radius: 3px;
   color: var(--tc-label);
-  font-size: 0.72rem;
-  height: 1.4rem;
+  font-size: 0.85rem;
+  height: var(--tc-key-h);
   cursor: pointer;
   display: flex;
   align-items: center;
@@ -2598,7 +2603,7 @@ html, body {
   display: flex;
   flex-direction: column;
   gap: 2px;
-  min-height: calc(var(--tc-action-rows, 2) * 1.35rem + (var(--tc-action-rows, 2) - 1) * 2px);
+  min-height: calc(var(--tc-action-rows, 2) * var(--tc-action-h) + (var(--tc-action-rows, 2) - 1) * 2px);
 }
 
 .tc-row {
@@ -2638,8 +2643,10 @@ html, body {
    own fixed strip above. */
 #touch-controls:not(.dpad-on) .tc-strip {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  grid-auto-rows: 1.35rem;   /* compact — another ~1/5 shorter */
+  /* --tc-cols is set per render: 4 for a full grid, fewer when a trimmed
+     custom layout leaves less to show, so the remaining buttons widen. */
+  grid-template-columns: repeat(var(--tc-cols, 4), minmax(0, 1fr));
+  grid-auto-rows: var(--tc-action-h);
   gap: 2px;
   overflow: visible;
 }
@@ -2647,7 +2654,7 @@ html, body {
   flex: none;         /* a grid item now — ignore the scroll-strip sizing */
   min-width: 0;
   min-height: 0;
-  font-size: 0.78rem;  /* smaller glyphs/labels so the buttons read compact */
+  font-size: 0.9rem;
 }
 
 /* Header row (Esc | tabs | ⇥ | O | Enter): equal widths — Esc/Enter were fixed
@@ -2661,7 +2668,7 @@ html, body {
 #touch-controls:not(.dpad-on) .tc-enter,
 #touch-controls:not(.dpad-on) .tc-pin,
 #touch-controls:not(.dpad-on) .tc-tab {
-  height: 1.35rem;
+  height: var(--tc-key-h);
 }
 
 /* With the d-pad on, the action strip sits in the panel to the RIGHT of the
@@ -2690,8 +2697,8 @@ html, body {
      width on EVERY tab — plain 1fr let the strip shrink-wrap to its content, so
      a tab with short labels (행동) sat narrower than one with long labels
      (기타) and looked left-clustered. */
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  grid-auto-rows: 1.35rem;   /* compact — matches the no-dpad grid height */
+  grid-template-columns: repeat(var(--tc-cols, 4), minmax(0, 1fr));
+  grid-auto-rows: var(--tc-action-h);
   gap: 2px;
   align-content: start;
   overflow: visible;
@@ -2705,7 +2712,7 @@ html, body {
 #touch-controls.dpad-on .tc-esc,
 #touch-controls.dpad-on .tc-enter,
 #touch-controls.dpad-on .tc-pin,
-#touch-controls.dpad-on .tc-tab { height: 1.35rem; }
+#touch-controls.dpad-on .tc-tab { height: var(--tc-key-h); }
 .tc-panel { min-height: 0; }
 .tc-header, .tc-footer { flex-shrink: 0; }
 
@@ -2837,8 +2844,8 @@ html, body {
   border: 1px solid var(--tc-border);
   border-radius: 3px;
   color: var(--tc-label);
-  font-size: 0.65rem;
-  height: 1.4rem;
+  font-size: 0.8rem;
+  height: var(--tc-key-h);
   cursor: pointer;
   display: flex;
   align-items: center;
@@ -3175,11 +3182,11 @@ html, body {
     padding: 0;
     margin: 0.35rem 0 1.25rem 0;
   }
-  /* Footer keys are 1.4rem in portrait, where dead padding sits below
+  /* Footer keys share --tc-key-h with portrait, where dead padding sits below
      them; flush against a screen edge they need real height to hit. */
   .tc-shift,
   .tc-ctrl,
-  .tc-kbd { height: 1.8rem; }
+  .tc-kbd { height: var(--tc-key-h); }
 
   /* Menu-specific touch buttons replace the regular touch panel
      while a CRT/menu is active. */
@@ -3277,7 +3284,7 @@ html, body {
   border-radius: 3px;
   color: var(--tc-label);
   font-size: 0.85rem;
-  height: 1.4rem;
+  height: var(--tc-key-h);
   cursor: pointer;
   display: flex;
   align-items: center;
@@ -3421,6 +3428,6 @@ html, body {
 @media (orientation: portrait) {
   .tc-footer { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); }
   .tc-footer .tc-tabs { grid-column: span 2; min-width: 0; }
-  .tc-footer > button { min-width: 0; height: 1.35rem; }
-  .tc-footer .tc-tab { height: 1.35rem; }
+  .tc-footer > button { min-width: 0; height: var(--tc-key-h); }
+  .tc-footer .tc-tab { height: var(--tc-key-h); }
 }

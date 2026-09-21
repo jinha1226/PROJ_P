@@ -12,7 +12,7 @@ function saveLayout(mut: (l: ReturnType<typeof defaultLayout>) => void): void {
 }
 
 describe('custom layout rendering', () => {
-  it('renders a replaced slot, a raw slot, and an empty slot', () => {
+  it('renders a replaced slot and a raw slot, and compacts an empty slot away', () => {
     saveLayout(l => {
       l.tabs.micro[0][0] = { cmd: 'wield' } // replace the default Use button
       l.tabs.micro[0][1] = { raw: '&' }
@@ -23,7 +23,26 @@ describe('custom layout rendering', () => {
     const cells = strip.querySelectorAll('.tc-btn')
     expect(cells[0].textContent).toContain('(w)')
     expect(cells[1].textContent).toBe('&')
-    expect(cells[2].classList.contains('tc-btn-spacer')).toBe(true)
+    // Outside edit mode the cleared slot leaves no gap: the next button
+    // (pickup, slot 3) moves up and no spacer is rendered.
+    expect(cells[2].textContent).toContain('(,)')
+    expect(strip.querySelector('.tc-btn-spacer')).toBeNull()
+    expect(cells.length).toBe(7)
+  })
+
+  it('narrows the grid to fit the remaining buttons in the reserved rows', () => {
+    // 6 of 8 slots kept over 2 rows → 3 columns; buttons get wider.
+    saveLayout(l => { l.tabs.micro[0][3] = null; l.tabs.micro[1][3] = null })
+    const tc = buildTouchControls(() => {})
+    const strip = tc.element.querySelector<HTMLElement>('.tc-strip')!
+    expect(strip.style.getPropertyValue('--tc-cols')).toBe('3')
+    expect(strip.querySelectorAll('.tc-btn').length).toBe(6)
+  })
+
+  it('keeps four columns for a full grid and never exceeds four', () => {
+    const tc = buildTouchControls(() => {})
+    const strip = tc.element.querySelector<HTMLElement>('.tc-strip')!
+    expect(strip.style.getPropertyValue('--tc-cols')).toBe('4')
   })
 
   it('renders a custom row count', () => {
