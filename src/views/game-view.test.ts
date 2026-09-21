@@ -1167,12 +1167,13 @@ describe('combat feedback wiring', () => {
     const host = h.view.querySelector<HTMLElement>('#map-wrap')!
     vi.spyOn(host, 'getBoundingClientRect').mockReturnValue({ left: 0, top: 0, width: 300, height: 500 } as DOMRect)
     h.dispatch({ msg: 'player', pos: { x: 0, y: 0 }, hp: 20, hp_max: 30 })
-    expect(host.querySelector('.combat-number')).toBeNull()
+    expect(host.querySelector('.combat-impact-player')).toBeNull()
     h.dispatch({ msg: 'player', hp: 13 })
-    expect(host.querySelector('.combat-number')?.textContent).toBe('−7 HP')
+    expect(host.querySelector('.combat-impact-player')).not.toBeNull()
+    expect(host.querySelector('.combat-impact')?.textContent).toBe('')  // ring only, no number
     h.dispatch({ msg: 'map', vgrdc: { x: 0, y: 0 }, cells: [] })
-    expect(host.querySelector('.combat-number')?.textContent).toBe('−7 HP')
+    expect(host.querySelector('.combat-impact-player')).not.toBeNull()
     h.dispatch({ msg: 'map', clear: true, cells: [] })
-    expect(host.querySelector('.combat-number')).toBeNull()
+    expect(host.querySelector('.combat-impact-player')).toBeNull()
   })
 })

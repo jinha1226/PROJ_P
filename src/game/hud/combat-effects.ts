@@ -23,7 +23,10 @@ export function hpLoss(previous: { hp?: number; hp_max?: number }, next: { hp?: 
   return Math.max(0, previous.hp - next.hp)
 }
 
-// Bounded, purely visual overlay. No commands, simulated hits, or animation locks.
+// Bounded, purely visual overlay: an impact ring at the hit cell, nothing
+// else. No damage numbers or wound labels — the map stays uncluttered and the
+// HUD/monster list carry the exact figures. No commands, simulated hits, or
+// animation locks.
 export class CombatEffects {
   private layer = document.createElement('div')
   private timers = new Map<HTMLElement, ReturnType<typeof setTimeout>>()
@@ -32,7 +35,7 @@ export class CombatEffects {
     this.layer.setAttribute('aria-hidden', 'true')
     host.appendChild(this.layer)
   }
-  show(at: Point, text: string, player = false): void {
+  show(at: Point, player = false): void {
     const point = this.project(at)
     if (!point) return
     const bounds = this.host.getBoundingClientRect()
@@ -42,10 +45,6 @@ export class CombatEffects {
     const el = document.createElement('span')
     el.className = `combat-impact${player ? ' combat-impact-player' : ''}`
     el.style.left = `${x}px`; el.style.top = `${y}px`
-    const label = document.createElement('span')
-    label.className = 'combat-number'
-    label.textContent = text
-    el.appendChild(label)
     this.layer.appendChild(el)
     this.timers.set(el, setTimeout(() => this.remove(el), 460))
   }

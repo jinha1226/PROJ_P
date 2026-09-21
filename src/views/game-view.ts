@@ -1209,12 +1209,7 @@ export function buildGameView(
         // garble the grid. Transient mode, so the extra full renders are fine.
         if (overviewActive) { mapView.fitToContainer(); mapView.fullRender() }
         if (!msg.clear) {
-          for (const target of worsened(beforeWounds, wounds(store))) {
-            const labels = getPref('uiLang') === 'ko'
-              ? ['', '경상', '부상', '중상', '심각', '빈사']
-              : ['', 'Light wound', 'Wounded', 'Badly hurt', 'Severe', 'Near death']
-            combatEffects.show(target, labels[target.tier])
-          }
+          for (const target of worsened(beforeWounds, wounds(store))) combatEffects.show(target)
         }
         monsterListView.update(store.getMonsters())
         if (monsterPanelOpen) monsterPanel.update(store.getMonsters())
@@ -1245,7 +1240,7 @@ export function buildGameView(
           view.classList.toggle('low-hp', playerStats.hp / playerStats.hp_max <= 0.3)
         }
         mapView.setPlayerStats(playerStats)
-        if (lostHp > 0) combatEffects.show(store.playerPos, `−${lostHp} HP`, true)
+        if (lostHp > 0) combatEffects.show(store.playerPos, true)
         inventoryStore.update(msg.inv)
         statsView.update(msg)
         if (msg.status !== undefined) statusView.update(msg.status)
