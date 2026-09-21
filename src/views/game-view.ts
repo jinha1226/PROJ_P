@@ -405,7 +405,6 @@ export function buildGameView(
     send: msg => conn.send(msg),
     idle: () => !spectating && currentInputMode === 1 && commandChannelIdle() && !monsterPanelOpen && !usePanel.isOpen,
     hasOverlay: () => uiStack.length > 0 || crtActive || dialogActive || !!activeMenu,
-    depth: () => uiStack.length + menuStack.length + Number(crtActive) + Number(dialogActive),
     restore: () => hideOverlay(),
     language: () => getPref('uiLang'),
   })
@@ -413,7 +412,6 @@ export function buildGameView(
     send: msg => conn.send(msg),
     idle: () => !spectating && currentInputMode === 1 && commandChannelIdle() && !monsterPanelOpen && !characterPanel.isOpen,
     hasOverlay: () => uiStack.length > 0 || crtActive || dialogActive || !!activeMenu,
-    depth: () => uiStack.length + menuStack.length + Number(crtActive) + Number(dialogActive),
     restore: () => hideOverlay(),
     language: () => getPref('uiLang'),
   }, 'use')

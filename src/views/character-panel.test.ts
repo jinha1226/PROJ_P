@@ -9,7 +9,7 @@ function setup(kind: 'character' | 'use' = 'character') {
   const state = { idle: true, depth: 0 }
   const send = vi.fn(), restore = vi.fn()
   const panel = new CharacterPanel(overlay, home, {
-    send, restore, idle: () => state.idle, depth: () => state.depth,
+    send, restore, idle: () => state.idle,
     hasOverlay: () => state.depth > 0, language: () => 'ko',
   }, kind)
   home.appendChild(panel.element)
@@ -53,30 +53,32 @@ describe('character panel command ownership', () => {
     h.closed(); expect(h.send).toHaveBeenLastCalledWith({ msg: 'input', text: 'i' })
     h.panel.reset()
   })
-  it('loads I then M into two panes and retains only one live interactive menu', () => {
+  it('I and M are separate tabs, each owning one live menu', () => {
     const h = setup(); h.panel.select('I'); h.menu('Magic Dart')
-    expect(h.send.mock.calls).toEqual([[{ msg: 'input', text: 'I' }], [{ msg: 'key', keycode: 27 }]])
+    // Opening I sends only I — no chained Escape + M fetch.
+    expect(h.send.mock.calls).toEqual([[{ msg: 'input', text: 'I' }]])
+    expect(h.panel.element.querySelector('.character-single')!.contains(h.overlay)).toBe(true)
+    expect(h.panel.element.querySelector('button[data-command="I"]')!.classList.contains('active')).toBe(true)
+    expect(h.panel.element.querySelector('button[data-command="M"]')!.classList.contains('active')).toBe(false)
+    // Switching to M closes I first, then sends M once the server is idle.
+    h.panel.select('M')
+    expect(h.send).toHaveBeenLastCalledWith({ msg: 'key', keycode: 27 })
     h.closed(); expect(h.send).toHaveBeenLastCalledWith({ msg: 'input', text: 'M' })
     h.menu('Fireball')
-    const top = h.panel.element.querySelector('section[data-command="I"]')!
-    const bottom = h.panel.element.querySelector('section[data-command="M"]')!
-    expect(top.textContent).toContain('Magic Dart')
-    expect(bottom.contains(h.overlay)).toBe(true)
-    expect(top.querySelector('.character-snapshot')?.hasAttribute('inert')).toBe(true)
-    h.panel.select('I'); h.closed(); h.menu('Magic Dart refreshed')
-    expect(top.contains(h.overlay)).toBe(true)
-    expect(bottom.textContent).toContain('Fireball')
+    expect(h.panel.element.querySelector('.character-single')!.contains(h.overlay)).toBe(true)
+    expect(h.panel.element.querySelector('button[data-command="M"]')!.classList.contains('active')).toBe(true)
+    expect(h.panel.element.querySelector('.character-spells')).toBeNull()
     h.panel.reset()
   })
-  it('empty I does not deadlock and an empty M can be closed without sending Escape', () => {
+  it('empty I shows the message and can be closed without sending Escape', () => {
     const h = setup(); h.panel.select('I')
     h.panel.observe({ msg: 'msgs', messages: [{ text: "You don't know any spells." }] })
-    expect(h.send).toHaveBeenLastCalledWith({ msg: 'input', text: 'M' })
     h.panel.observe({ msg: 'input_mode', mode: 1 })
+    expect(h.send.mock.calls).toEqual([[{ msg: 'input', text: 'I' }]])
     expect(h.panel.busy).toBe(false)
-    const count = h.send.mock.calls.length
+    expect(h.panel.element.textContent).toContain("You don't know any spells.")
     h.panel.close()
-    expect(h.send).toHaveBeenCalledTimes(count)
+    expect(h.send).toHaveBeenCalledTimes(1)
     expect(h.panel.isOpen).toBe(false)
   })
   it('close while opening waits for the late menu and never fires a queued tab', () => {

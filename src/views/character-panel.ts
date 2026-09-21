@@ -7,13 +7,13 @@ interface Hooks {
   send: (msg: ClientMsg) => void
   idle: () => boolean
   hasOverlay: () => boolean
-  depth: () => number
   restore: () => void
   language: () => 'ko' | 'en'
 }
 
-// One live server menu. The other spell half is an explicitly read-only snapshot.
-// Switching waits for an acknowledged close AND command-mode readiness; no Esc+key macros.
+// One live server menu at a time; every tab (including the I / M spell tabs)
+// is its own command. Switching waits for an acknowledged close AND
+// command-mode readiness; no Esc+key macros.
 export class CharacterPanel {
   readonly element = document.createElement('section')
   readonly openButton = document.createElement('button')
@@ -21,15 +21,11 @@ export class CharacterPanel {
   private notice = document.createElement('div')
   private body = document.createElement('div')
   private single = document.createElement('div')
-  private split = document.createElement('div')
-  private sections = new Map<'I' | 'M', { header: HTMLButtonElement; body: HTMLElement }>()
   private tabButtons = new Map<CharacterCommand, HTMLButtonElement>()
-  private snapshots = new Map<CharacterCommand, HTMLElement>()
   private active: CharacterCommand = '%'
   private desired: CharacterCommand | null = null
   private phase: 'off' | 'opening' | 'ready' | 'closing' = 'off'
   private acknowledgedClose = false
-  private fetchBoth = false
   private responseText = ''
   private timer: ReturnType<typeof setTimeout> | undefined
 
@@ -44,9 +40,9 @@ export class CharacterPanel {
     this.tabs.setAttribute('aria-label', 'Character sections')
     const names = kind === 'use'
       ? (this.ko ? ['물약', '스크롤', '완드', '투척'] : ['Potions', 'Scrolls', 'Wands', 'Throw'])
-      : (this.ko ? ['상태 %', '능력·변이 A', '스킬 m', '가방 i', '주문']
-        : ['Status %', 'Traits A', 'Skills m', 'Bag i', 'Spells'])
-    const keys: CharacterCommand[] = kind === 'use' ? ['q', 'r', 'V', 'F'] : ['%', 'A', 'm', 'i', 'I']
+      : (this.ko ? ['상태 %', '능력·변이 A', '스킬 m', '가방 i', '주문 I', '암기 M']
+        : ['Status %', 'Traits A', 'Skills m', 'Bag i', 'Spells I', 'Memorise M'])
+    const keys: CharacterCommand[] = kind === 'use' ? ['q', 'r', 'V', 'F'] : ['%', 'A', 'm', 'i', 'I', 'M']
     keys.forEach((key, i) => {
       const b = document.createElement('button')
       b.textContent = names[i]; b.dataset.command = key
@@ -61,18 +57,7 @@ export class CharacterPanel {
     this.notice.className = 'character-notice'; this.notice.setAttribute('role', 'status')
     this.body.className = 'character-body'
     this.single.className = 'character-single'
-    this.split.className = 'character-spells'
-    for (const key of ['I', 'M'] as const) {
-      const section = document.createElement('section')
-      section.className = 'character-spell-section'; section.dataset.command = key
-      const header = document.createElement('button')
-      header.className = 'character-spell-heading'
-      header.addEventListener('click', () => this.select(key))
-      const body = document.createElement('div'); body.className = 'character-spell-body'
-      section.append(header, body); this.split.appendChild(section)
-      this.sections.set(key, { header, body })
-    }
-    this.body.append(this.single, this.split)
+    this.body.append(this.single)
     this.element.append(this.tabs, this.notice, this.body)
   }
   private get ko(): boolean { return this.hooks.language() === 'ko' }
@@ -83,17 +68,12 @@ export class CharacterPanel {
     if (!(this.kind === 'use' ? USE_COMMANDS : CHARACTER_COMMANDS).includes(key)) return false
     if (!this.isOpen) {
       if (!this.hooks.idle()) return false
-      this.snapshots.clear()
       this.element.hidden = false
-      this.fetchBoth = key === 'I' || key === 'M'
-      this.start(this.fetchBoth ? 'I' : key)
+      this.start(key)
       return true
     }
     if (key === this.active && this.phase === 'ready') return true
-    const enteringSpells = (key === 'I' || key === 'M') && this.active !== 'I' && this.active !== 'M'
-    if (enteringSpells) { this.snapshots.delete('I'); this.snapshots.delete('M') }
-    this.fetchBoth = enteringSpells
-    this.desired = enteringSpells ? 'I' : key
+    this.desired = key
     if (this.phase === 'ready') {
       if (this.hooks.idle()) this.start(this.desired!)
       else this.beginClose()
@@ -103,7 +83,7 @@ export class CharacterPanel {
   }
   close(): void {
     if (!this.isOpen) return
-    this.fetchBoth = false; this.desired = null
+    this.desired = null
     if (this.phase === 'ready') {
       if (this.hooks.idle()) this.reset()
       else this.beginClose()
@@ -125,7 +105,6 @@ export class CharacterPanel {
     this.hooks.send({ msg: 'input', text: key })
   }
   private beginClose(): void {
-    this.capture()
     this.phase = 'closing'; this.acknowledgedClose = false
     this.overlay.inert = true
     this.notice.textContent = this.ko ? '메뉴 전환 중…' : 'Switching menu…'
@@ -140,32 +119,12 @@ export class CharacterPanel {
         : 'Waiting for the server; no extra commands have been sent.'
     }, 5000)
   }
-  private capture(): void {
-    if (!this.hooks.hasOverlay() || this.hooks.depth() > 1) return
-    const snapshot = this.overlay.cloneNode(true) as HTMLElement
-    snapshot.removeAttribute('id'); snapshot.removeAttribute('style')
-    snapshot.querySelectorAll('[id]').forEach(el => el.removeAttribute('id'))
-    snapshot.className = 'character-snapshot'; snapshot.inert = true
-    this.snapshots.set(this.active, snapshot)
-  }
   private layout(): void {
-    const spells = this.active === 'I' || this.active === 'M'
-    this.single.hidden = spells; this.split.hidden = !spells
     for (const [key, b] of this.tabButtons) {
-      const selected = spells ? key === 'I' : key === this.active
+      const selected = key === this.active
       b.classList.toggle('active', selected); b.setAttribute('aria-pressed', String(selected))
     }
-    if (!spells) { this.single.appendChild(this.overlay); return }
-    for (const [key, section] of this.sections) {
-      const live = key === this.active
-      const title = key === 'I' ? (this.ko ? '배운 주문 I' : 'Known spells I') : (this.ko ? '주문 암기 M' : 'Memorise M')
-      section.header.textContent = title + (live ? (this.ko ? ' · 선택됨' : ' · Active') : (this.ko ? ' · 눌러서 선택' : ' · Tap to activate'))
-      section.header.setAttribute('aria-pressed', String(live))
-      section.body.replaceChildren()
-      if (live) section.body.appendChild(this.overlay)
-      else if (this.snapshots.has(key)) section.body.appendChild(this.snapshots.get(key)!.cloneNode(true))
-      else section.body.textContent = this.ko ? '목록을 불러오면 여기에 표시됩니다.' : 'The list will appear here after loading.'
-    }
+    this.single.appendChild(this.overlay)
   }
   observe(msg: ServerMsg): void {
     if (!this.isOpen) return
@@ -181,22 +140,16 @@ export class CharacterPanel {
       if (this.hooks.hasOverlay() && ['menu', 'ui-push', 'txt', 'ui-state'].includes(msg.msg)) {
         this.phase = 'ready'; clearTimeout(this.timer); this.overlay.inert = false
         this.notice.textContent = ''
-        this.capture(); this.layout()
+        this.layout()
         if (this.cancelOpening || this.desired !== null) this.beginClose()
-        else if (this.fetchBoth && this.active === 'I') {
-          this.fetchBoth = false; this.desired = 'M'; this.beginClose()
-        }
       } else if ((msg.msg === 'msgs' || msg.msg === 'input_mode') && this.hooks.idle()) {
         if (msg.msg === 'msgs') this.responseText = (msg.messages ?? []).map(m => (m.text ?? '').replace(/<[^>]*>/g, '')).join('\n')
         const text = this.responseText || (this.ko ? '표시할 목록이 없습니다.' : 'No list available.')
         // These commands can return a message instead of a menu. Never infer
         // an empty menu merely from elapsed time or an unrelated message.
         if ((msg.msg === 'input_mode' && msg.mode === 1) || (this.kind === 'use' && /aren.t carrying|don.t have|have no|cannot (drink|read|evoke)|nothing to|없/.test(text)) || /don't know any spells|no spells|not carrying anything|memorise any|memorize any|주문.*없|마법.*없/.test(text)) {
-          const empty = document.createElement('div'); empty.className = 'character-snapshot'
-          empty.textContent = text; this.snapshots.set(this.active, empty)
           if (this.cancelOpening) { this.reset(); return }
-          const next = this.desired ?? (this.fetchBoth && this.active === 'I' ? 'M' : null)
-          this.fetchBoth = false
+          const next = this.desired
           if (next) this.start(next)
           else { this.phase = 'ready'; clearTimeout(this.timer); this.notice.textContent = text; this.layout() }
         }
@@ -220,15 +173,13 @@ export class CharacterPanel {
     }
     if (this.phase === 'ready') {
       if (this.hooks.idle() && (closeAck || msg.msg === 'input_mode')) this.reset()
-      else if (this.hooks.hasOverlay()) this.capture()
     }
   }
   reset(restore = true): void {
     clearTimeout(this.timer)
-    this.phase = 'off'; this.desired = null; this.fetchBoth = false; this.cancelOpening = false
+    this.phase = 'off'; this.desired = null; this.cancelOpening = false
     this.element.hidden = true; this.overlay.inert = false
     this.home.appendChild(this.overlay)
-    this.snapshots.clear()
     if (restore) this.hooks.restore()
   }
 }
