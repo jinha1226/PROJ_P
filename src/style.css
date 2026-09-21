@@ -3411,8 +3411,11 @@ html, body {
 .hg-equipped { display: flex; gap: .6em; min-width: 0; overflow-x: auto; white-space: nowrap; scrollbar-width: none; }
 .hg-equipped .hg-wq { flex: 0 0 auto; overflow: visible; font-size: inherit; }
 .hg-equipment-row #hud-quiver { min-width: 0; overflow-x: auto; white-space: nowrap; text-overflow: clip; font-size: inherit; scrollbar-width: none; }
-.hg-alert-row { display: flex; align-items: center; gap: .4em; min-width: 0; }
-.hg-alert-row:has(#hud-status:empty):has(#hud-warn:empty) { display: none; }
+/* Always reserves one line, even with no warning and no status lights. The
+   row used to hide itself when empty, so the first buff/ailment made it
+   appear (and the last one clearing made it vanish), resizing the map grid's
+   1fr track and shifting the whole screen. Height matches #hud-status. */
+.hg-alert-row { display: flex; align-items: center; gap: .4em; min-width: 0; min-height: 0.9rem; }
 
 #zoom-controls[hidden] { display: none; }
 
