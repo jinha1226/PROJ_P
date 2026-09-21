@@ -1,6 +1,7 @@
 // @vitest-environment happy-dom
 import { describe, it, expect, beforeEach } from 'vitest'
 import { buildTouchControls } from './touch'
+import { getPref } from '../../prefs'
 
 beforeEach(() => { localStorage.clear() })
 
@@ -70,5 +71,23 @@ describe('layout settings rows', () => {
     const overlay = tc.element.querySelector('.tc-settings-overlay') as HTMLElement
     expect(overlay.style.display).toBe('none')
     expect(tc.element.classList.contains('tc-editing')).toBe(true)
+  })
+
+  it('player sprite button cycles heroes, persists, and notifies', () => {
+    let changes = 0
+    const tc = buildTouchControls(() => {}, { onPlayerSpriteChange: () => { changes++ } })
+    ;(tc.element.querySelector('.tc-settings') as HTMLButtonElement).click()
+    const btn = tc.element.querySelector('.tc-set-sprite') as HTMLButtonElement
+    expect(getPref('playerSprite')).toBe('warrior')
+    expect(btn.textContent).toContain('Warrior')
+    btn.click()
+    expect(getPref('playerSprite')).toBe('mage')
+    expect(btn.textContent).toContain('Mage')
+    expect(changes).toBe(1)
+    for (let i = 0; i < 5; i++) btn.click()
+    expect(getPref('playerSprite')).toBe('dcss')  // …rogue, huntress, duelist, cleric, dcss
+    btn.click()
+    expect(getPref('playerSprite')).toBe('warrior')
+    expect(changes).toBe(7)
   })
 })

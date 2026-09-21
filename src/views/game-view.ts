@@ -32,6 +32,7 @@ import { parseSkillRows, trainedNames, computeSkillToggles, presetToRc, rcToPres
 import { TEX, getTileLoader, type TileLoader } from '../game/tiles/tile-loader'
 import { renderTiles, appendIconOverlays, monsterTileSpec, prependDngnLayer, type TileRef } from '../game/tiles/tile-view'
 import { getPref, setPref } from '../prefs'
+import { isPlayerSprite } from '../game/tiles/spd-hero'
 import { createCoachHint, type CoachHint } from '../game/coach/coach-hint'
 import { evaluateCoach, type CoachHintId, type CoachInput } from '../game/coach/coach'
 
@@ -884,11 +885,17 @@ export function buildGameView(
     conn.send(msg)
     afterUserSend(msg)
   }
-  let touchControls = buildTouchControls(touchSend, { overview: overviewHold, spellTab, onRequestRebuild: rebuildTouchControls, rc })
+  // Settings changed the player avatar: the tile view caches the pref, so push
+  // the new value (ASCII view: no-op).
+  const onPlayerSpriteChange = (): void => {
+    const s = getPref('playerSprite')
+    mapView.setPlayerSprite(isPlayerSprite(s) ? s : 'warrior')
+  }
+  let touchControls = buildTouchControls(touchSend, { overview: overviewHold, spellTab, onRequestRebuild: rebuildTouchControls, onPlayerSpriteChange, rc })
   function rebuildTouchControls(): void {
     touchControls.dispose()
     const old = touchControls.element
-    touchControls = buildTouchControls(touchSend, { overview: overviewHold, spellTab, onRequestRebuild: rebuildTouchControls, rc })
+    touchControls = buildTouchControls(touchSend, { overview: overviewHold, spellTab, onRequestRebuild: rebuildTouchControls, onPlayerSpriteChange, rc })
     old.replaceWith(touchControls.element)
   }
   // Fetch the RC as soon as we're in a real game: the touch-layout backup

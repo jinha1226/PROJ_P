@@ -13,6 +13,8 @@ import {
   ZOOM_DEFAULT, clampZoom, zoomSpec, zoomModeToLevel, levelIsZoomed,
 } from './zoom'
 import { TEX, type TileLoader, type TileSprite } from '../tiles/tile-loader'
+import { HERO_H, HERO_W, heroSpriteSync, isPlayerSprite, loadHeroSprite, type PlayerSprite } from '../tiles/spd-hero'
+import { getPref } from '../../prefs'
 import {
   FG_TILE_ID_MASK,
   FG_S_UNDER, FG_FLYING,
@@ -258,6 +260,10 @@ export class TileMapView {
   // (see tile-loader.ts), so this view can never read another version's
   // atlas under this version's tileinfo.
   private loader: TileLoader | null = null
+
+  // Player avatar choice (prefs.playerSprite), cached here because getPref
+  // re-parses localStorage and drawCell runs per visible cell per frame.
+  private playerSprite: PlayerSprite = 'warrior'
   // Guards against duplicate preload runs. Keyed implicitly by `this.loader`:
   // preloadAtlases() re-runs if handed a *different* loader (a version switch
   // without rebuilding the view), but no-ops on a repeat call with the same one.
@@ -301,6 +307,9 @@ export class TileMapView {
     this.ctx = ctx
     this.ctx.imageSmoothingEnabled = false
     this.container.appendChild(this.canvas)
+
+    const pref = getPref('playerSprite')
+    this.setPlayerSprite(isPlayerSprite(pref) ? pref : 'warrior')
 
     // Note: the constructor does NOT preload. game-view drives preloadAtlases()
     // explicitly, passing this game's per-version loader once it knows the
@@ -618,6 +627,22 @@ export class TileMapView {
     if (changed) this.redrawPlayerCell()
   }
 
+  // Swaps the player avatar. Kicks off the sprite load and repaints the
+  // player cell once it arrives (drawCell falls back to the doll until then).
+  setPlayerSprite(sprite: PlayerSprite): void {
+    this.playerSprite = sprite
+    if (sprite !== 'dcss') loadHeroSprite(sprite, () => this.redrawPlayerCell())
+    this.redrawPlayerCell()
+  }
+
+  // The SPD hero image for the player's own cell, or null when the DCSS doll
+  // should be drawn (pref 'dcss', not the player's cell, or not yet loaded).
+  private heroFor(mx: number, my: number): HTMLImageElement | null {
+    if (this.playerSprite === 'dcss') return null
+    if (mx !== this.store.playerPos.x || my !== this.store.playerPos.y) return null
+    return heroSpriteSync(this.playerSprite)
+  }
+
   private redrawPlayerCell(): void {
     if (!this.ready) return
     const p = this.store.playerPos
@@ -892,8 +917,18 @@ export class TileMapView {
     // actors via cell.trans).
     const hasDoll = cell.doll && cell.doll.length > 0
     const hasMcache = cell.mcache && cell.mcache.length > 0
+    // Only the player's cell ever carries a hero; and only while the server
+    // says an actor is standing there (fg/doll present), so a displaced
+    // playerPos can't paint a phantom avatar on an empty floor.
+    const hero = (hasDoll || hasMcache || fg.value > 0) ? this.heroFor(mx, my) : null
     const drawActor = (): void => {
-      if (hasDoll || hasMcache) {
+      if (hero) {
+        // 12×15 native → 24×30, centred horizontally and sat on the cell's
+        // bottom edge like a DCSS doll. Atlas-pixel space; smoothing is off.
+        const w = HERO_W * 2, h = HERO_H * 2
+        this.ctx.drawImage(hero, 0, 0, HERO_W, HERO_H,
+          px + (ATLAS_CELL - w) / 2, py + ATLAS_CELL - h, w, h)
+      } else if (hasDoll || hasMcache) {
         if (cell.doll) {
           const offsetMap = hasMcache
             ? new Map<number, [number, number]>((cell.mcache as Array<[number, number, number]>).map(([t, x, y]) => [t, [x, y]]))

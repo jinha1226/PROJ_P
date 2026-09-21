@@ -55,6 +55,18 @@ This DCSS code is "version 2 or, at your option, any later version";
 it is taken forward to GPLv3 and combined into this AGPL-3.0-or-later
 work as AGPLv3 section 13 permits.
 
+## Shattered Pixel Dungeon artwork
+
+`public/tiles/spd/hero-*.png` are the idle frames of the hero sprites from
+[Shattered Pixel Dungeon](https://github.com/00-Evan/shattered-pixel-dungeon)
+(`core/src/main/assets/sprites/{warrior,mage,rogue,huntress,duelist,cleric}.png`),
+Copyright (C) 2014–2025 Evan Debenham, based on Pixel Dungeon, Copyright (C)
+2012–2015 Oleg Dolya. Licensed under the GNU General Public License, version 3
+or (at your option) any later version, and combined into this AGPL-3.0-or-later
+work as GPLv3 section 13 permits. They are used only as the tile-mode player
+avatar (`src/game/tiles/spd-hero.ts`); everything else on the map is drawn
+from the connected server's own DCSS atlases.
+
 ## Independently implemented
 
 The remaining code — the WebSocket layer, the map and monster state

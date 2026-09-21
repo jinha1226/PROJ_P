@@ -1,3 +1,4 @@
+import { HERO_LABELS, isPlayerSprite, nextPlayerSprite } from '../tiles/spd-hero'
 import { bindHold, type HoldAction } from './hold-button'
 import type { ClientMsg } from '../../ws/types'
 import {
@@ -423,7 +424,7 @@ const RC_TOGGLES: { key: string; on: string; ko: string; en: string }[] = [
   { key: 'autofight_stop', on: '50', ko: '자동전투 50% 정지',  en: 'Autofight stop 50%' },
 ]
 
-export function buildTouchControls(send: SendFn, opts: { overview?: HoldAction; spellTab?: SpellTabConfig; onRequestRebuild?: () => void; rc?: RcControls } = {}): TouchControls {
+export function buildTouchControls(send: SendFn, opts: { overview?: HoldAction; spellTab?: SpellTabConfig; onRequestRebuild?: () => void; onPlayerSpriteChange?: () => void; rc?: RcControls } = {}): TouchControls {
   let ctrlActive = false
   let activeTab: TabKey = 'micro'
   // True while a menu/overlay is open: Tab pages the list there instead of
@@ -901,6 +902,31 @@ export function buildTouchControls(send: SendFn, opts: { overview?: HoldAction; 
     coachRow.appendChild(coachLabel)
     coachRow.appendChild(coachToggleBtn)
     settingsOverlay.appendChild(coachRow)
+
+    // Player sprite row (tile mode): cycles through the SPD heroes, then the
+    // DCSS doll. Takes effect immediately via onPlayerSpriteChange.
+    const spriteRow = document.createElement('div')
+    spriteRow.className = 'tc-settings-row'
+    const spriteLabel = document.createElement('span')
+    spriteLabel.className = 'tc-settings-label'
+    spriteLabel.textContent = '플레이어 모습 / Player sprite'
+    const spriteBtn = document.createElement('button')
+    spriteBtn.className = 'tc-settings-btn tc-set-sprite'
+    const spriteText = (): string => {
+      const cur = getPref('playerSprite')
+      const l = HERO_LABELS[isPlayerSprite(cur) ? cur : 'warrior']
+      return `${l.ko}/${l.en}`
+    }
+    spriteBtn.textContent = spriteText()
+    spriteBtn.addEventListener('click', () => {  // click only — see langToggleBtn
+      const cur = getPref('playerSprite')
+      setPref('playerSprite', nextPlayerSprite(isPlayerSprite(cur) ? cur : 'warrior'))
+      spriteBtn.textContent = spriteText()
+      opts.onPlayerSpriteChange?.()
+    })
+    spriteRow.appendChild(spriteLabel)
+    spriteRow.appendChild(spriteBtn)
+    settingsOverlay.appendChild(spriteRow)
 
     // RC options section
     const rcSection = document.createElement('div')

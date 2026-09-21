@@ -1,3 +1,4 @@
+import type { PlayerSprite } from '../tiles/spd-hero'
 import type { MapStore } from './map-store'
 import { parseCellKey } from './map-store'
 import { decodeColor, DEFAULT_BG, flashColor } from './colors'
@@ -66,6 +67,9 @@ export class MapView {
   // Present so callers can treat MapView and TileMapView uniformly (the tile
   // view draws under-tile mini-bars from these stats).
   setPlayerStats(_p: { hp?: number; hp_max?: number; mp?: number; mp_max?: number }): void {}
+
+  // No-op in ASCII mode: the player is the @ glyph. See TileMapView.
+  setPlayerSprite(_s: PlayerSprite): void {}
 
   // Multiplier applied to the chosen font size in fitToContainer. Smaller
   // scale ⇒ smaller glyphs ⇒ viewport expansion fits more cells. Caller is

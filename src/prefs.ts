@@ -1,5 +1,6 @@
 import { SPECTATE_SERVERS } from './servers'
 import type { TouchLayout } from './game/input/custom-layout'
+import type { PlayerSprite } from './game/tiles/spd-hero'
 
 const KEY = 'pocketzot:prefs'
 
@@ -20,6 +21,9 @@ export interface Prefs {
   // User-customized touch HUD layout (slots + dpad side/size). null = default.
   // Validated on read by touch-catalog.ts, not here.
   touchLayout: TouchLayout | null
+  // Tile-mode player avatar: a Shattered Pixel Dungeon hero, or 'dcss' for
+  // the server's doll composition. Ignored in ASCII mode.
+  playerSprite: PlayerSprite
 }
 
 const DEFAULTS: Prefs = {
@@ -34,6 +38,7 @@ const DEFAULTS: Prefs = {
   mapZoomLevel: null,
   hiddenSpells: [],
   touchLayout: null,
+  playerSprite: 'warrior',
 }
 
 // Session fallback for values whose localStorage write failed (private mode,
