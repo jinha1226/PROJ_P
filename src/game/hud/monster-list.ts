@@ -9,15 +9,10 @@ import { DCSS_COLOR_MAP, escHtml } from '../dcss-colors'
 import { decodeColor } from '../map/colors'
 import {
   ATTITUDE_CLASSES, MDAM_COLORS, UNUSUAL_COLOR, decodeFgThreatTier, decodeMdam,
-  fgHaloDngnName, fgThreatDngnName,
   filterAndSortMonsters, monsterSort, nameColor, threatColor,
 } from './monster-style'
-import {
-  appendIconOverlays, appendMonsterActor, appendTiles,
-  prependDngnIndex, prependDngnLayer,
-} from '../tiles/tile-view'
+import { appendIconOverlays, appendMonsterStack, appendTiles } from '../tiles/tile-view'
 import { TEX, type TileLoader } from '../tiles/tile-loader'
-import { bgFlags } from '../map/flag-decode'
 import { getPref, setPref, type MonsterListMode } from '../../prefs'
 
 // Up to MAX_ROWS top-sorted groups are listed. When more groups exist, the
@@ -533,18 +528,7 @@ export class MonsterListView {
       const stack = document.createElement('span')
       stack.className = 'ml-tile tile-stack'
 
-      // Layer order matches MonsterPanelView.renderRow: monster sprite on
-      // top, summoner ring below it, threat wash below that, halo below that,
-      // floor at the bottom. prependDngn* slots in at index 0 of the DOM, so
-      // prepend calls run in reverse of bottom-up paint order.
-      appendMonsterActor(this.loader, stack, cell, TILE_SCALE)
-      if (cell?.highlighted_summoner) prependDngnLayer(this.loader, stack, 'HALO_SUMMONER', TILE_SCALE)
-      const threat = fgThreatDngnName(cell?.fg)
-      if (threat) prependDngnLayer(this.loader, stack, threat, TILE_SCALE)
-      const halo = fgHaloDngnName(cell?.fg)
-      if (halo) prependDngnLayer(this.loader, stack, halo, TILE_SCALE)
-      if (cell?.t_bg !== undefined) prependDngnIndex(this.loader, stack, bgFlags(cell.t_bg).value, TILE_SCALE)
-
+      appendMonsterStack(this.loader, stack, cell, TILE_SCALE)
       // Damage shows as the per-sprite MDAM overlay (as on the map), so no
       // ml-hp chip on tile rows — and unlike the chip, every member of a
       // grouped row shows its own damage state.

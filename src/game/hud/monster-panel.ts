@@ -1,12 +1,10 @@
 import type { MapStore, MonsterCell } from '../map/map-store'
 import { decodeColor } from '../map/colors'
-import { bgFlags } from '../map/flag-decode'
-import { appendIconOverlays, appendMonsterActor, prependDngnIndex, prependDngnLayer } from '../tiles/tile-view'
+import { appendIconOverlays, appendMonsterStack } from '../tiles/tile-view'
 import type { TileLoader } from '../tiles/tile-loader'
 import {
   MDAM_COLORS,
   decodeMdam, mdamTier,
-  fgHaloDngnName, fgThreatDngnName,
   filterAndSortMonsters, nameColor,
 } from './monster-style'
 import { iconNameMap, monsterStatusLabels, type IconNames } from './monster-status'
@@ -95,17 +93,7 @@ export class MonsterPanelView {
     const tileEl = document.createElement('div')
     tileEl.className = 'tile-stack mp-tile'
     row.appendChild(tileEl)
-    appendMonsterActor(this.loader, tileEl, cell, TILE_SCALE)
-    if (cell?.highlighted_summoner) prependDngnLayer(this.loader, tileEl, 'HALO_SUMMONER', TILE_SCALE)
-    const threatWash = fgThreatDngnName(cell?.fg)
-    if (threatWash) prependDngnLayer(this.loader, tileEl, threatWash, TILE_SCALE)
-    const halo = fgHaloDngnName(cell?.fg)
-    if (halo) prependDngnLayer(this.loader, tileEl, halo, TILE_SCALE)
-    // Order matters: each prepend slots in at index 0, so the floor (called
-    // last) ends up at the bottom of the DOM stack, halo above it, threat
-    // wash above that, summoner ring above that, sprite on top — same
-    // bottom-up order as the map.
-    if (cell?.t_bg !== undefined) prependDngnIndex(this.loader, tileEl, bgFlags(cell.t_bg).value, TILE_SCALE)
+    appendMonsterStack(this.loader, tileEl, cell, TILE_SCALE)
 
     const mdam = decodeMdam(cell?.fg)
     const tier = mdamTier(mdam)
