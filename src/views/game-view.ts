@@ -971,11 +971,11 @@ export function buildGameView(opts: GameViewOptions): HTMLElement {
       fitNow()
     })
   }
-  // Every re-fit goes through here, never a bare mapView.fitToContainer():
-  // a re-fit resizes the viewport, so the minimaps' you-are-here rect must
-  // follow. The
-  // double-tap zoom and the render-mode swap once re-fit directly and left
-  // the rect stale until the next move.
+  // Every re-fit goes through here, never a bare fitToContainer() — here or
+  // inside a view: a re-fit resizes the viewport, so the minimaps'
+  // you-are-here rect must follow. The double-tap zoom, the render-mode swap
+  // and the tile preload each left it stale until the next move when they
+  // re-fit directly.
   function fitNow(): void {
     mapView.fitToContainer()
     minimaps.scheduleRepaint()
@@ -1023,9 +1023,30 @@ export function buildGameView(opts: GameViewOptions): HTMLElement {
     // before that — e.g. the persisted-pref application at build, or a gesture
     // toggle before game_client — the game_client handler preloads when the
     // version lands.
-    if (mode === 'tiles' && loader) void (mapView as TileMapView).preloadAtlases(loader)
+    if (mode === 'tiles' && loader) preloadTiles(loader)
     monsterListView.setRenderMode(mode)
     requestAnimationFrame(() => { fitNow(); mapView.fullRender() })
+  }
+
+  // Once the atlases land, fit and fully paint on the next frame rather than
+  // now. Two races make a direct fullRender unsafe on first load:
+  //   (a) preload can resolve before the initial ResizeObserver callback
+  //       fires (possible when atlases come from HTTP cache on a warm
+  //       reload), leaving cellPx/viewportW/H at their constructor
+  //       defaults and the canvas at its default 300×150 backing-store;
+  //       a fullRender at that point clips off most of the map.
+  //   (b) the `map` messages that arrive during preload all hit ASCII
+  //       fallback and the next non-clear/non-vgrdc map is render(dirty),
+  //       which never repaints the cells that were drawn as fallback.
+  // rAF guarantees layout has settled and gives the fit a real container
+  // size; the explicit fullRender afterwards covers the case where the size
+  // didn't change and setViewportSize early-exited.
+  function preloadTiles(l: TileLoader): void {
+    const tiles = mapView as TileMapView
+    void tiles.preloadAtlases(l).then((ready) => {
+      if (!ready || mapView !== tiles || disposed) return
+      requestAnimationFrame(() => { fitNow(); mapView.fullRender() })
+    })
   }
 
   // Live-apply when the settings page changes the render-mode pref while a
@@ -1369,7 +1390,7 @@ export function buildGameView(opts: GameViewOptions): HTMLElement {
     if (conn.httpBase === '') void primeFingerprint('', msg.version, true)
     advisory.check(gameId, msg.version)
     if (renderMode === 'tiles') {
-      void (mapView as TileMapView).preloadAtlases(l)
+      preloadTiles(l)
       monsterListView.update(store.getMonsters())
     }
   }

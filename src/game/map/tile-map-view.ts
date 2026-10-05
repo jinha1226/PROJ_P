@@ -217,8 +217,10 @@ export class TileMapView {
   // Public so game-view can call once it holds this game's loader (from the
   // game_client handler, or the spectator handoff) — the TileMapView is
   // constructed before that's known when the user has tile mode persisted.
-  async preloadAtlases(loader: TileLoader): Promise<void> {
-    if (this.loader === loader && this.preloadStarted) return
+  // Resolves true only for the call that made the view ready; the caller
+  // then owns the fit and full paint (game-view preloadTiles).
+  async preloadAtlases(loader: TileLoader): Promise<boolean> {
+    if (this.loader === loader && this.preloadStarted) return false
     this.loader = loader
     this.preloadStarted = true
     this.ready = false
@@ -235,7 +237,7 @@ export class TileMapView {
       ])
       // A newer preload (different loader) superseded us while we awaited —
       // don't clobber its state or flip ready over the wrong version.
-      if (this.loader !== loader) return
+      if (this.loader !== loader) return false
       for (const [k, v] of Object.entries(dngnMod as Record<string, unknown>)) {
         if (typeof v === 'number') this.dngn[k] = v
       }
@@ -257,22 +259,10 @@ export class TileMapView {
         ? { dngn: this.dngn, basetile: bt as (id: number) => number, tileCount: this.tileCount }
         : null
       this.ready = true
-      // Schedule a fit+paint on the next frame rather than painting now.
-      // Two races make a direct fullRender unsafe on first load:
-      //   (a) preload can resolve before the initial ResizeObserver callback
-      //       fires (possible when atlases come from HTTP cache on a warm
-      //       reload), leaving cellPx/viewportW/H at their constructor
-      //       defaults and the canvas at its default 300×150 backing-store;
-      //       a fullRender at that point clips off most of the map.
-      //   (b) the `map` messages that arrive during preload all hit ASCII
-      //       fallback and the next non-clear/non-vgrdc map is render(dirty),
-      //       which never repaints the cells that were drawn as fallback.
-      // rAF guarantees layout has settled and gives fitToContainer a real
-      // container size; the explicit fullRender afterwards covers the case
-      // where the size didn't change and setViewportSize early-exited.
-      requestAnimationFrame(() => { this.fitToContainer(); this.fullRender() })
+      return true
     } catch (err) {
       console.warn('TileMapView atlas preload failed:', err)
+      return false
     }
   }
 

@@ -84,14 +84,14 @@ function installInstrumentation(): void {
 // promise the FIRST preloadAtlases call returns so the driver can block on
 // it (??= — later calls for the same loader early-return an already-settled
 // no-op promise, which must not displace the real one).
-let preloadPromise: Promise<void> | null = null
+let preloadPromise: Promise<unknown> | null = null
 function capturePreload(): void {
   // Same patcher instrumentMethod uses, for the same reason: a rename of
   // preloadAtlases must warn, not silently leave the run measuring the
   // ASCII-fallback canvas path.
   patchMethod(TileMapView.prototype, 'preloadAtlases', (orig) =>
     function (this: unknown, ...args: unknown[]): unknown {
-      const p = orig.apply(this, args) as Promise<void>
+      const p = orig.apply(this, args) as Promise<unknown>
       preloadPromise ??= p
       return p
     })
@@ -265,7 +265,7 @@ export async function buildReplayView(params: URLSearchParams): Promise<HTMLElem
         if (mode === 'tiles' && !warmupFrames && preloadPromise) {
           warmupFrames = i + 1
           await preloadPromise
-          await nextPaint() // its internal rAF fit+fullRender
+          await nextPaint() // game-view preloadTiles' rAF fit+fullRender
         }
       },
     })
