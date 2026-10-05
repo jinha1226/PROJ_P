@@ -21,7 +21,7 @@ export interface CrtViewDeps {
   showBar(): void
   // The topmost CRT frame on the popup stack.
   topCrt(): { tag?: string; lines: Map<number, string> } | undefined
-  autoCloseKbdIfOurs(): void
+  closeAutoKbd(): void
   focusView(): void
 }
 
@@ -64,7 +64,7 @@ export class CrtView {
   }
 
   private mount(tag: string | undefined): void {
-    this.d.autoCloseKbdIfOurs()
+    this.d.closeAutoKbd()
     // Only skills brings its own bar (letter row + ⎋). Never hide the strip
     // for any other CRT: its d-pad, ⏎/⎋ and abc▴ keyboard are that screen's
     // only input. Pre-0.24 character creation is one (species list, tag "",

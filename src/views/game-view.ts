@@ -433,30 +433,6 @@ export function buildGameView(opts: GameViewOptions): HTMLElement {
   // machine as the virtual kbd (see shift-state.ts). Resets when the
   // menu closes.
   const menuShift = createShiftToggle({ onChange: () => menuBar.refreshShift() })
-  // Tracks whether the virtual keyboard was opened by us (paired with the
-  // custom-seed input). Auto-close sites only fire `closeKbd` when this flag is
-  // set, so a kbd the user manually toggled open via the kbd button stays
-  // open across overlay transitions.
-  let kbdAutoOpened = false
-
-  function autoOpenKbd(): void {
-    touchControls.openKbd()
-    kbdAutoOpened = true
-  }
-
-  function autoCloseKbdIfOurs(): void {
-    if (!kbdAutoOpened) return
-    kbdAutoOpened = false
-    touchControls.closeKbd()
-  }
-
-  // A user-driven dismissal (the Android back gesture) closes the kbd
-  // regardless of who opened it — and must clear the auto flag, or a later
-  // autoCloseKbdIfOurs closes a kbd the user reopened by hand.
-  function manualCloseKbd(): void {
-    kbdAutoOpened = false
-    touchControls.closeKbd()
-  }
 
   const view = document.createElement('div')
   view.id = 'game-view'
@@ -904,7 +880,7 @@ export function buildGameView(opts: GameViewOptions): HTMLElement {
     bar: menuBar,
     showBar: () => setMenuBar(true),
     topCrt: () => popups.topCrt(),
-    autoCloseKbdIfOurs,
+    closeAutoKbd: () => touchControls.closeAutoKbd(),
     focusView,
   })
 
@@ -1108,7 +1084,7 @@ export function buildGameView(opts: GameViewOptions): HTMLElement {
     // listener does (and like docKeyHandler, which checks them first).
     if (closeTopOverlay()) return
     if (touchControls.isKbdOpen()) {
-      manualCloseKbd()
+      touchControls.closeKbd()
       return
     }
     // Chat and spectator mirror physical Esc (the router's kbd-only layers).
@@ -2086,7 +2062,7 @@ export function buildGameView(opts: GameViewOptions): HTMLElement {
       return overlayContent
     },
     renderOverlay,
-    autoOpenKbd,
+    autoOpenKbd: () => touchControls.openKbd({ auto: true }),
     focusView,
     // A getter, not a captured value: `loader` is reassigned on game_client,
     // after this ctx is built.
@@ -2095,7 +2071,7 @@ export function buildGameView(opts: GameViewOptions): HTMLElement {
   }
 
   function renderOverlay(title: string, buildBody: () => void, opts?: { float?: boolean; screen?: 'newgame'; over?: object }): void {
-    autoCloseKbdIfOurs()
+    touchControls.closeAutoKbd()
     enterOverlayLayout(opts)
 
     const headerEl = document.createElement('div')
@@ -2117,7 +2093,7 @@ export function buildGameView(opts: GameViewOptions): HTMLElement {
   }
 
   function hideOverlay(): void {
-    autoCloseKbdIfOurs()
+    touchControls.closeAutoKbd()
     clearOverlayContent()
     overlayMode = 'none'
     touchHidden = false

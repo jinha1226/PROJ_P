@@ -572,4 +572,29 @@ describe('strip with a text field showing', () => {
     tc.closeKbd()
     expect(input.inputMode).toBe('')
   })
+
+  it('closeAutoKbd takes down only a kbd an auto open raised', () => {
+    const { tc } = setup()
+    const kbdEl = tc.element.querySelector<HTMLElement>('#kbd-overlay')!
+    const showing = () => kbdEl.style.display !== 'none'
+    const abcDown = () =>
+      [...kbdEl.querySelectorAll<HTMLElement>('.kbd-key')].find(b => b.textContent === 'abc▾')!
+    const abcUp = () => tc.element.querySelector<HTMLElement>('.tc-footer .tc-kbd')!
+
+    tc.openKbd({ auto: true })
+    tc.closeAutoKbd()
+    expect(showing()).toBe(false)
+
+    // Closed on its own abc▾, then reopened by hand: the user's now.
+    tc.openKbd({ auto: true })
+    abcDown().click()
+    abcUp().click()
+    tc.closeAutoKbd()
+    expect(showing()).toBe(true)
+
+    // An auto open over a kbd the user already had up doesn't claim it.
+    tc.openKbd({ auto: true })
+    tc.closeAutoKbd()
+    expect(showing()).toBe(true)
+  })
 })

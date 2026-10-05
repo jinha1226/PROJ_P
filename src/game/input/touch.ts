@@ -94,8 +94,11 @@ export interface TouchControls {
   // Tracks "a server overlay is up" (root class `overlay-mode`), set from
   // game-view's applyLayout. Read by the d-pad hold (see buildDpad).
   setOverlayMode(on: boolean): void
-  openKbd(): void
+  // `auto`: raised for a text prompt (the custom-seed field); closeAutoKbd
+  // takes down only such a kbd.
+  openKbd(opts?: { auto?: boolean }): void
   closeKbd(): void
+  closeAutoKbd(): void
   isKbdOpen(): boolean     // for the Android back handler: back dismisses the kbd first
   refreshSpellTab(): void  // re-render the z tab if it is the active tab
   // Whether the d-pad Shift toggle is engaged, consuming a one-shot (lock
@@ -328,8 +331,28 @@ export function buildTouchControls(wireSend: SendFn, opts: TouchControlsOpts = {
   root.id = 'touch-controls'
 
   // Keyboard overlay (fixed position, renders above everything)
-  const { element: kbdEl, open: openKbd, close: closeKbd } = buildKeyboardOverlay(send, bindTap)
+  const kbd = buildKeyboardOverlay(send, bindTap)
+  const kbdEl = kbd.element
   root.appendChild(kbdEl)
+  // Whether the open kbd is one openKbd({auto}) raised. An auto open over
+  // a kbd the user already had up doesn't claim it. The kbd's own abc▾
+  // closes it without coming through here, so closeAutoKbd checks it's
+  // still showing and every manual open clears the claim.
+  let kbdAuto = false
+  const kbdShowing = (): boolean => kbdEl.style.display !== 'none'
+  function openKbd(opts?: { auto?: boolean }): void {
+    kbdAuto = !!opts?.auto && (kbdAuto || !kbdShowing())
+    kbd.open()
+  }
+  function closeKbd(): void {
+    kbdAuto = false
+    kbd.close()
+  }
+  function closeAutoKbd(): void {
+    const ours = kbdAuto
+    kbdAuto = false
+    if (ours && kbdShowing()) kbd.close()
+  }
 
   // --- D-pad ---
 
@@ -437,7 +460,7 @@ export function buildTouchControls(wireSend: SendFn, opts: TouchControlsOpts = {
   kbdBtn.className = 'tc-kbd'
   kbdBtn.textContent = 'abc▴'
   kbdBtn.title = 'Open keyboard input'
-  bindTap(kbdBtn, openKbd)
+  bindTap(kbdBtn, () => openKbd())
   footerEl.appendChild(kbdBtn)
 
   // --- Render helpers ---
@@ -647,5 +670,5 @@ export function buildTouchControls(wireSend: SendFn, opts: TouchControlsOpts = {
   // isKbdOpen also demands rendered geometry: overlay layouts can hide the
   // whole controls root while a manually-opened kbd stays display:flex —
   // an invisible kbd must not swallow the back gesture's dismissal.
-  return { element: root, enterXMode, exitXMode, setXModePlace, xModeSlot: xSlotEl, setCursorMode, setOverlayMode, openKbd, closeKbd, isKbdOpen: () => kbdEl.style.display !== 'none' && kbdEl.getClientRects().length > 0, refreshSpellTab, consumeShift, destroy }
+  return { element: root, enterXMode, exitXMode, setXModePlace, xModeSlot: xSlotEl, setCursorMode, setOverlayMode, openKbd, closeKbd, closeAutoKbd, isKbdOpen: () => kbdShowing() && kbdEl.getClientRects().length > 0, refreshSpellTab, consumeShift, destroy }
 }
