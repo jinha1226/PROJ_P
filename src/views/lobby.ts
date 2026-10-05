@@ -15,6 +15,7 @@ import { combineHandlers, dispatch, type MsgOf } from '../ws/dispatcher'
 import { MessageHold } from '../ws/message-hold'
 import { isBelowSupportCutoff, parseDcssVersion } from '../util/dcss-version'
 import { attachScrollCue } from '../util/scroll-cue'
+import { registerViewDispose } from './view-dispose'
 
 export function buildLobbyView(
   conn: GameConnection,
@@ -161,15 +162,6 @@ export function buildLobbyView(
       document.addEventListener('pointerdown', onOutside, true)
     }
     function onOutside(e: Event): void {
-      // Self-unhooks once the view is gone (same pattern as login.ts's pref
-      // listener): a lobby can be torn down with the menu still open — an
-      // inbound `close`, or a dropped socket — and nothing calls closeMenu on
-      // those paths, so without this the listener keeps the whole detached
-      // view (games map, tile loader, connection) alive on `document`.
-      if (!chip.isConnected) {
-        document.removeEventListener('pointerdown', onOutside, true)
-        return
-      }
       const t = e.target as Node | null
       if (!t) return
       if (chip.contains(t) || menuEl.contains(t)) return
@@ -566,10 +558,16 @@ export function buildLobbyView(
     }
   }
 
-  const ticker = window.setInterval(() => {
-    if (!view.isConnected) { window.clearInterval(ticker); return }
-    updateIdleLabels()
-  }, 1000)
+  const ticker = window.setInterval(updateIdleLabels, 1000)
+
+  // A lobby can be torn down with a chip menu still open — an inbound
+  // `close`, or a dropped socket — and nothing else calls closeMenu on those
+  // paths; its document listener would keep the whole detached view (games
+  // map, tile loader, connection) alive.
+  registerViewDispose(view, () => {
+    closeChipMenu?.()
+    window.clearInterval(ticker)
+  })
 
   if (exit) maybeShowExitDialog(view, exit)
 

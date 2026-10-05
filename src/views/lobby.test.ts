@@ -1,11 +1,12 @@
 // @vitest-environment happy-dom
 
-import { describe, it, expect, vi } from 'vitest'
+import { afterEach, describe, it, expect, vi } from 'vitest'
 import { fakeStorage } from '../test/fake-storage'
 
 vi.stubGlobal('localStorage', fakeStorage())
 
-import { buildLobbyView, selectPrimaryGameIds } from './lobby'
+import { buildLobbyView as buildLobbyViewRaw, selectPrimaryGameIds } from './lobby'
+import { disposeView } from './view-dispose'
 import type { WsConnection } from '../ws/connection'
 import type { ServerMsg } from '../ws/types'
 import { getTileLoader } from '../game/tiles/tile-loader'
@@ -29,6 +30,15 @@ import { activeGameStart, clearGameStart, rememberGameStart } from '../reconnect
 // so calling it in the test returns the very instance the lobby created.
 const WS_URL = 'wss://test.example/socket'
 const HTTP_BASE = 'https://test.example'
+
+// No setView here to run each lobby's disposer (its idle ticker).
+const built: HTMLElement[] = []
+function buildLobbyView(...args: Parameters<typeof buildLobbyViewRaw>): HTMLElement {
+  const view = buildLobbyViewRaw(...args)
+  built.push(view)
+  return view
+}
+afterEach(() => { for (const v of built.splice(0)) disposeView(v) })
 
 function fakeConn(wsUrl: string, httpBase: string): WsConnection {
   return {

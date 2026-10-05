@@ -18,6 +18,7 @@ import {
 import { compactPlace, nameTitle } from '../game/char-label'
 import { escHtml } from '../game/dcss-colors'
 import { MessageHold } from '../ws/message-hold'
+import { registerViewDispose } from './view-dispose'
 
 export interface LoginResult {
   conn: WsConnection
@@ -315,16 +316,14 @@ export function buildLoginView(
       }
     }
     paint()
-    // Self-unhooks once this view is gone (same pattern as game-view's pref
-    // listeners) — each buildLoginView mounts a fresh view.
-    const onSpritesPref = (): void => {
-      if (!view.isConnected) {
-        window.removeEventListener(LOGIN_SPRITES_CHANGED_EVENT, onSpritesPref)
-        return
-      }
-      paint()
-    }
+    const onSpritesPref = (): void => paint()
     window.addEventListener(LOGIN_SPRITES_CHANGED_EVENT, onSpritesPref)
+    // Each lobby drop mounts a fresh login view; without this every old one
+    // stays reachable from window until the pref next changes.
+    registerViewDispose(view, () => {
+      window.removeEventListener(LOGIN_SPRITES_CHANGED_EVENT, onSpritesPref)
+      painting?.abort()
+    })
   }
 
   // Offline card: one tap opens the offline lobby (save slots, backup
