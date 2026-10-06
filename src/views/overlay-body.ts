@@ -233,7 +233,24 @@ function matchLabel(line: string): RegExpMatchArray | null {
     ?? line.match(/^([^\s<][^<]{0,17}?:)()(?=[^\s<])/)
 }
 
-export function unwrapHangingIndents(body: string): string {
+// An item examined from Ctrl-F search results has the search's first match
+// recoloured in its description (stash.cc StashSearchMenu::examine_index →
+// annotate_string("lightcyan"), trunk and 0.34.1 alike), sent through
+// to_colour_string as a switch back to the label's colour:
+// `<lightcyan>Death<lightgrey>:     It …` (wire captured in golden 22).
+// Label matching reads the line with that highlight lifted; the text keeps
+// it. Never widen this to other markup: tags before the colon are what keep
+// key-help rows (`<white>Tab<lightgrey>    : …`) and the help screen's
+// books row (command.cc `<lightcyan>+</lightcyan> : books (…`), whose
+// 4-space continuation would validate as a column, out of the label match.
+function liftSearchHighlight(line: string): string {
+  return line.replace(/<lightcyan>([^<]*)<lightgrey>/g, '$1')
+}
+
+// `searchHighlight`: the body may carry the search highlight above — only
+// describe-item bodies can (annotate_string's one caller is that
+// describe_item filter).
+export function unwrapHangingIndents(body: string, searchHighlight = false): string {
   const lines = body.split('\n')
   const out: string[] = []
   // Active opens-only color carried across lines. Quote blocks arrive as
@@ -252,7 +269,8 @@ export function unwrapHangingIndents(body: string): string {
     const line = lines[i]
     const shielded = activeColor === 'darkgrey'
     trackTags(line)
-    const m = shielded ? null : matchLabel(line)
+    const shape = searchHighlight ? liftSearchHighlight(line) : line
+    const m = shielded ? null : matchLabel(shape)
     if (m) {
       const col = m[1].length + m[2].length
       const contRe = new RegExp(`^ {${col}}(?=\\S)`)
@@ -281,7 +299,7 @@ export function unwrapHangingIndents(body: string): string {
       // excludes right-aligned-to-col-80 layouts like the god-powers
       // "Granted powers:        (Cost)" header), and no multi-space runs in
       // the remainder (multi-column rows keep their alignment).
-      if (m[2].length >= 2 && m[1].length <= 16 && col <= 18 && !/ {3,}/.test(line.slice(col))) {
+      if (m[2].length >= 2 && m[1].length <= 16 && col <= 18 && !/ {3,}/.test(shape.slice(col))) {
         out.push(HANG_MARK + line)
         continue
       }
@@ -324,7 +342,8 @@ export function joinIndentedRuns(text: string): string {
 // and the stat-row/per-line-tabular reformatting is skipped, so the caller can
 // scale the whole block to fit (see fitTerminalBody). Used for the game-over
 // screen; the describe-* panels keep the per-line heuristic (terminal=false).
-export function renderBodyLines(rawBody: string, highlight: string, terminal = false): string {
+// `searchHighlight` as for unwrapHangingIndents.
+export function renderBodyLines(rawBody: string, highlight: string, terminal = false, searchHighlight = false): string {
   return balanceColorTagsAcrossLines(rawBody).split('\n').map(line => {
     // propagateDarkgreyColor may prepend tags, as for HANG_MARK below.
     const cellsAt = line.indexOf(GRID_MARK)
@@ -344,7 +363,8 @@ export function renderBodyLines(rawBody: string, highlight: string, terminal = f
     let hangStyle = ''
     if (hang) {
       line = line.replace(HANG_MARK, '')
-      const pm = matchLabel(line)
+      const shape = searchHighlight ? liftSearchHighlight(line) : line
+      const pm = matchLabel(shape)
       const col = pm ? pm[0].length : 0
       // Hang wrapped text at the description column so the block stays aligned.
       // Exception: the mundane-ego run-in form `'Of X': ` hangs at a compact
@@ -354,12 +374,17 @@ export function renderBodyLines(rawBody: string, highlight: string, terminal = f
       // space (e.g. `Corpsefed: `, padded to 11), and must still hang at its
       // column to line up with its 2+-space siblings (`rMiasma:`, `^Drain:`).
       // The quote prefix is what marks the run-in form, not the space count.
-      if (pm && col <= 18 && !line.startsWith("'")) hangStyle = ` style="--hang-col:${col}ch"`
+      if (pm && col <= 18 && !shape.startsWith("'")) hangStyle = ` style="--hang-col:${col}ch"`
     }
     if (!terminal && !hang) {
       const stat = tryStatRow(line)
       if (stat) return stat
-      const plain = plainStatSegments(line)
+      // A search highlight on the stat header (`Base <lightcyan>armour<lightgrey>
+      // rating: 2 …`, golden 23) must not cost the row its chips. The shape is
+      // judged with it lifted; the chips split the wire line so it keeps its
+      // colour — the tags hold no spaces, so both split at the same gaps.
+      const shape = searchHighlight ? liftSearchHighlight(line) : line
+      const plain = plainStatSegments(shape) && line.trim().split(/ {2,}/)
       if (plain) {
         const chips = plain.map(s => `<span class="overlay-stat">${dcssToHtml(s)}</span>`).join('')
         return `<div class="overlay-line overlay-stat-row">${chips}</div>`

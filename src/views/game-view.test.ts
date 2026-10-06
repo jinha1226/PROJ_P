@@ -10,6 +10,8 @@ import type { ServerMsg, ClientMsg, GameExit } from '../ws/types'
 import type { MapStore } from '../game/map/map-store'
 import { fakeStorage } from '../test/fake-storage'
 import { listAllAvatars, saveAvatar } from '../avatars'
+import stashSearchGolden from '../golden/22-stash-search-describe-highlight.golden.json'
+import searchPlacementsGolden from '../golden/23-stash-search-highlight-placements.golden.json'
 
 // game-view.ts exports buildGameView (plus unwrapHangingIndents/HANG_MARK for
 // the data-file sweep test), so it's exercised end-to-end the way
@@ -1208,6 +1210,86 @@ describe('ui-push / ui-pop overlay stack', () => {
     expect(hangEls.map(el => el.style.getPropertyValue('--hang-col'))).toEqual(['11ch', '11ch'])
     // A single "Word:text" line with no continuation is left as prose.
     expect(unwrapHangingIndents('Note:this is prose\nnext line')).toBe('Note:this is prose\nnext line')
+  })
+
+  it('unwraps a label carrying the Ctrl-F search highlight (golden 22 wire)', () => {
+    const h = setup()
+    h.dispatch(stashSearchGolden.messages.find(m => m.msg === 'ui-push'))
+    const hangEls = [...overlay(h).querySelectorAll<HTMLElement>('.overlay-line--hang')]
+    expect(hangEls.map(el => el.textContent)).toEqual([
+      'Death:     It empowers your Necromancy spells and improves their success rate. '
+        + 'When you cast a Necromancy spell, it may drain the life force of '
+        + 'susceptible adjacent enemies to heal you; the chance and power of '
+        + "this effect depend on the spell's level.",
+      'Harm:      It increases damage dealt and taken.',
+      'rC+:       It protects you from cold.',
+      'Will+:     It increases your willpower.',
+    ])
+    expect(hangEls.map(el => el.style.getPropertyValue('--hang-col'))).toEqual(['11ch', '11ch', '11ch', '11ch'])
+    // The highlight itself still renders.
+    expect(hangEls[0].querySelector('span')?.textContent).toBe('Death')
+    const nowrap = [...overlay(h).querySelectorAll('.overlay-line--nowrap')]
+    expect(nowrap.some(el => el.textContent?.includes('Necromancy'))).toBe(false)
+  })
+
+  it('keeps a stat header as chips, highlight intact, when the search match lands on it (golden 23 wire)', () => {
+    const h = setup()
+    h.dispatch(searchPlacementsGolden.messages.find(m => m.msg === 'ui-push'))
+    const row = overlay(h).querySelector<HTMLElement>('.overlay-stat-row')!
+    expect([...row.querySelectorAll('.overlay-stat')].map(el => el.textContent))
+      .toEqual(['Base armour rating: 2', 'Encumbrance rating: 0'])
+    expect(row.querySelector('.overlay-stat span')?.textContent).toBe('armour')
+  })
+
+  it('a search highlight anywhere within a line leaves the item body layout unchanged (goldens 22, 23)', () => {
+    const h = setup()
+    const layout = () => [...overlay(h).querySelectorAll<HTMLElement>('.overlay-body > *')]
+      .map(el => `${el.className}|${el.style.getPropertyValue('--hang-col')}|${el.textContent}`)
+    // annotate_string + to_colour_string: open lightcyan, then switch back to
+    // the colour active at the match's end.
+    const highlightAt = (body: string, s: number, e: number) => {
+      const active = [...body.slice(0, s).matchAll(/<([a-z]+)>/g)].at(-1)?.[1] ?? 'lightgrey'
+      return `${body.slice(0, s)}<lightcyan>${body.slice(s, e)}<${active}>${body.slice(e)}`
+    }
+    const pushes = [...stashSearchGolden.messages, ...searchPlacementsGolden.messages]
+      .filter((m): m is typeof m & { body: string } => m.msg === 'ui-push')
+    let placements = 0
+    for (const push of pushes) {
+      const plain = push.body.replace(/<lightcyan>([^<]*)<lightgrey>/g, '$1')
+      const render = (body: string) => {
+        h.dispatch({ ...push, body })
+        const got = layout()
+        h.dispatch({ msg: 'ui-pop' })
+        return got
+      }
+      const base = render(plain)
+      // Every visible word, and every two-word span within one line (the
+      // default plain-text search can't match across a line break).
+      const words = [...plain.matchAll(/<[a-z]+>|[^\s<]+/g)].filter(w => !w[0].startsWith('<'))
+      for (let i = 0; i < words.length; i++) {
+        for (const j of [i, i + 1]) {
+          if (j >= words.length) continue
+          const s = words[i].index!, e = words[j].index! + words[j][0].length
+          if (plain.slice(s, e).includes('\n')) continue
+          placements++
+          expect(render(highlightAt(plain, s, e)), JSON.stringify(plain.slice(s, e))).toEqual(base)
+        }
+      }
+    }
+    expect(placements).toBeGreaterThan(500)
+  })
+
+  it('lifts the search highlight for label matching in describe-item bodies only', () => {
+    const rows = [
+      'r<lightcyan>Poi<lightgrey>s:     It protects you from poison.',
+      '<lightcyan>Harm<lightgrey>:      It increases damage dealt and taken.',
+    ].join('\n')
+    expect(unwrapHangingIndents(rows, true)).toBe(rows.split('\n').map(l => '\u0001' + l).join('\n'))
+    expect(unwrapHangingIndents(rows)).toBe(rows)
+    // The help screen's books row: lifted, its 4-space continuation would
+    // validate as a label column. Outside describe-item it must stay put.
+    const books = '<lightcyan>+<lightgrey> : books (<white>M<lightgrey>emorise,\n    pick up to add to spell library)'
+    expect(unwrapHangingIndents(books)).toBe(books)
   })
 
   it('moves describe-god power costs onto an indented line under the description', () => {

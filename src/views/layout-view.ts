@@ -148,7 +148,10 @@ export class LayoutView {
     // reflowed (dialogue-format quote lines look like label rows). game-over
     // is one fixed-width terminal block — leave it alone.
     if (msg.type === 'formatted-scroller') rawBody = reflowOverview(rawBody)
-    if (msg.type !== 'game-over') rawBody = unwrapHangingIndents(unpadMutationCategory(rawBody))
+    // Only an item describe can carry the Ctrl-F search highlight
+    // (overlay-body.ts liftSearchHighlight).
+    const searchHighlight = msg.type === 'describe-item'
+    if (msg.type !== 'game-over') rawBody = unwrapHangingIndents(unpadMutationCategory(rawBody), searchHighlight)
     if (msg.type === 'describe-god') {
       // describe-god has no `title`/`text` — name is the heading, and the
       // body is split across pane fields (description / favour+powers_list /
@@ -256,10 +259,10 @@ export class LayoutView {
                 bodyEl.appendChild(renderSpellbook(loader, book, colourSpells, onSpell))
               }
             }
-            if (part) bodyEl.insertAdjacentHTML('beforeend', renderBodyLines(part, msg.highlight ?? '', terminal))
+            if (part) bodyEl.insertAdjacentHTML('beforeend', renderBodyLines(part, msg.highlight ?? '', terminal, searchHighlight))
           })
         } else {
-          bodyEl.innerHTML = renderBodyLines(rawBody, msg.highlight ?? '', terminal)
+          bodyEl.innerHTML = renderBodyLines(rawBody, msg.highlight ?? '', terminal, searchHighlight)
         }
         overlay.appendChild(bodyEl)
         // rAF re-fits once fonts settle (the sync call lands before paint).
