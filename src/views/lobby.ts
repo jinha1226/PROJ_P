@@ -114,13 +114,13 @@ export function buildLobbyView(
 
   view.innerHTML = `
     <div class="lobby-header">
-      <button id="lobby-back" class="lobby-btn-ghost" aria-label="Back to login">← Login</button>
+      <button id="lobby-back" class="lobby-btn-ghost is-back" aria-label="Back to login">Login</button>
       ${headerRight}
     </div>
     <div class="lobby-scroll">
       <div id="lobby-notice" class="lobby-notice" hidden></div>
       ${gamesContainer}
-      <h2 class="lobby-section-title">Active Games</h2>
+      <h2 class="lobby-section-title">Active games</h2>
       <div id="lobby-list" class="lobby-list">
         <div class="lobby-loading">Loading…</div>
       </div>
@@ -501,6 +501,9 @@ export function buildLobbyView(
     for (const g of idle) listEl.appendChild(buildRow(g))
   }
 
+  // Line 2 keeps the character string whole ("MiFi XL:27 Zot:5" reads as one
+  // unit, as in milestones) with the version as a dim suffix; only the
+  // spectator count — what you scan for when picking a game — trails the row.
   function buildRow(g: LobbyEntry): HTMLElement {
     const parts: string[] = []
     const hasMeta = g.char || g.xl != null || g.place
@@ -510,9 +513,9 @@ export function buildLobbyView(
     if (!hasMeta && g.milestone) parts.push(`<i>${escHtml(g.milestone.replace(/^started /, ''))}</i>`)
     const ver = versionLabel(g.game_id)
     if (ver) parts.push(`<span class="lobby-game-version">${escHtml(ver)}</span>`)
-    if (g.spectator_count && g.spectator_count > 0) {
-      parts.push(`<span class="lobby-game-spectators">${g.spectator_count} spectator${g.spectator_count === 1 ? '' : 's'}</span>`)
-    }
+    const spectators = g.spectator_count && g.spectator_count > 0
+      ? `<span class="lobby-game-spectators">${g.spectator_count} spectator${g.spectator_count === 1 ? '' : 's'}</span>`
+      : ''
     const id = String(g.id)
     const isIdle = idleSinceMs.has(id)
     const row = document.createElement('div')
@@ -527,6 +530,7 @@ export function buildLobbyView(
         </div>
         <span class="lobby-game-info">${parts.join(' ')}</span>
       </div>
+      ${spectators}
     `
     const startWatch = (): void => {
       rememberGameStart(
@@ -636,9 +640,9 @@ export function maybeShowExitDialog(view: HTMLElement, exit: GameExit): void {
   if (exit.message) {
     parts.push(`<pre class="lobby-exit-summary">${escHtml(dedent(exit.message))}</pre>`)
   }
-  // Footer action row, separated from the recap by a hairline. Close sits left
-  // and the morgue link is pushed right, matching the reference webtiles exit
-  // dialog so returning players' muscle memory holds.
+  // Footer action row. Close sits left and the morgue link right, matching
+  // the reference webtiles exit dialog so returning players' muscle memory
+  // holds.
   const actions: string[] = ['<button type="button" class="lobby-exit-close">Close</button>']
   if (exit.dump) {
     const href = `${exit.dump}.txt`

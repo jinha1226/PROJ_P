@@ -10,7 +10,7 @@ import { count } from '../counter'
 
 // Full-screen "crypt": the complete retained character history (../avatars),
 // painted as a vertical-scrolling 4-wide grid of doll sprites. An opaque full
-// screen, not a modal card — so it's dismissed with a "← Back" ghost button (the
+// screen, not a modal card — so it's dismissed with a "‹ Back" ghost button (the
 // same chrome as the lobby), top-left; Escape also closes it (mountOverlay).
 // Mounted on document.body above the login view, opened by tapping the login doll
 // strip. The grid mirrors the strip's newest-first order (newest top-left), so the
@@ -82,7 +82,7 @@ export function openAvatarCard(a: Avatar): void {
 }
 
 // The full-screen shell shared by the crypt, the records browser, and its
-// morgue drill-down: pinned header with the "← Back" ghost button (the same
+// morgue drill-down: pinned header with the "‹ Back" ghost button (the same
 // chrome as the lobby), scrollable body, scroll-edge cue (hairline under the
 // pinned bar while content is scrolled beneath it), Escape dismissal.
 // Callers fill the header's right side and the body — static markup only,
@@ -97,7 +97,7 @@ export function mountCryptShell(
   view.className = extraClass ? `crypt-view ${extraClass}` : 'crypt-view'
   view.innerHTML = `
     <header class="crypt-header">
-      <button type="button" class="crypt-back lobby-btn-ghost" aria-label="Back">← Back</button>
+      <button type="button" class="crypt-back lobby-btn-ghost is-back" aria-label="Back">Back</button>
       ${headerHtml}
     </header>
     <div class="crypt-scroll">${bodyHtml}</div>

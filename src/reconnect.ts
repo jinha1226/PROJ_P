@@ -533,10 +533,15 @@ interface Overlay extends ResumeUi {
 }
 
 // Dim overlay over the (frozen) game view. Kept outside #app so view swaps
-// underneath never disturb it.
+// underneath never disturb it. Status shows as a capsule (a status is not a
+// question, so no alert); askForceTerminate turns the card into a centred
+// dialog (.is-question) until it's answered. The backdrop blocks every
+// opener, so whether a sheet is up is fixed at mount: over one the capsule
+// docks at the bottom, clear of the sheet's header (.is-over-sheet).
 function buildOverlay(onCancel: () => void): Overlay {
   const backdrop = document.createElement('div')
   backdrop.className = 'reconnect-backdrop'
+  if (document.querySelector('.doc-backdrop')) backdrop.classList.add('is-over-sheet')
   backdrop.innerHTML = `
     <div class="reconnect-card">
       <div class="reconnect-spinner" aria-hidden="true"></div>
@@ -571,6 +576,8 @@ function buildOverlay(onCancel: () => void): Overlay {
     },
     askForceTerminate(answer: (yes: boolean) => void): void {
       spinnerEl.hidden = true
+      backdrop.classList.add('is-question')
+      statusEl.textContent = 'Previous session still running'
       questionEl.textContent = FORCE_TERMINATE_WARNING
       questionEl.hidden = false
       actionsEl.innerHTML = `
@@ -581,6 +588,7 @@ function buildOverlay(onCancel: () => void): Overlay {
       const respond = (yes: boolean): void => {
         if (answered) return
         answered = true
+        backdrop.classList.remove('is-question')
         spinnerEl.hidden = false
         questionEl.hidden = true
         renderCancelAction()

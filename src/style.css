@@ -12,14 +12,22 @@
      base colour surfaced as a seam somewhere (a warm #0a0908 chrome did,
      2026-09-15). Hierarchy is the raised tokens below, never the base. */
   --bg:        #000000;
-  --surface:   #14110f;
-  --surface2:  #1f1b18;
+  /* The surface ladder ("Tango gray"): every chrome gray carries the hue of
+     the game palette's own grays (lightgrey #babdb6 / darkgrey #555753 sit
+     at OKLCH ~126°, chroma ~0.007–0.010), at chroma 0.004–0.009, so chrome
+     and game share one gray family. Measured 2026-10-07: cool blue-grays
+     sit at ~286° (opposite the game's) and the old stone ladder at ~56° —
+     a diluted wall-brown that echoed the map's walls; don't drift back to
+     either. A control is one step above the surface it sits on. */
+  --surface:   #1c1d1b;  /* cards on the page; sheets and dialogs */
+  --surface2:  #2c2d2a;  /* cards in a sheet; controls on the page */
+  --surface3:  #393b38;  /* controls in sheet cards and dialogs */
+  --surface4:  #5a5b57;  /* a segmented control's selected thumb */
   /* Pressed-state fill for every tappable control, dark-UI style: press
-     LIGHTENS (12% white over --surface, Material's pressed state-layer
-     opacity; iOS/Gboard dark keyboards make a similar-size jump). surface2
-     was tried as the press fill and is only ~1.1:1 against --surface —
-     invisible on an OLED phone; don't reuse a resting surface token here. */
-  --press:     #302e2c;
+     LIGHTENS, a step above the lightest control it lands on. A resting
+     surface token as the press fill (surface2 over surface) measured only
+     ~1.1:1 — invisible on an OLED phone; don't reuse one here. */
+  --press:     #42443f;
   /* List rows in scrolling views hold their press state back this long
      (`transition: background-color 0s var(--press-delay)` on :active), so
      a scroll that starts on a row never lights it — native lists wait the
@@ -30,8 +38,10 @@
      row pressed longer than this would stay lit (main.ts has the why). */
   --press-delay: 100ms;
   --accent:    #f59e0b;
-  --text:      #e7e5e4;
-  --text-dim:  #a8a29e;
+  /* Text on the same hue as the ladder; --text is the palette's own white. */
+  --text:      #eeeeec;
+  --text-dim:  #9d9f99;
+  --text-faint: #686a65;
   --danger:    #ef4444;
   /* The DCSS 16-colour term palette (Tango), same names and values as the
      reference's --color-0..15. Anything that means "DCSS colour N" uses
@@ -59,24 +69,40 @@
      cursor square. The tiles-mode canvas fallback stroke (tile-map-view.ts
      paintCursorIfHere) uses the JS twin. */
   --map-cursor: var(--color-14);
-  --border:    rgba(245, 158, 11, 0.12);
+  /* Chrome separates by fill, not outline: --separator is the one hairline,
+     between rows of a list, inset at both ends. --border is a region seam on black (HUD / keyboard / bars), never
+     a control's outline. */
+  --separator: #3c3e3a;
+  --border:    #242522;
   /* The accent's jobs, per the HIG Color/Buttons pages ("avoid using the
      same color to mean different things"; "to emphasize primary actions,
      apply color to the background rather than to symbols or text"): a FILL
-     is a view's one primary action; small marks are state (selected, unread,
-     ✓, focus); links; the wordmark. Never a label, title or name — names
-     lead by weight. --accent-line is the border of a secondary button that
-     sits beside a primary (trunk, Install, a version with a save). */
-  --accent-line: rgba(245, 158, 11, 0.35);
-  --accent-tint: rgba(245, 158, 11, 0.12);  /* selected-state fill */
-  --border-card: rgba(245, 158, 11, 0.22);  /* modal card outline, a step above --border */
-  --danger-line: rgba(239, 68, 68, 0.35);   /* a destructive button's border: --danger at the --accent-line alpha */
+     is a view's one primary action; small marks are state (✓, unread,
+     armed, pressed, the caret); links and tappable text-only actions (New
+     set, Spectate, Install); the wordmark. Never a static
+     label, title or name — names lead by weight. In-game chrome's state
+     grammar: a gray step up = current/active, accent = armed/pressed.
+     Dialog buttons stay neutral (destructive red, preferred bold). */
+  --accent-line: rgba(245, 158, 11, 0.35);  /* a version button with a save */
   /* Modal chrome of the app's own dialogs (exit, docs/settings, reconnect,
      crypt card), so they read as one family. The in-game prompt card
      follows the reference client instead (.overlay-float). */
-  --modal-scrim:  rgba(0, 0, 0, 0.6);
+  --modal-scrim:  rgba(0, 0, 0, 0.45);
   --modal-shadow: 0 12px 40px rgba(0, 0, 0, 0.55);
+  --alert-w: 21.25rem;  /* the exit card and the reconnect question */
 
+  /* Radii by shape class, not by component: a key or inner well, a small
+     control, any full-width bar (cards and buttons alike), a sheet or
+     dialog. Nested shapes derive (segmented thumb = ctl − its 3px inset).
+     Capsules only for small pills; circles for icon buttons. */
+  --r-key:   8px;
+  --r-ctl:   12px;
+  --r-bar:   16px;
+  --r-sheet: 24px;
+
+  /* Chrome is the UI font (--font-ui); mono is for the game's words —
+     game content, and game data shown inside chrome (combo/XL/place,
+     versions, hostnames, keys, the morgue recap). */
   --font-mono: ui-monospace, 'SFMono-Regular', Menlo, monospace;
   --font-ui:   system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
   --map-font-size: 17px;
@@ -172,6 +198,22 @@ html, body {
      no unprefixed form). Don't re-add per-element copies. */
   -webkit-tap-highlight-color: transparent;
 }
+/* The app's own screens and dialogs use --font-ui; the page default above stays
+   mono for the game. Inside these roots, game data opts back into
+   --font-mono per element (see --font-ui). Form controls don't inherit
+   font, hence the button/input/select line. Both at zero specificity
+   (:where): any class rule — a mono key, a hostname picker — wins. */
+:where(#login-view, #lobby-view, .doc-backdrop, .lobby-exit-backdrop,
+       .reconnect-backdrop, .size-palette, .rc-editor, .crypt-header,
+       #spectator-bar) {
+  font-family: var(--font-ui);
+  -webkit-font-smoothing: antialiased;
+}
+:where(#login-view, #lobby-view, .doc-backdrop, .lobby-exit-backdrop,
+       .reconnect-backdrop, .size-palette, .rc-editor, .crypt-header,
+       #spectator-bar) :where(button, input, select, textarea) {
+  font-family: inherit;
+}
 /* Controls aren't text: a long-press on one must not start iOS text
    selection (observed on device 2026-09-25 — holding a lobby row selected
    its text with a haptic). Element-level only, never on a container: an
@@ -263,12 +305,11 @@ html.pz-home-indicator { --safe-bottom: var(--home-indicator-cap); }
      overlays (see .login-group-toggle), which may extend only into them. */
   --login-head-gap: 1.25rem;  /* title / avatar shelf → first group */
   --login-group-gap: 1.6rem;  /* group → group */
+  /* No card of its own: the page is the surface, the groups' cells sit on
+     it (one step up), as a settings list does. */
   width: 100%;
-  max-width: 360px;
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  padding: 1.5rem 1.25rem;
+  max-width: 26rem;
+  padding: 1rem 0;
 }
 
 /* The login-screen Settings entry: same self-labeling gear as the in-game HUD
@@ -294,11 +335,10 @@ html.pz-home-indicator { --safe-bottom: var(--home-indicator-cap); }
 .login-moved {
   position: relative;
   margin-bottom: 1.25rem;
-  padding: 0.8rem 2rem 0.85rem 0.85rem;
-  background: var(--surface2);
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  font-size: 0.85rem;
+  padding: 0.85rem 2.25rem 0.9rem 1.25rem;
+  background: var(--surface);
+  border-radius: var(--r-bar);
+  font-size: 0.9375rem;
   line-height: 1.5;
   color: var(--text);
 }
@@ -593,10 +633,10 @@ html.pz-home-indicator { --safe-bottom: var(--home-indicator-cap); }
   outline: none; /* programmatic focus (dismissal focus-parking), no ring */
 }
 
-/* Two top-level mode groups (Play online / On this device — login.ts). The
-   group label's trailing hairline makes the mode split structural without
-   boxing the groups; sub-labels inside a group are normal-case and dimmer,
-   one clear level below. */
+/* Two top-level mode groups (Play online / Play offline — login.ts), as
+   grouped-list section headers: sentence case, gray, on the cells' text
+   column (20px in), the disclosure chevron at the trailing margin; the
+   sub-labels inside a group (Spectate as guest) one size down. */
 .login-group { margin-bottom: var(--login-group-gap); }
 .login-group:last-of-type { margin-bottom: 0; }
 
@@ -604,17 +644,13 @@ html.pz-home-indicator { --safe-bottom: var(--home-indicator-cap); }
   display: flex;
   align-items: center;
   gap: 0.6rem;
-  font-size: 0.72rem;
+  padding: 0 1.25rem;
+  font-size: 1rem;
+  font-weight: 600;
   color: var(--text-dim);
-  text-transform: uppercase;
-  letter-spacing: 0.1em;
-  margin-bottom: 0.7rem;
+  margin-bottom: 0.5rem;
 }
-.login-group-label::after {
-  content: "";
-  flex: 1;
-  border-top: 1px solid var(--border);
-}
+.login-group-label::after { content: ""; flex: 1; }
 /* The two mode groups as iOS-style disclosure sections (HIG DisclosureGroup:
    Notes/Files/Reminders section headers): the header row is the control, a
    trailing chevron points right collapsed / down open (no rotation animation
@@ -677,32 +713,46 @@ html.pz-home-indicator { --safe-bottom: var(--home-indicator-cap); }
 .login-subsection:last-child { margin-bottom: 0; }
 
 .login-sub-label {
-  font-size: 0.85rem;
+  padding: 0 1.25rem;
+  font-size: 0.8125rem;
   color: var(--text-dim);
-  margin-bottom: 0.5rem;
+  margin-bottom: 0.4rem;
 }
 
+/* Saved accounts: one grouped list, separators inset at both ends. */
 .login-account-list {
   display: flex;
   flex-direction: column;
-  gap: 0.4rem;
+  border-radius: var(--r-bar);
+  overflow: hidden;
 }
 
 .login-account-card {
+  position: relative;
   display: grid;
   grid-template-columns: auto 1fr auto;
   grid-template-areas: "tag user arrow";
   align-items: center;
-  gap: 0 0.7rem;
-  background: var(--surface2);
-  border: 1px solid var(--border);
-  border-radius: 4px;
+  gap: 0 0.75rem;
+  min-height: 3.25rem;
+  background: var(--surface);
+  border: none;
+  border-radius: var(--r-bar);
   color: var(--text);
-  font-family: var(--font-mono);
-  padding: 0.55rem 0.7rem;
+  padding: 0.5rem 1.25rem;
   cursor: pointer;
   text-align: left;
   width: 100%;
+}
+.login-account-list .login-account-card { border-radius: 0; }
+.login-account-list .login-account-card + .login-account-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 1.25rem;
+  right: 1.25rem;
+  height: 0.5px;
+  background: var(--separator);
 }
 
 :root:not(.press-cancelled) .login-account-card:active { background: var(--press); transition: background-color 0s var(--press-delay); }
@@ -715,28 +765,39 @@ html.pz-home-indicator { --safe-bottom: var(--home-indicator-cap); }
      Connect is folded away — and a full fill per card would shout. */
   background: rgba(245, 158, 11, 0.15);
   color: var(--accent);
-  border-radius: 3px;
+  border-radius: 6px;
   padding: 0.25rem 0.5rem;
-  font-size: 0.78rem;
-  font-weight: bold;
-  letter-spacing: 0.05em;
+  font-size: 0.8125rem;
+  font-weight: 600;
   min-width: 3rem;
   text-align: center;
 }
 
 .login-account-username {
   grid-area: user;
-  font-size: 1rem;
+  font-size: 1.0625rem;
   color: var(--text);
 }
 
+/* Trailing chevron (a row that goes somewhere), not an arrow glyph */
 .login-account-card::after {
-  content: "→";
+  content: "";
   grid-area: arrow;
-  color: var(--text-dim);
-  font-size: 1.1rem;
+  width: 0.5rem;
+  height: 0.5rem;
+  margin-right: 0.2rem;
+  border-right: 2px solid var(--text-faint);
+  border-bottom: 2px solid var(--text-faint);
+  transform: rotate(-45deg);
 }
-.login-account-card:disabled::after { content: "…"; }
+.login-account-card:disabled::after {
+  content: "…";
+  width: auto;
+  height: auto;
+  border: none;
+  transform: none;
+  color: var(--text-dim);
+}
 
 /* Offline entry card (login.ts renderOfflineCard): account-card chrome with a
    two-line middle — the most recent character (or "New game") as the title +
@@ -760,8 +821,10 @@ html.pz-home-indicator { --safe-bottom: var(--home-indicator-cap); }
   gap: 0.6em;
   min-width: 0;
 }
+/* XL / place: game data, mono */
 .login-offline-sub {
-  font-size: 0.78rem;
+  font-family: var(--font-mono);
+  font-size: 0.8125rem;
   color: var(--text-dim);
   white-space: nowrap;
   overflow: hidden;
@@ -769,16 +832,27 @@ html.pz-home-indicator { --safe-bottom: var(--home-indicator-cap); }
 }
 .login-offline-count {
   flex: 0 0 auto;
-  font-size: 0.78rem;
-  font-style: italic;
+  font-size: 0.8125rem;
   color: var(--text-dim);
   white-space: nowrap;
 }
 .login-offline-count:empty { display: none; }
+/* The device glyph's well: a square, not a pill like the server tags */
+.login-offline-card .login-account-tag {
+  min-width: 0;
+  width: 2rem;
+  height: 2rem;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--r-key);
+}
 
 .login-add-section > summary {
   cursor: pointer;
-  font-size: 0.85rem;  /* same scale as .login-sub-label; the chevron marks it as the action */
+  padding: 0.6rem 1.25rem 0;
+  font-size: 0.9375rem;
   color: var(--text-dim);
   list-style: none;
 }
@@ -803,99 +877,114 @@ html.pz-home-indicator { --safe-bottom: var(--home-indicator-cap); }
 .lobby-more-games[open] > summary::before { transform: translateY(-0.2em) rotate(45deg); }
 .login-add-section[open] > summary { margin-bottom: 0.6rem; }
 
-.login-spectate-select {
-  display: block;
-  width: 100%;
-  background: var(--surface2);
-  border: 1px solid var(--border);
-  border-radius: 4px;
-  color: var(--text-dim);
+/* Server pickers hold hostnames: game data, mono. WebKit's menulist
+   ignores padding and draws its own arrow, so the picker is unstyled
+   (appearance: none) with a drawn ⌃⌄ at the trailing edge; its height is
+   pinned with `height` — WebKit honours that on a menulist and ignores
+   min-height (measured). */
+.login-spectate-select,
+.login-form-row select {
+  -webkit-appearance: none;
+  appearance: none;
+  height: 2.75rem;
+  padding: 0 2.25rem 0 1.25rem;
+  background: transparent url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='16' viewBox='0 0 10 16'%3E%3Cpath d='M1.5 6 5 2.5 8.5 6M1.5 10 5 13.5 8.5 10' fill='none' stroke='%239d9f99' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") no-repeat right 1.1rem center;
+  border: none;
+  color: var(--text);
   font-family: var(--font-mono);
-  font-size: 1rem;
-  padding: 0.5rem 0.75rem;
+  font-size: 0.9375rem;
   outline: none;
-  margin-bottom: 0.5rem;
 }
-.login-spectate-select:focus { border-color: var(--accent); color: var(--text); }
 
-/* Spectating stays a first-class path, but a one-line one: the server picker
-   and the go button share a row instead of stacking full-width under a label.
-   That's 37px back for the offline group below (measured, 402x874) without
-   costing a tap or hiding the path. Stretch, so the two controls are exactly
-   the same height rather than nearly.
-
-   The select's 10rem basis is a wrap threshold, not a width: it holds a
-   hostname (login.ts), and a phone narrow enough to clip that down to
-   "crawl.dc" (~320px) wraps the row back into the old full-width stack
-   instead, both children growing to fill their line. 375px keeps the single
-   row with the hostname intact, so the compression holds everywhere it helps
-   and gives way where it would cost legibility — no width breakpoint needed,
-   and none exists in this stylesheet to follow. */
+/* Spectating stays a first-class path, but a one-line one: the server
+   picker and the go action share one cell instead of stacking under a
+   label (37px back for the offline group, measured at 402x874). */
 .login-spectate-row {
   display: flex;
   align-items: stretch;
-  flex-wrap: wrap;
-  gap: 0.5rem;
+  background: var(--surface);
+  border-radius: var(--r-bar);
+  overflow: hidden;
 }
-.login-spectate-row .login-spectate-select {
-  flex: 1 1 10rem;
-  min-width: 0;
-  width: auto;
-  margin-bottom: 0;
-  /* WebKit renders a menulist select at ~23px, ignoring its vertical padding,
-     so beside the button it would sit visibly short. Pin it to the button's
-     height — which also keeps the wrapped narrow layout, where there is no
-     button on the line to stretch against, identical to the single-row one.
-     `height`, not `min-height`: WebKit honours the former on a menulist and
-     ignores the latter (measured). rem so it still tracks the root font. */
-  height: 2.25rem;
-}
-.login-spectate-row .login-btn-spectate {
-  /* Grows only to fill its own line once wrapped; on the shared row the
-     select gets the slack, since the hostname is what needs the pixels. */
-  flex: 1 0 auto;
-  width: auto;
-  padding: 0.5rem 0.85rem;
-}
+.login-spectate-row .login-spectate-select { flex: 1 1 auto; min-width: 0; }
 
+/* The sign-in form: one grouped cell — a Server row (name leading, picker
+   trailing), then the two fields, separators inset at both ends. */
+.login-form-group {
+  margin-bottom: 1rem;
+  background: var(--surface);
+  border-radius: var(--r-bar);
+  overflow: hidden;
+}
+.login-form-row {
+  position: relative;
+  display: flex;
+  align-items: center;
+  min-height: 2.75rem;
+  padding: 0 1.25rem;
+}
+.login-form-row + .login-form-row::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 1.25rem;
+  right: 1.25rem;
+  height: 0.5px;
+  background: var(--separator);
+}
+.login-form-name { flex: 1; font-size: 1.0625rem; color: var(--text); }
+.login-form-row--picker { padding-right: 0; }
+.login-form-row select { flex: none; padding-left: 0.75rem; text-align: right; color: var(--text-dim); }
+.login-form-row input {
+  flex: 1;
+  min-width: 0;
+  height: 2.75rem;
+  padding: 0;
+  background: none;
+  border: none;
+  outline: none;
+  color: var(--text);
+  caret-color: var(--accent);
+  font-size: 1.0625rem;  /* ≥16px: iOS zooms on focusing a smaller input */
+}
+.login-form-row input::placeholder { color: var(--text-faint); }
+
+/* Labelled field outside a form group (offline lobby's character name) */
 .login-label {
   display: flex;
   flex-direction: column;
-  gap: 0.3rem;
+  gap: 0.4rem;
   margin-bottom: 0.85rem;
-  font-size: 0.85rem;
+  padding: 0 1.25rem;
+  font-size: 0.8125rem;
   color: var(--text-dim);
 }
-
-.login-label input,
-.login-label select {
-  background: var(--surface2);
-  border: 1px solid var(--border);
-  border-radius: 4px;
-  font-family: var(--font-mono);
-  font-size: 1rem;
-  padding: 0.5rem 0.75rem;
+.login-label input {
+  margin: 0 -1.25rem;
+  height: 2.75rem;
+  padding: 0 1.25rem;
+  background: var(--surface);
+  border: none;
+  border-radius: var(--r-bar);
+  color: var(--text);
+  caret-color: var(--accent);
+  font-size: 1.0625rem;
   outline: none;
 }
 
-.login-label input { color: var(--text); }
-.login-label select { color: var(--text-dim); }
-
-.login-label input:focus,
-.login-label select:focus { border-color: var(--accent); }
-.login-label select:focus { color: var(--text); }
-
 .login-error {
+  padding: 0 1.25rem;
   color: var(--danger);
-  font-size: 0.85rem;
+  font-size: 0.9375rem;
   margin-bottom: 0.75rem;
 }
 
 .login-btn {
   /* the fill itself: the shared rule at .lobby-btn-primary */
   width: 100%;
-  font-size: 1rem;
-  padding: 0.7rem;
+  min-height: 3.125rem;
+  font-size: 1.0625rem;
+  padding: 0 1rem;
 }
 
 .login-btn:disabled {
@@ -918,30 +1007,38 @@ html.pz-home-indicator { --safe-bottom: var(--home-indicator-cap); }
   .login-btn.login-busy:disabled { animation: none; }
 }
 
-/* Two classes: the shared fill rule sits later in the file (.lobby-btn-primary). */
+/* Two classes: the shared fill rule sits later in the file (.lobby-btn-primary).
+   A text action at the cell's trailing end, past a separator. */
 .login-btn.login-btn-spectate {
-  background: transparent;
-  color: var(--text-dim);
-  border: 1px solid var(--border);
-  font-weight: normal;
+  flex: none;
+  width: auto;
+  min-height: 0;
+  padding: 0 1.25rem;
+  background: none;
+  border: none;
+  border-radius: 0;
+  box-shadow: inset 0.5px 0 0 var(--separator);
+  color: var(--accent);
+  font-weight: 400;
 }
 
 /* Flex rather than an inline row so spacing is keyed on position, not element
    type: the gear chip is a <button> among the anchors, and gap spaces any
-   child without each one restating the constant. */
+   child without each one restating the constant. Links in the accent (the
+   rule allows links), no underline. */
 .login-footer {
   margin-top: 1.5rem;
   display: flex;
   justify-content: center;
   align-items: center;
-  gap: 0.75rem;
-  font-size: 0.8rem;
-  color: var(--muted, #888);
+  gap: 1.25rem;
+  font-size: 0.9375rem;
+  color: var(--accent);
 }
 
 .login-footer a {
   color: inherit;
-  text-decoration: underline;
+  text-decoration: none;
 }
 
 /* Unread badge on the "What's new" entry points (login footer link, lobby
@@ -1011,7 +1108,7 @@ html.pz-home-indicator { --safe-bottom: var(--home-indicator-cap); }
 
 /* Pinned nav bar shared by the lobby and the crypt: a 36px centered row that
    owns the safe-top inset (so scrolled content never rides under the dynamic
-   island) and lands the "← Back" button in the same spot in both views. The
+   island) and lands the "‹ Back" button in the same spot in both views. The
    is-scrolled hairline appears only while content is scrolled beneath — a
    box-shadow rather than a border so its appearance costs no layout height
    (class toggled by each view's scroll listener, src/util/scroll-cue.ts). */
@@ -1037,13 +1134,13 @@ html.pz-home-indicator { --safe-bottom: var(--home-indicator-cap); }
   display: inline-flex;
   align-items: center;
   gap: 0.3rem;
-  background: var(--surface);
+  min-height: 2.25rem;
+  background: var(--surface2);
   border: none;
   border-radius: 999px;
   color: var(--text);
-  font-family: var(--font-mono);
-  font-size: 0.8rem;
-  padding: 0.35rem 0.75rem;
+  font-size: 0.9375rem;
+  padding: 0 0.9rem;
   cursor: pointer;
 }
 
@@ -1086,26 +1183,25 @@ button.lobby-account-chip:active { background: var(--press); }
   top: calc(100% + 4px);
   right: 0;
   z-index: 20;
-  min-width: 8rem;
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: 4px;
+  min-width: 12rem;
+  background: var(--surface2);
+  border-radius: var(--r-ctl);
   display: flex;
   flex-direction: column;
-  padding: 0.25rem;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+  padding: 0.3rem;
+  box-shadow: var(--modal-shadow);
 }
 
 .lobby-account-menu-item {
   background: transparent;
   border: none;
   color: var(--text);
-  font-family: var(--font-mono);
-  font-size: 0.85rem;
-  padding: 0.5rem 0.75rem;
+  font-size: 1.0625rem;
+  min-height: 2.75rem;
+  padding: 0 0.85rem;
   text-align: left;
   cursor: pointer;
-  border-radius: 3px;
+  border-radius: calc(var(--r-ctl) - 0.3rem);
   white-space: nowrap;  /* the unread dot rides the label, never a 2nd line */
 }
 .lobby-account-menu-item:active { background: var(--press); }
@@ -1126,74 +1222,84 @@ button.lobby-account-chip:active { background: var(--press); }
 .login-btn,
 .lobby-btn-primary {
   background: var(--accent);
-  /* Transparent, not none: the outlined trunk button stacks under the
-     headline one, and a borderless fill set its label 1px left of trunk's. */
-  border: 1px solid transparent;
-  border-radius: 4px;
+  border: none;
+  border-radius: var(--r-bar);
   color: var(--bg);
-  font-family: var(--font-mono);
-  font-weight: bold;
+  font-weight: 600;
   cursor: pointer;
 }
 /* Fills press by dimming (as .settings-btn-primary, .rc-editor-save); the
-   outlined buttons take --press. */
+   gray-filled buttons take --press. */
 .login-btn:not(:disabled):active,
 .lobby-btn-primary:not(:disabled):active { opacity: 0.85; }
 .login-btn.login-btn-spectate:not(:disabled):active,
 .lobby-btn-trunk:not(:disabled):active,
 .lobby-btn-secondary:not(:disabled):active { background: var(--press); opacity: 1; }
 .lobby-btn-primary {
-  font-size: 0.95rem;
+  font-size: 1.0625rem;
+  min-height: 3.125rem;
   padding: 0.6rem 1rem;
   align-self: flex-start;
 }
 
+/* Version-list buttons ("Show all versions"): small filled controls */
 .lobby-btn-secondary {
-  background: transparent;
-  border: 1px solid var(--border);
-  border-radius: 4px;
-  color: var(--text-dim);
-  font-family: var(--font-mono);
-  font-size: 0.8rem;
-  padding: 0.4rem 0.6rem;
+  min-height: 2.25rem;
+  background: var(--surface2);
+  border: none;
+  border-radius: var(--r-ctl);
+  color: var(--text);
+  font-family: var(--font-mono);  /* game ids */
+  font-size: 0.8125rem;
+  padding: 0 0.75rem;
   cursor: pointer;
   white-space: nowrap;
 }
 
-/* Trunk headline button: same size/prominence as the filled stable primary,
-   but an outline (not filled) treatment. The two headline buttons render in a
-   fixed order (stable on top); differentiating trunk by fill vs. outline — not
-   just position — keeps a player who's used to a trunk-first server (CAO/CPO)
-   from launching stable by reflex. Overrides the .lobby-btn-primary fill via
-   later source order (equal specificity). */
+/* Trunk headline button: same size as the filled stable primary, but gray,
+   not accent. The two headline buttons render in a fixed order (stable on
+   top); differentiating trunk by fill — not just position — keeps a player
+   who's used to a trunk-first server (CAO/CPO) from launching stable by
+   reflex. Overrides the .lobby-btn-primary fill via later source order
+   (equal specificity). */
 .lobby-btn-trunk {
-  background: transparent;
-  border: 1px solid var(--accent-line);
+  background: var(--surface2);
   color: var(--text);
 }
 
-/* Ghost nav button used for "← Back"-style header actions in the lobby and
-   spectator header. No static border so it doesn't compete with the identity
-   pill beside it; press feedback comes from a tinted background. */
+/* Ghost nav button for "‹ Back"-style header actions (lobby "‹ Login",
+   crypt "‹ Back", spectator "‹ Lobby"): chevron + label, no fill, so it
+   doesn't compete with the identity pill beside it; press feedback is a
+   fill. The label keeps the destination — "Login" says you're leaving the
+   server. .is-back draws the chevron (the offline name form's Cancel is a
+   ghost without one). */
 .lobby-btn-ghost {
   background: transparent;
-  border: 1px solid transparent;
-  border-radius: 6px;
+  border: none;
+  border-radius: var(--r-ctl);
   color: var(--text);
-  font-family: var(--font-mono);
-  font-size: 0.9rem;
-  padding: 0.4rem 0.65rem 0.4rem 0.5rem;
+  font-size: 1.0625rem;
+  padding: 0 0.75rem 0 0.4rem;
   cursor: pointer;
   white-space: nowrap;
   display: inline-flex;
   align-items: center;
-  gap: 0.2rem;
-  min-height: 32px;
+  gap: 0.4rem;
+  min-height: 2.25rem;
   position: relative;
 }
-/* All three uses (lobby "← Login", crypt "← Back", spectator "← Lobby") sit
-   at screen edges where taps are least accurate, and the visible pill is only
-   ~32px tall — an invisible hit extension catches near-miss taps. Vertically
+.lobby-btn-ghost.is-back::before {
+  content: '';
+  width: 0.6rem;
+  height: 0.6rem;
+  margin-left: 0.45rem;
+  border-left: 2.5px solid currentColor;
+  border-bottom: 2.5px solid currentColor;
+  transform: rotate(45deg);
+}
+/* All three back uses (lobby "‹ Login", crypt "‹ Back", spectator "‹ Lobby")
+   sit at screen edges where taps are least accurate, and the visible button
+   is only 36px tall — an invisible hit extension catches near-miss taps. Vertically
    free (nothing adjacent); horizontally capped at 7px to stay inside the
    0.5rem flex gaps to sibling tap targets (chat chip, account chip). */
 .lobby-btn-ghost::after {
@@ -1202,14 +1308,11 @@ button.lobby-account-chip:active { background: var(--press); }
   inset: -10px -7px;
 }
 /* Hover only on hover-capable devices: stacked shells (records → morgue,
-   lobby → records) put identical ← buttons at the same coordinates, and an
+   lobby → records) put identical back buttons at the same coordinates, and an
    unguarded :hover sticks to the button revealed under the closing tap on
    iOS (emulated-hover transfer — seen live 2026-07-21). */
 @media (hover: hover) {
-  .lobby-btn-ghost:hover {
-    background: var(--surface);
-    border-color: var(--border);
-  }
+  .lobby-btn-ghost:hover { background: var(--surface); }
 }
 .lobby-btn-ghost:active { background: var(--press); }
 .lobby-btn-ghost:focus-visible {
@@ -1224,10 +1327,12 @@ button.lobby-account-chip:active { background: var(--press); }
   align-items: stretch;
 }
 
+/* Headline buttons: centred labels (a left-aligned label in a full-width
+   bar reads as a list row) */
 .lobby-actions .lobby-btn-primary,
 .lobby-actions .lobby-btn-secondary {
   align-self: stretch;
-  text-align: left;
+  text-align: center;
 }
 
 .lobby-more-games {
@@ -1243,9 +1348,9 @@ button.lobby-account-chip:active { background: var(--press); }
 
 .lobby-more-games > summary {
   cursor: pointer;
-  font-size: 0.8rem;
+  font-size: 0.9375rem;
   color: var(--text-dim);
-  padding: 0.3rem 0;
+  padding: 0.4rem 1.25rem;
   list-style: none;
 }
 .lobby-more-games > summary:active { opacity: 0.5; }
@@ -1262,34 +1367,24 @@ button.lobby-account-chip:active { background: var(--press); }
   color: var(--text-dim);
 }
 
-/* Same grammar as the login screen's .login-group-label (size, weight,
-   trailing rule) minus its chevron — these sections don't collapse. The
-   weight is explicit because the element is an h2. */
+/* Same grammar as the login screen's .login-group-label (size, weight, on
+   the cells' text column) minus its chevron — these sections don't
+   collapse. */
 .lobby-section-title {
-  display: flex;
-  align-items: center;
-  gap: 0.6rem;
-  font-size: 0.72rem;
-  font-weight: 400;
+  padding: 0 1.25rem;
+  font-size: 1rem;
+  font-weight: 600;
   color: var(--text-dim);
-  text-transform: uppercase;
-  letter-spacing: 0.1em;
   /* Adds to .lobby-scroll's 0.75rem gap: more space above a section title
      than below it, so the title binds to its own section's content. */
-  margin-top: 0.4rem;
-}
-.lobby-section-title::after {
-  content: "";
-  flex: 1;
-  border-top: 1px solid var(--border);
+  margin: 0.75rem 0 -0.25rem;
 }
 
 .lobby-section-divider {
-  font-size: 0.75rem;
+  font-size: 0.8125rem;
   color: var(--text-dim);
   text-align: center;
   padding: 0.4rem 0 0.2rem;
-  letter-spacing: 0.05em;
 }
 
 .lobby-notice {
@@ -1297,36 +1392,52 @@ button.lobby-account-chip:active { background: var(--press); }
   top: 0;
   z-index: 1;
   background: var(--surface);
-  border: 1px solid var(--warn);
-  border-radius: 4px;
-  color: var(--warn);
-  font-size: 0.85rem;
-  padding: 0.5rem 0.75rem;
+  border-radius: var(--r-bar);
+  box-shadow: inset 3px 0 0 var(--warn);
+  color: var(--text);
+  font-size: 0.9375rem;
+  padding: 0.75rem 1.25rem;
 }
 
-.lobby-list { display: flex; flex-direction: column; gap: 0.4rem; }
-.lobby-loading, .lobby-empty { color: var(--text-dim); font-size: 0.85rem; }
+/* One grouped list: rows share a cell, separators inset at both ends */
+.lobby-list { display: flex; flex-direction: column; }
+.lobby-loading, .lobby-empty { padding: 0 1.25rem; color: var(--text-dim); font-size: 0.9375rem; }
 
 .lobby-game-row {
   display: flex;
   align-items: center;
   gap: 0.75rem;
+  min-height: 3.5rem;
   background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: 4px;
-  padding: 0.5rem 1.6rem 0.5rem 0.75rem;
+  border: none;
+  padding: 0.6rem 2.5rem 0.6rem 1.25rem;
   cursor: pointer;
   position: relative;
 }
-
-.lobby-game-row::after {
-  content: "→";
+.lobby-game-row:first-child { border-top-left-radius: var(--r-bar); border-top-right-radius: var(--r-bar); }
+.lobby-game-row:last-child { border-bottom-left-radius: var(--r-bar); border-bottom-right-radius: var(--r-bar); }
+.lobby-game-row + .lobby-game-row::before {
+  content: '';
   position: absolute;
-  right: 0.6rem;
+  top: 0;
+  left: 1.25rem;
+  right: 1.25rem;
+  height: 0.5px;
+  background: var(--separator);
+}
+
+/* Trailing chevron on the 20px margin, where the separators end */
+.lobby-game-row::after {
+  content: "";
+  position: absolute;
+  right: 1.35rem;
   top: 50%;
-  transform: translateY(-50%);
-  color: var(--text-dim);
-  font-size: 0.95rem;
+  width: 0.5rem;
+  height: 0.5rem;
+  margin-top: -0.25rem;
+  border-right: 2px solid var(--text-faint);
+  border-bottom: 2px solid var(--text-faint);
+  transform: rotate(-45deg);
   pointer-events: none;
 }
 
@@ -1351,6 +1462,7 @@ button.lobby-account-chip:active { background: var(--press); }
 }
 .lobby-game-user {
   color: var(--text);
+  font-size: 1.0625rem;
   font-weight: 600;
   flex: 0 1 auto;
   min-width: 0;
@@ -1370,23 +1482,22 @@ button.lobby-account-chip:active { background: var(--press); }
 .lobby-btn-save {
   display: block;
   margin-top: 0.15rem;
-  font-size: 0.8rem;
+  font-family: var(--font-mono);  /* the server's save description: game data */
+  font-size: 0.8125rem;
   font-weight: normal;
   white-space: normal;
 }
-.lobby-btn-secondary.has-save { border-color: var(--accent-line); color: var(--text); }
-.lobby-game-info { font-size: 0.85rem; color: var(--text-dim); }
-.lobby-game-idle { flex: 0 0 auto; white-space: nowrap; font-size: 0.8rem; color: var(--text-dim); }
+/* A version with a save: the one accent mark a gray button carries */
+.lobby-btn-secondary.has-save { box-shadow: inset 0 0 0 1.5px var(--accent-line); }
+/* The character line is game data: mono, whole; the version a dim suffix */
+.lobby-game-info { font-family: var(--font-mono); font-size: 0.8125rem; color: var(--text-dim); }
+.lobby-game-info .lobby-game-version { margin-left: 0.6ch; color: var(--text-faint); }
+.lobby-game-idle { flex: 0 0 auto; white-space: nowrap; font-size: 0.8125rem; color: var(--text-dim); }
 .lobby-game-idle:empty { display: none; }
 
-/* The row's one highlight is brightness, not accent — a stranger's game
-   is content. */
-.lobby-game-spectators { color: var(--text); }
-
-.lobby-game-version {
-  font-style: italic;
-  opacity: 0.7;
-}
+/* The spectator count trails the row: what you scan for when choosing a
+   game to watch. Brightness, not accent — a stranger's game is content. */
+.lobby-game-spectators { flex: none; font-size: 0.8125rem; color: var(--text-dim); }
 
 /* ── Offline lobby (views/offline-lobby.ts) ──────────────────
    Shares the online lobby's shell (header/list/rows); these are the
@@ -1400,8 +1511,7 @@ button.lobby-account-chip:active { background: var(--press); }
   flex-direction: column;
   gap: 0.6rem;
   background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: 6px;
+  border-radius: var(--r-bar);
   padding: 0.75rem;
 }
 
@@ -1436,14 +1546,15 @@ button.lobby-account-chip:active { background: var(--press); }
 /* Packless, the bar's empty box collapses; a card row's holds a text glyph
    (paintMenuIcons), so it is never empty. */
 .offline-menu-icon:not(.offline-device-glyph):empty { display: none; }
-/* The bar has no border, so the card border's 1px joins its padding. The
-   negative block margin lets the sprite overhang the label's line box so the
-   bar keeps its sprite-less height — any value past the 7px overhang does. */
+/* The bar takes the menu rows' left geometry (padding, glyph column, gap),
+   so its label starts on their label edge. The negative block margin lets
+   the sprite overhang the label's line box so the bar keeps its sprite-less
+   height — any value past the 7px overhang does. */
 #offline-new {
   display: flex;
   align-items: center;
   gap: 0.6rem;
-  padding-left: calc(0.75rem + 1px);
+  padding-left: 1.25rem;
 }
 #offline-new .offline-menu-icon { margin-block: -8px; }
 /* Inert during a download (setNewGameDisabled) — and looking it: the
@@ -1459,15 +1570,23 @@ button.lobby-account-chip:active { background: var(--press); }
    The doubled class is load-bearing: .offline-device-row's align-items is
    declared further down the file, and would win at equal specificity. */
 .offline-device-row.offline-nav-row { align-items: center; cursor: pointer; }
-.offline-nav-row .offline-device-label { font-size: 0.95rem; }
-.offline-nav-row::after { content: "→"; color: var(--text-dim); font-size: 0.95rem; }
+.offline-nav-row .offline-device-label { font-size: 1.0625rem; }
+.offline-nav-row::after {
+  content: "";
+  flex: none;
+  width: 0.5rem;
+  height: 0.5rem;
+  margin-right: 0.2rem;
+  border-right: 2px solid var(--text-faint);
+  border-bottom: 2px solid var(--text-faint);
+  transform: rotate(-45deg);
+}
 :root:not(.press-cancelled) .offline-nav-row:not(.is-disabled):active { background: var(--press); transition: background-color 0s var(--press-delay); }
 .offline-nav-row:focus-visible { outline: 1px solid var(--accent); outline-offset: -1px; }
 .offline-nav-row.is-disabled { opacity: 0.5; cursor: default; }
 /* The name form, opened in place of the New game row: the card is its
    surface there, so it drops its own. */
-.offline-device > .offline-name-form { background: none; border: none; border-radius: 0; }
-.offline-device > .offline-name-form + .offline-device-row { border-top: 1px solid var(--border); }
+.offline-device > .offline-name-form { background: none; border-radius: 0; }
 
 /* Slot-row meta line: stays one line beside the doll instead of wrapping the
    row taller. Only the char^god fact may shrink/ellipsize — rationale at
@@ -1491,8 +1610,7 @@ button.lobby-account-chip:active { background: var(--press); }
 /* Third slot-row line = latest milestone, rendered only when one was
    captured (the two above it are the shared .lobby-game-* row lines). */
 .offline-slot-milestone {
-  font-size: 0.8rem;
-  font-style: italic;
+  font-size: 0.8125rem;
   color: var(--text-dim);
   overflow: hidden;
   text-overflow: ellipsis;
@@ -1506,16 +1624,17 @@ button.lobby-account-chip:active { background: var(--press); }
 .offline-slot-confirm-cancel {
   flex: 0 0 auto;
   white-space: nowrap;
-  padding: 0.4rem 0.6rem;
+  min-height: 2.25rem;
+  padding: 0 0.75rem;
   font-family: var(--font-mono);
-  font-size: 0.85rem;
+  font-size: 0.875rem;
   color: var(--text);
-  background: transparent;
-  border: 1px solid var(--border);
-  border-radius: 6px;
+  background: var(--surface2);
+  border: none;
+  border-radius: var(--r-ctl);
   cursor: pointer;
 }
-.offline-slot-confirm-del { color: var(--danger); border-color: var(--danger-line); }
+.offline-slot-confirm-del { color: var(--danger); }
 .offline-slot-confirm-del:disabled { opacity: 0.5; cursor: default; }
 .offline-slot-confirm-del:active,
 .offline-slot-confirm-cancel:active { background: var(--press); }
@@ -1526,9 +1645,9 @@ button.lobby-account-chip:active { background: var(--press); }
   font-size: 0.75rem;
   line-height: 1.4;
   color: var(--text-dim);
-  /* Under the New game bar: a caption at the bar's content inset (border +
-     padding), so the price hangs off the control, not off the page margin. */
-  padding-left: calc(0.75rem + 1px);
+  /* Under the New game bar: a caption at the bar's content inset, so the
+     price hangs off the control, not off the page margin. */
+  padding-left: 1.25rem;
   margin-top: -0.15rem;
 }
 /* Under the SAVED GAMES heading (placeNewGame sets .is-boxed): a boxed notice
@@ -1538,10 +1657,9 @@ button.lobby-account-chip:active { background: var(--press); }
 .offline-gate-note.is-boxed { padding-left: 0; margin-top: 0; }
 .offline-gate-note.is-boxed > span {
   display: inline-block;
-  padding: 0.4rem 0.75rem;
+  padding: 0.5rem 1rem;
   background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: 4px;
+  border-radius: var(--r-ctl);
 }
 .offline-gate-note.is-boxed > span::before { content: "ⓘ  "; }
 
@@ -1554,24 +1672,33 @@ button.lobby-account-chip:active { background: var(--press); }
    own label already says whose data it is. */
 .offline-device {
   background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: 4px;
+  border-radius: var(--r-bar);
+  overflow: hidden;
 }
 .offline-device-row {
+  position: relative;
   display: flex;
   /* Baseline, not center: the glyph lines up with the label's first line
      instead of floating against the middle of a wrapped sub-line block.
      Buttons opt back into vertical centering below. */
   align-items: baseline;
   gap: 0.6rem;
-  padding: 0.6rem 0.75rem;
+  padding: 0.6rem 1.25rem;
   min-height: 3.2rem;
 }
-.offline-device-row + .offline-device-row {
-  border-top: 1px solid var(--border);
+/* Separators start at the label column (past the glyph) and stop at the
+   trailing margin — the grouped-list rule. */
+.offline-device > * + .offline-device-row::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: calc(1.25rem + var(--glyph-col) + 0.6rem);
+  right: 1.25rem;
+  height: 0.5px;
+  background: var(--separator);
 }
 /* A [hidden] first row still matches the sibling combinator above. */
-.offline-device-row[hidden] + .offline-device-row { border-top: none; }
+.offline-device > [hidden] + .offline-device-row::before { display: none; }
 .offline-device-glyph {
   width: var(--glyph-col); /* .offline-menu-icon block */
   text-align: center;
@@ -1591,11 +1718,11 @@ button.lobby-account-chip:active { background: var(--press); }
   min-width: 0;
 }
 .offline-device-label {
-  font-size: 0.85rem;
+  font-size: 1rem;
   line-height: 1.3;
 }
 .offline-device-sub {
-  font-size: 0.72rem;
+  font-size: 0.8125rem;
   line-height: 1.35;
   color: var(--text-dim);
 }
@@ -1607,18 +1734,20 @@ button.lobby-account-chip:active { background: var(--press); }
   flex-shrink: 0;
   align-self: center;
   font: inherit;
-  font-size: 0.8rem;
-  padding: 0.4rem 0.7rem;
-  background: transparent;
+  font-size: 0.9375rem;
+  min-height: 2.125rem;
+  padding: 0 0.8rem;
+  background: var(--surface2);
   color: var(--text);
-  border: 1px solid var(--border);
-  border-radius: 4px;
+  border: none;
+  border-radius: var(--r-ctl);
   cursor: pointer;
 }
 .offline-device-btn:active { background: var(--press); }
 .offline-device-btn:disabled { opacity: 0.5; cursor: default; }
-/* The download/update action is the row's call to action. */
-.offline-device-btn.is-accent { border-color: var(--accent-line); }
+/* The download/update action is the row's call to action: a tappable text
+   action in the accent (the amended rule), on the same gray. */
+.offline-device-btn.is-accent { color: var(--accent); }
 
 /* ── Offline options (RC) file editor (views/rc-editor.ts) ───
    Full-screen fixed column over the offline lobby: slim header, flex-fill
@@ -1638,50 +1767,48 @@ button.lobby-account-chip:active { background: var(--press); }
   align-items: baseline;
   gap: 0.5rem;
 }
-.rc-editor-title { color: var(--text); font-size: 1rem; }
+.rc-editor-title { color: var(--text); font-size: 1.0625rem; font-weight: 600; }
 .rc-editor-path { color: var(--text-dim); font-size: 0.8rem; }
 .rc-editor-text {
   flex: 1;
   min-height: 0;
   resize: none;
-  padding: 0.6rem 0.75rem;
+  padding: 0.75rem 0.9rem;
   background: var(--surface);
   color: var(--text);
-  border: 1px solid var(--border);
-  border-radius: 6px;
+  border: none;
+  border-radius: var(--r-bar);
+  caret-color: var(--accent);
   font-family: var(--font-mono);
   /* Sub-16px is safe from iOS's focus auto-zoom only because the viewport
      meta sets maximum-scale=1 (index.html) — keep the two in sync. */
   font-size: var(--fs-overlay);
   line-height: 1.45;
 }
-.rc-editor-text:focus {
-  outline: 1px solid var(--accent);
-  outline-offset: -1px;
-}
+.rc-editor-text:focus { outline: none; }
 .rc-editor-text::placeholder { color: var(--text-dim); opacity: 0.6; }
 .rc-editor-error { color: var(--danger); font-size: 0.8rem; }
 .rc-editor-footer { display: flex; gap: 0.6rem; }
 .rc-editor-esc,
 .rc-editor-save {
   flex: 1;
-  padding: 0.55rem 0.75rem;
-  font-family: var(--font-mono);
-  font-size: 0.9rem;
+  min-height: 3rem;
+  padding: 0 0.75rem;
+  font-size: 1rem;
+  font-weight: 500;
   color: var(--text);
-  background: transparent;
-  border: 1px solid var(--border);
-  border-radius: 6px;
+  background: var(--surface2);
+  border: none;
+  border-radius: var(--r-bar);
   cursor: pointer;
 }
 /* The escape glyph is thinner than text at the same size, so bump it to sit
    visually level with the "Save" label beside it (cf. .menu-ctrl-glyph). */
-.rc-editor-esc { font-size: 1.25rem; line-height: 1; padding-block: 0.4rem; }
+.rc-editor-esc { font-size: 1.25rem; line-height: 1; }
 .rc-editor-save {
   background: var(--accent);
-  border-color: var(--accent);
   color: var(--bg);
-  font-weight: bold;
+  font-weight: 600;
 }
 .rc-editor-esc:active { background: var(--press); }
 .rc-editor-save:active { opacity: 0.85; }
@@ -1698,67 +1825,67 @@ button.lobby-account-chip:active { background: var(--press); }
   padding: var(--safe-frame-pad);
   background: var(--modal-scrim);
 }
+/* The app's dialog card: --alert-w is shared with the reconnect question
+   (.reconnect-card.is-question), so the two dialogs are one width. */
 .lobby-exit-card {
   width: 100%;
-  max-width: 30rem;
+  max-width: var(--alert-w);
   max-height: 100%;
   overflow-y: auto;
   background: var(--surface);
-  /* Firmer border + drop shadow so the card reads as floating above the
-     dimmed lobby behind it. */
-  border: 1px solid var(--border-card);
-  border-radius: 10px;
+  border-radius: var(--r-sheet);
   box-shadow: var(--modal-shadow);
-  padding: 1.25rem;
+  padding: 1.4rem 0.75rem 0.75rem;
   display: flex;
   flex-direction: column;
-  gap: 1rem;
-  font-family: var(--font-mono);
+  gap: 0.9rem;
 }
 .lobby-exit-reason {
-  font-size: 0.95rem;
-  line-height: 1.5;
+  padding: 0 0.5rem;
+  font-size: 1.0625rem;
+  font-weight: 600;
+  line-height: 1.3;
+  text-align: center;
   color: var(--text);
 }
+/* The game's own recap, in a black well: game text inside chrome sits on
+   the game's black (the settings log preview and d-pad specimen do too). */
 .lobby-exit-summary {
   margin: 0;
+  padding: 0.6rem 0.65rem;
+  background: var(--bg);
+  border-radius: var(--r-ctl);
   white-space: pre;
   overflow-x: hidden;
+  font-family: var(--font-mono);
   font-size: 0.85rem;
   line-height: 1.5;
   color: var(--text);
 }
-/* Action row, divided from the recap by a hairline. Close is pushed to the
-   right by margin-auto so it sits opposite the morgue link (or alone at the
-   right when there's no morgue). */
+/* Close left, the morgue link right — the reference dialog's order, kept
+   for returning players' muscle memory; both are filled buttons sharing
+   the row. */
 .lobby-exit-footer {
   display: flex;
-  align-items: center;
-  gap: 1rem;
-  padding-top: 1rem;
-  border-top: 1px solid var(--border);
+  gap: 0.5rem;
 }
-/* Pushed to the right edge, opposite Close — mirrors the reference layout. */
+.lobby-exit-close,
 .lobby-exit-link {
-  margin-left: auto;
-  color: var(--accent);
-  text-decoration: underline;
-  font-size: 0.95rem;
-}
-.lobby-exit-link:active { opacity: 0.5; }
-/* Peer of the morgue link, not a CTA: a light dim text button, padded only
-   enough for a comfortable tap target. */
-.lobby-exit-close {
-  padding: 0.5rem 0.75rem;
-  font-family: var(--font-mono);
-  font-size: 0.95rem;
-  color: var(--text-dim);
-  background: transparent;
+  flex: 1;
+  min-height: 3rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   border: none;
-  border-radius: 6px;
+  border-radius: var(--r-ctl);
+  background: var(--surface2);
+  font-size: 1.0625rem;
   cursor: pointer;
 }
-.lobby-exit-close:active { background: var(--press); }
+.lobby-exit-close { color: var(--text); font-weight: 600; }
+.lobby-exit-link { color: var(--accent); text-decoration: none; }
+.lobby-exit-close:active,
+.lobby-exit-link:active { background: var(--press); }
 
 /* ── In-app document modal (About / What's new) ───────────── */
 /* Floats above login/lobby; rendered from ABOUT.md / CHANGELOG.md. Backdrop and
@@ -1780,31 +1907,43 @@ button.lobby-account-chip:active { background: var(--press); }
   display: flex;
   flex-direction: column;
   background: var(--surface);
-  border: 1px solid var(--border-card);
-  border-radius: 10px;
+  border-radius: var(--r-sheet);
   box-shadow: var(--modal-shadow);
-  font-family: var(--font-mono);
   overflow: hidden;
 }
+/* Centred title, a circular ✕ at the trailing edge;
+   no rule under the header — the body scrolls under it on the same fill. */
 .doc-header {
+  position: relative;
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  padding: 0.85rem 1rem;
-  border-bottom: 1px solid var(--border);
+  justify-content: center;
+  min-height: 3.5rem;
+  padding: 0.6rem 3.75rem;
   flex-shrink: 0;
 }
-.doc-title { color: var(--text); font-size: 1rem; }
+.doc-title { color: var(--text); font-size: 1.0625rem; font-weight: 600; }
 .doc-close {
-  padding: 0.35rem 0.6rem;
-  font-family: var(--font-mono);
-  font-size: 1rem;
-  color: var(--text-dim);
-  background: transparent;
+  position: absolute;
+  right: 0.75rem;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 2.25rem;
+  height: 2.25rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--text);
+  background: var(--surface2);
   border: none;
-  border-radius: 6px;
+  border-radius: 50%;
   cursor: pointer;
 }
+/* A 44pt target around the 36pt circle */
+.doc-close::after { content: ''; position: absolute; inset: -4px; }
 .doc-close:active { background: var(--press); }
 .doc-body {
   overflow-y: auto;
@@ -1831,7 +1970,7 @@ button.lobby-account-chip:active { background: var(--press); }
   font-size: 0.85em;
   background: var(--surface2);
   padding: 0.1em 0.35em;
-  border-radius: 3px;
+  border-radius: 4px;
   word-break: break-word;
 }
 
@@ -2321,14 +2460,18 @@ html.map-hold, html.map-hold * {
   line-height: var(--msglog-line);
 }
 
+/* A field over the map: the strip's level (--tc-fill), amber only as the
+   caret. */
 .game-text-input {
-  background: var(--surface2);
-  border: 1px solid var(--accent);
+  background: var(--tc-fill);
+  border: none;
+  border-radius: var(--r-key);
   color: var(--text);
   -webkit-text-fill-color: var(--text);
+  caret-color: var(--accent);
   font-family: var(--font-mono);
   font-size: 16px;
-  padding: 0.15rem 0.4rem;
+  padding: 0.15rem 0.5rem;
   outline: none;
   width: 12ch;
 }
@@ -2383,8 +2526,8 @@ html.map-hold, html.map-hold * {
 .numpad-btn {
   font-family: var(--font-mono);
   font-size: 1.25rem;
-  border-radius: 6px;
-  border: 1px solid var(--border);
+  border-radius: var(--r-key);
+  border: none;
   cursor: pointer;
   display: flex;
   align-items: center;
@@ -2454,11 +2597,14 @@ html.map-hold, html.map-hold * {
   line-height: 1.4;
 }
 
+/* Text fields in game prompts: a filled field, amber only as the caret */
 .input-dialog-field {
   background: var(--surface2);
-  border: 1px solid var(--accent);
+  border: none;
+  border-radius: var(--r-key);
   color: var(--text);
   -webkit-text-fill-color: var(--text);
+  caret-color: var(--accent);
   font-family: var(--font-mono);
   /* 16px keeps iOS Safari from auto-zooming on focus */
   font-size: 16px;
@@ -2519,9 +2665,11 @@ html.map-hold, html.map-hold * {
   flex: 1 1 12rem;
   min-width: 0;
   background: var(--surface2);
-  border: 1px solid var(--accent);
+  border: none;
+  border-radius: var(--r-key);
   color: var(--text);
   -webkit-text-fill-color: var(--text);
+  caret-color: var(--accent);
   font-family: var(--font-mono);
   /* 16px avoids iOS Safari auto-zoom on focus */
   font-size: 16px;
@@ -2531,12 +2679,13 @@ html.map-hold, html.map-hold * {
 
 .seed-btn {
   background: var(--surface2);
-  border: 1px solid var(--border);
-  border-radius: 4px;
+  border: none;
+  border-radius: var(--r-key);
   color: var(--text);
   font-family: var(--font-mono);
   font-size: 0.85rem;
-  padding: 0.4rem 0.7rem;
+  min-height: 2.25rem;
+  padding: 0 0.8rem;
   cursor: pointer;
   touch-action: manipulation;
 }
@@ -2959,8 +3108,9 @@ html.map-hold, html.map-hold * {
   align-items: center;
   gap: 0.6rem;
   padding: 0.4rem 0.5rem;
-  background: rgba(255, 255, 255, 0.03);
-  border-radius: 4px;
+  /* No resting tint (a 3% white one was invisible on an OLED phone); the
+     press state below still lights the row. */
+  border-radius: var(--r-key);
   min-height: 48px;
   cursor: pointer;
 }
@@ -3241,13 +3391,13 @@ html.map-hold, html.map-hold * {
 
 #game-lobby-btn {
   align-self: flex-end;
-  background: transparent;
-  border: 1px solid var(--border);
-  border-radius: 4px;
+  background: var(--surface);
+  border: none;
+  border-radius: var(--r-key);
   color: var(--text-dim);
   font-family: var(--font-mono);
   font-size: 0.7rem;
-  padding: 0.2rem 0.4rem;
+  padding: 0.2rem 0.5rem;
   cursor: pointer;
   margin-top: 0.15rem;
 }
@@ -3584,8 +3734,7 @@ html.map-hold, html.map-hold * {
   width: 100%;
   max-width: 30rem;
   background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: var(--r-sheet);
   padding: 1.5rem 1.25rem;
   display: flex;
   flex-direction: column;
@@ -3616,9 +3765,9 @@ html.map-hold, html.map-hold * {
   padding: 0.6rem 1rem;
   font: 0.95rem var(--font-mono);
   color: var(--text);
-  background: transparent;
-  border: 1px solid var(--border);
-  border-radius: 6px;
+  background: var(--surface2);
+  border: none;
+  border-radius: var(--r-ctl);
   cursor: pointer;
 }
 .dialog-body .button:active,
@@ -3777,7 +3926,22 @@ html.map-hold, html.map-hold * {
   display: flex;
   flex-wrap: wrap;
   gap: 0.3rem;
+  border-top: none;
 }
+/* In the layout actions bar the choices are a row of keys, drawn as the
+   strip's keys (the controls right under them), not a lighter chip. Here
+   only: the same .action-btn sits in the log's prompt rows and the
+   X-describe strip, which stay transparent over the map (below). */
+.overlay-actions .action-btn {
+  min-height: 2rem;
+  padding: 0 0.7rem;
+  background: var(--tc-fill);
+  border: none;
+  border-radius: var(--r-key);
+  color: var(--tc-label);
+  font-size: 0.8rem;
+}
+.overlay-actions .action-btn:active { background: var(--tc-press); color: var(--accent); }
 
 /* Engine-offered choices as buttons (prompt rows, X-describe strip, layout
    actions bar, random-combo confirm). Neutral edge, like the chat pill —
@@ -4198,10 +4362,11 @@ html.map-hold, html.map-hold * {
   flex-wrap: wrap;
 }
 
+/* The bar stands in for the strip while a menu is up: the strip's keys. */
 .menu-ctrl-btn {
-  background: var(--surface2);
-  border: 1px solid var(--border);
-  border-radius: 4px;
+  background: var(--tc-fill);
+  border: none;
+  border-radius: var(--r-key);
   color: var(--text);
   font-family: var(--font-mono);
   font-size: 0.95rem;
@@ -4223,7 +4388,7 @@ html.map-hold, html.map-hold * {
   column-gap: 0.35em;
 }
 .menu-ctrl-btn:active,
-.menu-ctrl-btn.pressed { background: var(--press); color: var(--accent); }
+.menu-ctrl-btn.pressed { background: var(--tc-press); color: var(--accent); }
 .menu-ctrl-glyph { font-size: 1.25rem; line-height: 1; }
 
 .skill-letter-row {
@@ -4282,8 +4447,20 @@ html.map-hold, html.map-hold * {
 /* ── Unified touch controls ─────────────────────────────────── */
 /* Token block shared with the settings pad preview (.set-dpad-pad), so the
    specimen buttons can't drift from the strip's real resting look. */
+/* The game-key palette: the strip, and everything that draws the strip's
+   keys elsewhere (virtual keyboard, the settings d-pad specimen, the
+   control-set editor's grids and key picker, the describe actions bar)
+   and the in-game chrome that floats at the strip's level (size palette).
+   One block, so the copies can't drift from the strip. */
 #touch-controls,
-.set-dpad-pad {
+#kbd-overlay,
+.set-dpad-pad,
+.ed-grid,
+.ed-picker-keys,
+.overlay-actions,
+#menu-controls,
+.size-palette,
+.game-text-input {
   /* D-pad cell size (consumed by .tc-dpad / .tc-dpad-btn) — also sets the
      whole strip's height via the max-height calc below, so the settings
      slider scales the macro panel along with the d-pad. User-adjustable:
@@ -4295,16 +4472,17 @@ html.map-hold, html.map-hold * {
   /* Control-grid button floor (.tc-btn); the z spell grid derives its
      height from it (.tc-spell-grid). */
   --tc-btn-min-h: 2rem;
-  /* Resting palette one step darker than the app-wide tokens: at night the
-     map is sparse dim glyphs on near-black, so --text/--surface2 buttons
-     outshine the play area. Presses brighten to the app-wide --press fill
+  /* Resting palette below the whole chrome ladder: at night the map is
+     sparse dim glyphs on near-black, so --text/--surface buttons outshine
+     the play area. In-game chrome over the map (palette, in-log field,
+     chat chip) sits at this level too. Presses brighten to --surface3
      (+ accent label), so tap feedback stays crisp against the dim resting
-     state. */
-  --tc-fill: var(--surface);
-  --tc-press: var(--press);
+     state. Keys separate by fill alone — no outline. */
+  --tc-fill: #161715;
+  --tc-press: var(--surface3);
   --tc-label: var(--text-dim);
-  --tc-label-dim: #78716c;  /* one stone step below --text-dim, for the wait btn */
-  --tc-border: rgba(245, 158, 11, 0.07);
+  --tc-label-dim: var(--text-faint);  /* the wait btn */
+  --tc-border: transparent;
 }
 
 #touch-controls {
@@ -4395,7 +4573,7 @@ html.map-hold, html.map-hold * {
 .tc-dpad-btn {
   background: var(--tc-fill);
   border: 1px solid var(--tc-border);
-  border-radius: 4px;
+  border-radius: var(--r-key);
   color: var(--tc-label);
   font-size: 1.4rem;
   width: var(--tc-dpad);
@@ -4437,7 +4615,7 @@ html.map-hold, html.map-hold * {
 .tc-enter {
   background: var(--tc-fill);
   border: 1px solid var(--tc-border);
-  border-radius: 3px;
+  border-radius: var(--r-key);
   color: var(--tc-label);
   font-size: 0.8rem;
   height: 1.4rem;
@@ -4467,16 +4645,16 @@ html.map-hold, html.map-hold * {
    hole in the row — --surface is only ~5 levels above --bg, so the step
    down was invisible; a raised half-step (toward --surface2) reads as a
    lighter slab that pulls the eye off the row. Flush, the track is just a
-   wider member of the button family and the amber lozenge alone carries
-   the selection. No dividers between segments: iOS hides them next to
-   the selection anyway, and at this size they'd be noise. */
+   wider member of the button family and the lozenge alone carries the
+   selection. No dividers between segments: iOS hides them next to the
+   selection anyway, and at this size they'd be noise. */
 .tc-tabs {
   display: flex;
   flex-direction: row;
   flex: 1;
   background: var(--tc-fill);
   border: 1px solid var(--tc-border);
-  border-radius: 3px;
+  border-radius: var(--r-key);
   /* 1px inset for the lozenge: iOS insets its segment 2pt in a 32pt track
      (~12% per edge); 2px here on a 22px track was ~27% and read as a
      lozenge that failed to fill. 0 would make it a flush button again. */
@@ -4488,7 +4666,7 @@ html.map-hold, html.map-hold * {
   flex: 1;
   background: transparent;
   border: 0;
-  border-radius: 2px;
+  border-radius: calc(var(--r-key) - 1px);  /* concentric in the 1px-inset track */
   color: var(--tc-label);
   font-size: 0.8rem;  /* = .tc-esc/.tc-enter — same row, same glyph size */
   cursor: pointer;
@@ -4507,9 +4685,12 @@ html.map-hold, html.map-hold * {
    row with the sheet open, the spell rail in landscape — each needing its
    own gate. The row was usable as-is; keep hit-testing inside the strip. */
 
+/* In-game chrome has one state grammar: a gray fill one step up is the
+   current/active thing (this tab, a held Shift, the editor's current key);
+   amber marks only armed or pressed. */
 .tc-tab.active {
-  color: var(--accent);
-  background: rgba(245, 158, 11, 0.18);
+  color: var(--text);
+  background: var(--surface2);
 }
 
 .tc-tab:active,
@@ -4552,7 +4733,7 @@ html.map-hold, html.map-hold * {
   box-sizing: border-box;
   padding: 2px;
   border: 1px solid var(--tc-border);
-  border-radius: 3px;
+  border-radius: var(--r-key);
 }
 .minimap-xslot { line-height: 0; }  /* no descender gap under the inline canvas */
 /* Scrub-to-pan (X mode) owns one-finger drags on these minimaps; why
@@ -4587,7 +4768,7 @@ html.map-hold, html.map-hold * {
   flex: 1;
   background: var(--tc-fill);
   border: 1px solid var(--tc-border);
-  border-radius: 3px;
+  border-radius: var(--r-key);
   color: var(--tc-label);
   font-family: var(--font-mono);
   font-size: 0.95rem;
@@ -4639,7 +4820,7 @@ html.map-hold, html.map-hold * {
   padding: 4px;
   background: var(--tc-fill);
   border: 1px solid var(--tc-border);
-  border-radius: 3px;
+  border-radius: var(--r-key);
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
 }
@@ -4669,7 +4850,7 @@ html.map-hold, html.map-hold * {
   flex: 1;
   background: var(--tc-fill);
   border: 1px solid var(--tc-border);
-  border-radius: 3px;
+  border-radius: var(--r-key);
   color: var(--tc-label);
   font-size: 0.65rem;
   height: 1.4rem;
@@ -4682,19 +4863,17 @@ html.map-hold, html.map-hold * {
   touch-action: manipulation;
 }
 
+/* Sticky modifiers, by brightness and shape rather than hue: held = the
+   active-state gray step + full label; locked adds an amber underline. Two
+   warm fills (amber held, yellow locked) left the difference to hue alone,
+   and a near-white held key was the brightest thing on the night map. */
 .tc-shift.active,
 .tc-ctrl.active {
-  background: var(--accent);
-  color: var(--bg);
-  border-color: var(--accent);
+  background: var(--surface2);
+  color: var(--text);
 }
 
-.tc-shift.locked {
-  background: var(--warn);
-  color: var(--bg);
-  border-color: var(--warn);
-  box-shadow: inset 0 0 0 1px var(--bg);
-}
+.tc-shift.locked { box-shadow: inset 0 -2px 0 var(--accent); }
 
 .tc-shift:active,
 .tc-shift.pressed,
@@ -4751,13 +4930,13 @@ html.map-hold, html.map-hold * {
 
 .kbd-key {
   position: relative;
-  background: var(--surface2);
-  border: 1px solid var(--border);
-  border-radius: 3px;
+  background: var(--tc-fill);
+  border: 0;
+  border-radius: var(--r-key);
   /* Half-dim. The persistent touch strip dims further (--tc-label, set in
      the #touch-controls block) — the keyboard is transient and summoned
      deliberately, so it can afford to stay more readable. */
-  color: #c9c4be;
+  color: #c6c8c2;
   font-family: var(--font-mono);
   font-size: 1em;
   cursor: pointer;
@@ -4793,7 +4972,7 @@ html.map-hold, html.map-hold * {
 .kbd-row > .kbd-key:last-child::after { right: -2rem; }
 
 .kbd-key:active,
-.kbd-key.pressed { background: var(--press); color: var(--accent); }
+.kbd-key.pressed { background: var(--tc-press); color: var(--accent); }
 
 .kbd-key.wide {
   width: auto;
@@ -4814,18 +4993,13 @@ html.map-hold, html.map-hold * {
   line-height: 1;
 }
 
+/* Same modifier grammar as the strip's (.tc-shift.active / .locked). */
 .kbd-key.mod.active {
-  background: var(--accent);
-  color: var(--bg);
-  border-color: var(--accent);
+  background: var(--surface2);
+  color: var(--text);
 }
 
-.kbd-key.mod.locked {
-  background: var(--warn);
-  color: var(--bg);
-  border-color: var(--warn);
-  box-shadow: inset 0 0 0 1px var(--bg);
-}
+.kbd-key.mod.locked { box-shadow: inset 0 -3px 0 var(--accent); }
 
 .kbd-key.with-shifted,
 .kbd-key.with-corner { position: relative; }
@@ -5385,64 +5559,99 @@ html.map-hold, html.map-hold * {
 
 /* ── Reconnect overlay (src/reconnect.ts) ───────────── */
 /* Floats over the frozen game view while auto-resume replays login + play
-   after an unexpected socket drop (iOS app-swap). */
+   after an unexpected socket drop (iOS app-swap). The backdrop blocks
+   input to the game, so it stays honestly modal: a light dim, the status
+   in a capsule at the top (at the bottom over an open sheet), a centred
+   dialog only while the force-close question is up (reconnect.ts
+   buildOverlay has the classes). */
 .reconnect-backdrop {
   position: fixed;
   inset: 0;
   z-index: var(--z-reconnect);
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: center;
   padding: var(--safe-frame-pad);
-  background: var(--modal-scrim);
+  background: rgba(0, 0, 0, 0.3);
 }
+.reconnect-backdrop.is-over-sheet { align-items: flex-end; }
+.reconnect-backdrop.is-question { align-items: center; background: var(--modal-scrim); }
 .reconnect-card {
   display: flex;
-  flex-direction: column;
   align-items: center;
-  gap: 0.9rem;
-  max-width: 22rem;
-  background: var(--surface);
-  border: 1px solid var(--border-card);
-  border-radius: 10px;
+  gap: 0.75rem;
+  max-width: 100%;
+  padding: 0.375rem 0.375rem 0.375rem 1rem;
+  background: var(--surface2);
+  border-radius: 1.6rem;
   box-shadow: var(--modal-shadow);
-  padding: 1.5rem 1.75rem;
-  font-family: var(--font-mono);
 }
+.is-question .reconnect-card {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0.4rem;
+  width: var(--alert-w);
+  padding: 1.4rem 0.75rem 0.75rem;
+  background: var(--surface);
+  border-radius: var(--r-sheet);
+}
+/* A thin neutral ring with an amber arc — the one moving thing on screen. */
 .reconnect-spinner {
-  width: 1.5rem;
-  height: 1.5rem;
+  flex: none;
+  width: 1.25rem;
+  height: 1.25rem;
   border-radius: 50%;
-  border: 2px solid var(--border);
+  border: 2px solid var(--surface4);
   border-top-color: var(--accent);
-  animation: reconnect-spin 0.9s linear infinite;
+  animation: reconnect-spin 0.8s linear infinite;
 }
 @keyframes reconnect-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) {
+  .reconnect-spinner { animation-duration: 2.4s; }
+}
 .reconnect-status {
   color: var(--text);
-  font-size: 0.95rem;
-  line-height: 1.5;
+  font-size: 0.9375rem;
+  font-weight: 500;
+  line-height: 1.3;
+}
+.is-question .reconnect-status {
+  padding: 0 0.5rem;
+  font-size: 1.0625rem;
+  font-weight: 600;
   text-align: center;
 }
 .reconnect-question {
-  color: var(--warn);
-  font-size: 0.85rem;
-  line-height: 1.5;
+  padding: 0 0.5rem;
+  color: var(--text);
+  font-size: 0.8125rem;
+  line-height: 1.4;
   text-align: center;
 }
-.reconnect-actions { display: flex; gap: 0.75rem; }
+.reconnect-actions { display: flex; gap: 0.5rem; flex: none; }
+.is-question .reconnect-actions { flex-direction: column; margin-top: 0.75rem; }
 .reconnect-btn {
-  padding: 0.5rem 0.9rem;
-  font-family: var(--font-mono);
-  font-size: 0.9rem;
-  color: var(--text-dim);
-  background: transparent;
-  border: 1px solid var(--border);
-  border-radius: 6px;
+  min-height: 2.25rem;
+  padding: 0 1rem;
+  font-size: 0.9375rem;
+  font-weight: 500;
+  color: var(--text);
+  background: var(--surface3);
+  border: none;
+  border-radius: 1.2rem;
   cursor: pointer;
 }
+.is-question .reconnect-btn {
+  min-height: 3rem;
+  font-size: 1.0625rem;
+  background: var(--surface2);
+  border-radius: var(--r-ctl);
+}
 .reconnect-btn:active { background: var(--press); }
-.reconnect-force-yes { color: var(--danger); border-color: var(--danger-line); }
+/* Destructive in red, the safe way out bold (below it, the cancel-style
+   action's slot). */
+.reconnect-force-yes { color: var(--danger); }
+.reconnect-force-no { font-weight: 600; }
 
 /* Yes/no row inside the lobby notice (force_terminate? on the manual path). */
 .lobby-notice-actions {
@@ -5451,164 +5660,255 @@ html.map-hold, html.map-hold * {
   margin-top: 0.5rem;
 }
 .lobby-notice-actions button {
-  padding: 0.4rem 0.75rem;
-  font-family: var(--font-mono);
-  font-size: 0.85rem;
+  min-height: 2.25rem;
+  padding: 0 0.9rem;
+  font-size: 0.9375rem;
   color: var(--text);
-  background: transparent;
-  border: 1px solid var(--border);
-  border-radius: 6px;
+  background: var(--surface2);
+  border: none;
+  border-radius: var(--r-ctl);
   cursor: pointer;
 }
 .lobby-notice-actions button:active { background: var(--press); }
 
 /* ── Settings overlay (src/views/settings-view.ts) ───────────── */
-/* Reuses the doc-viewer shell (.doc-backdrop/.doc-card) one tier lower. */
-.settings-backdrop { z-index: var(--z-settings); }
-.settings-card { max-width: 26rem; }
+/* Reuses the doc-viewer shell (.doc-backdrop/.doc-card) one tier lower, as
+   a bottom sheet: full height under the status bar, top corners rounded.
+   No grabber — there's no drag-to-dismiss (it would fight the body's own
+   scroll); ✕, Escape and a scrim tap close it. */
+.settings-backdrop {
+  z-index: var(--z-settings);
+  align-items: flex-end;
+  padding: max(0.875rem, calc(var(--safe-top) + 0.5rem)) var(--safe-right) 0 var(--safe-left);
+}
+.settings-card {
+  height: 100%;
+  border-radius: var(--r-sheet) var(--r-sheet) 0 0;
+}
 .settings-body {
-  font-family: var(--font-mono);
   overflow-y: auto;
-  padding: 0.75rem 1rem 1.5rem;
+  padding: 0.25rem 1rem calc(1.5rem + var(--safe-bottom));
   color: var(--text);
 }
+/* Section headers sit on the cell's text column (20px in from its edge),
+   sentence case, gray; the explanation is a footer under the cell. */
 .settings-h {
-  font-size: 0.95rem;
-  color: var(--text);
-  margin: 0.5rem 0 0.4rem;
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--text-dim);
+  margin: 0 0 0.5rem;
+  padding: 0 1.25rem;
 }
-/* Breathing room between stacked sections on the home page */
-.settings-h:not(:first-child) { margin-top: 1.6rem; }
+.settings-sec + .settings-sec { margin-top: 1.6rem; }
+.settings-sec:first-child { margin-top: 0.5rem; }
+.settings-cell {
+  background: var(--surface2);
+  border-radius: var(--r-bar);
+  padding: 0.875rem 1.25rem;
+  overflow: hidden;
+}
+/* A lone segmented control sits on the sheet itself */
+.settings-cell.is-bare { background: none; padding: 0; border-radius: 0; overflow: visible; }
+.settings-cell.is-list { padding: 0; }
 .settings-hint {
   color: var(--text-dim);
-  font-size: 0.75rem;
-  line-height: 1.45;
+  font-size: 0.8125rem;
+  line-height: 1.4;
   margin: 0 0 0.75rem;
 }
+.settings-footer {
+  margin: 0.5rem 0 0;
+  padding: 0 1.25rem;
+  /* no one-word last lines under a cell */
+  text-wrap: pretty;
+}
 
-/* Control-set list: tap a row to activate; ⋯ reveals per-set actions. */
-.set-list { display: flex; flex-direction: column; gap: 0.35rem; }
-.set-row { display: flex; gap: 0.3rem; align-items: stretch; }
+/* Row lists inside a cell: 44pt rows, the one hairline between rows, inset
+   at both ends (leading at the text column, trailing at the cell's 20px
+   margin). */
+.set-list, .set-action-rows { display: flex; flex-direction: column; }
+.set-row, .set-action-row, .settings-nav { position: relative; }
+.set-row + .set-row::before,
+.set-row-actions + .set-row::before,
+.set-action-rows > *::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: var(--row-text-x, 1.25rem);
+  right: 1.25rem;
+  height: 0.5px;
+  background: var(--separator);
+}
+/* Control-set list: tap a row to activate; ⋯ reveals per-set actions. The
+   leading ✓ column puts every row's text at --row-text-x. */
+.set-list, .set-action-rows { --row-text-x: 3.05rem; }
+.set-row { display: flex; align-items: stretch; }
 .set-row-main {
   flex: 1;
   display: flex;
   align-items: center;
   gap: 0.55rem;
   min-width: 0;
+  min-height: 2.75rem;
   text-align: left;
-  background: var(--surface2);
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  padding: 0.55rem 0.7rem;
+  background: none;
+  border: none;
+  padding: 0 0 0 1.25rem;
   color: var(--text);
-  font-family: var(--font-mono);
-  font-size: 0.85rem;
+  font-size: 1.0625rem;
   cursor: pointer;
 }
-/* Selected = accent border + amber fill, matching the .settings-seg active
-   segment so selection reads the same everywhere on the page. */
-.set-row.active .set-row-main { border-color: var(--accent); background: var(--accent-tint); }
 :root:not(.press-cancelled) .set-row-main:active { background: var(--press); transition: background-color 0s var(--press-delay); }
-.set-radio { color: var(--text-dim); flex-shrink: 0; }
-.set-row.active .set-radio { color: var(--accent); }
+.set-radio { width: 1.25rem; flex-shrink: 0; color: var(--accent); font-weight: 600; }
 .set-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .set-badge {
   margin-left: auto;
   flex-shrink: 0;
-  font-size: 0.62rem;
+  font-size: 0.9375rem;
   color: var(--text-dim);
-  border: 1px solid var(--border);
-  border-radius: 4px;
-  padding: 0.1rem 0.35rem;
 }
 /* Same badge inside the viewer's heading, where there's no flex row */
-.settings-h .set-badge { margin-left: 0.5rem; font-weight: normal; vertical-align: middle; }
+.settings-h .set-badge { margin-left: 0.5rem; font-size: 0.875rem; font-weight: normal; vertical-align: baseline; }
 .set-row-more {
-  width: 2.2rem;
+  width: 3rem;
   background: transparent;
-  border: 1px solid var(--border);
-  border-radius: 6px;
+  border: none;
   color: var(--text-dim);
-  font-size: 1rem;
+  font-size: 1.15rem;
   cursor: pointer;
 }
 .set-row-more:active { background: var(--press); }
-.set-row-actions { display: flex; flex-wrap: wrap; gap: 0.3rem; margin: 0 0 0.25rem; }
+.set-row-actions { display: flex; flex-wrap: wrap; gap: 0.4rem; padding: 0 1.25rem 0.75rem var(--row-text-x); }
 .set-action {
   flex: 1;
-  padding: 0.4rem 0.3rem;
-  background: transparent;
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  color: var(--text-dim);
-  font-family: var(--font-mono);
-  font-size: 0.72rem;
+  min-height: 2.25rem;
+  padding: 0 0.5rem;
+  background: var(--surface3);
+  border: none;
+  border-radius: var(--r-ctl);
+  color: var(--text);
+  font-size: 0.9375rem;
   cursor: pointer;
 }
 .set-action:active { background: var(--press); }
-.set-action-danger { color: var(--danger); border-color: var(--danger-line); }
+.set-action-danger { color: var(--danger); }
 /* Export's transient "Copied ✓" morph */
-.set-action.flash { color: var(--accent); border-color: var(--accent); }
+.set-action.flash { color: var(--accent); }
+/* New set / Import…: text-only action rows on the list's text column */
+.set-action-row {
+  min-height: 2.75rem;
+  padding: 0 1.25rem 0 var(--row-text-x);
+  text-align: left;
+  background: none;
+  border: none;
+  color: var(--accent);
+  font-size: 1.0625rem;
+  cursor: pointer;
+}
+:root:not(.press-cancelled) .set-action-row:active { background: var(--press); transition: background-color 0s var(--press-delay); }
+/* Row that opens something else: label + trailing chevron */
+.settings-nav {
+  display: block;
+  width: 100%;
+  min-height: 2.75rem;
+  padding: 0 2.5rem 0 1.25rem;
+  text-align: left;
+  background: none;
+  border: none;
+  color: var(--text);
+  font-size: 1.0625rem;
+  cursor: pointer;
+}
+.settings-nav::after {
+  content: '';
+  position: absolute;
+  right: 1.35rem;
+  top: 50%;
+  width: 0.5rem;
+  height: 0.5rem;
+  margin-top: -0.25rem;
+  border-right: 2px solid var(--text-faint);
+  border-bottom: 2px solid var(--text-faint);
+  transform: rotate(-45deg);
+}
+:root:not(.press-cancelled) .settings-nav:active { background: var(--press); transition: background-color 0s var(--press-delay); }
 
-.settings-actions { display: flex; gap: 0.5rem; margin-top: 0.9rem; }
+.settings-actions { display: flex; gap: 0.5rem; margin-top: 1rem; }
 .settings-btn {
   flex: 1;
-  padding: 0.55rem 0.6rem;
+  min-height: 3rem;
+  padding: 0 0.75rem;
   background: var(--surface2);
-  border: 1px solid var(--border);
-  border-radius: 6px;
+  border: none;
+  border-radius: var(--r-bar);
   color: var(--text);
-  font-family: var(--font-mono);
-  font-size: 0.85rem;
+  font-size: 1.0625rem;
+  font-weight: 500;
   cursor: pointer;
 }
 .settings-btn:active { background: var(--press); }
+/* The view's one primary action (Save, Edit, Duplicate & edit) */
 .settings-btn-primary {
   background: var(--accent);
-  border-color: var(--accent);
   color: var(--bg);
-  font-weight: bold;
+  font-weight: 600;
 }
 .settings-btn-primary:active { background: var(--accent); opacity: 0.85; }
 
-/* Map display picker: a .seg (see below) at settings-btn size. The active
-   segment gets a tint so it reads as state. */
-.settings-seg { margin-top: 0.9rem; }
-.settings-seg .settings-btn {
-  background: transparent;
-  color: var(--text-dim);
+/* Segmented control (Map display, Monster list, Character sprites): a
+   track one step up from the sheet, the selection a raised gray thumb —
+   brightness, not hue. Segments are .settings-btn reshaped (see .seg). */
+.settings-seg {
+  padding: 3px;
+  background: var(--surface2);
+  border-radius: var(--r-ctl);
 }
-.settings-seg .settings-btn.active { background: var(--accent-tint); }
+.settings-seg .settings-btn {
+  min-height: 2.125rem;
+  background: transparent;
+  font-size: 0.9375rem;
+}
+.settings-seg .settings-btn.active {
+  background: var(--surface4);
+  font-weight: 600;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
+}
 
 /* Discrete sliders: the page's second control vocabulary — segments are
-   state adjectives, dotted sliders are ordered magnitudes (sizes, counts).
-   A radiogroup of tap-dots on a track; labels sit UNDER dots (endpoint words
-   or per-dot numbers) so the full row width goes to tap targets. The stock
-   stop keeps a hollow ring so it stays findable without a reset button. */
-.set-slider-cap {
-  color: var(--text-dim);
-  font-size: 0.72rem;
-  margin: 0.9rem 0 0;
+   state adjectives, sliders are ordered magnitudes (sizes, counts). Their
+   anatomy: small and large end
+   symbols inline with the track, ticks under it at the stops, a pill knob
+   on the active stop, the track filled up to it. Each stop is an equal
+   flex cell (a radio); the track spans the end stops' centres plus half a
+   knob, so the knob never overhangs either end. The stock stop's tick is a
+   ring, findable without a reset button. */
+.set-slider-row {
+  --knob-w: 2.375rem;
+  --knob-h: 1.5rem;
+  --track-y: 1.1rem;  /* track centre within a stop cell */
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-top: 0.875rem;
 }
+.settings-cell > .set-slider-row:first-child { margin-top: 0; }
+.set-slider-end {
+  flex: none;
+  min-width: 1.4rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 0.4rem;  /* centre on the track, not on the tick row */
+  color: var(--text-dim);
+}
+.set-slider-letter { font-weight: 600; line-height: 1; }
 .set-slider {
   position: relative;
+  flex: 1;
   display: flex;
-  margin-top: 0.9rem;
-}
-.set-slider-cap + .set-slider { margin-top: 0.1rem; }
-/* Track line spans first-to-last dot center: dots are equal flex cells, so
-   half a cell insets each end. --stops is set inline by sliderPref. */
-.set-slider::before {
-  content: '';
-  position: absolute;
-  left: calc(100% / var(--stops) / 2);
-  right: calc(100% / var(--stops) / 2);
-  top: calc(1.1rem - 1px);  /* mark-row center (see .set-slider-mark margin) */
-  height: 2px;
-  background: var(--border);
 }
 .set-slider-dot {
-  position: relative;  /* paints above the track ::before */
+  position: relative;
   flex: 1;
   background: transparent;
   border: none;
@@ -5616,33 +5916,44 @@ html.map-hold, html.map-hold * {
   display: flex;
   flex-direction: column;
   align-items: center;
+  padding: 0 0 0.4rem;
 }
+/* Each stop paints its own slice of the track: filled (accent) up to and
+   including the left half of the active stop, unfilled after. */
+.set-slider-dot::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: calc(var(--track-y) - 3px);
+  height: 6px;
+  background: var(--surface4);
+}
+.set-slider-dot:first-child::before { left: calc(50% - var(--knob-w) / 2); border-radius: 3px 0 0 3px; }
+.set-slider-dot:last-child::before { right: calc(50% - var(--knob-w) / 2); border-radius: 0 3px 3px 0; }
+.set-slider-dot:has(~ .active)::before { background: var(--accent); }
+.set-slider-dot.active::before { background: linear-gradient(to right, var(--accent) 50%, var(--surface4) 50%); }
+.set-slider-dot.active:first-child::before { background: var(--surface4); }
+/* Ticks hang under the track; the knob covers its own stop's. */
 .set-slider-mark {
-  width: 10px;
-  height: 10px;
-  margin: calc(1.1rem - 5px) 0;
+  position: relative;
+  width: 4px;
+  height: 4px;
+  margin-top: calc(var(--track-y) + 9px);
   border-radius: 50%;
-  background: var(--surface2);
-  border: 1px solid var(--border);
+  background: var(--text-faint);
 }
-.set-slider-dot.default .set-slider-mark { background: var(--bg); }
+.set-slider-dot.default .set-slider-mark { background: none; box-shadow: 0 0 0 1.5px var(--text-dim); }
 .set-slider-dot.active .set-slider-mark {
-  background: var(--accent);
-  border-color: var(--accent);
-  transform: scale(1.3);
-}
-.set-slider-num {
-  font-size: 0.65rem;
-  color: var(--text-dim);
-  margin-bottom: 0.15rem;
-}
-.set-slider-dot.active .set-slider-num { color: var(--accent); }
-/* Specimen end labels (font-size set inline by sliderPref from the stop
-   tables): the log's mono font so the font slider's "Aa" is the real
-   article; line-height pinned so the large end doesn't stretch the row. */
-.set-slider-spec {
-  font-family: var(--font-mono);
-  line-height: 1;
+  position: absolute;
+  top: calc(var(--track-y) - var(--knob-h) / 2);
+  left: calc(50% - var(--knob-w) / 2);
+  width: var(--knob-w);
+  height: var(--knob-h);
+  margin: 0;
+  border-radius: 999px;
+  background: #fff;
+  box-shadow: 0 0.5px 4px rgba(0, 0, 0, 0.15), 0 6px 13px rgba(0, 0, 0, 0.15);
 }
 
 /* D-pad size preview: the whole 3×3 pad at true size, centered above the
@@ -5656,10 +5967,12 @@ html.map-hold, html.map-hold * {
   display: flex;
   justify-content: center;
   align-items: center;
-  height: calc(var(--pz-dpad-max) * 3 + 4px);
-  margin-top: 0.5rem;
+  height: calc(var(--pz-dpad-max) * 3 + 4px + 1.5rem);
+  /* A black well: the specimen is a copy of the strip, which sits on the
+     page's black — strip keys on a gray card would read inverted. */
+  background: var(--bg);
+  border-radius: var(--r-ctl);
 }
-.set-dpad-preview + .set-slider { margin-top: 0.2rem; }
 /* Cell size and colors come from the shared #touch-controls token block
    above. Not the real .tc-dpad/.tc-dpad-btn classes: the landscape media
    query restyles those into the translucent map-float look, which would
@@ -5673,7 +5986,7 @@ html.map-hold, html.map-hold * {
 .set-dpad-specimen {
   background: var(--tc-fill);
   border: 1px solid var(--tc-border);
-  border-radius: 4px;
+  border-radius: var(--r-key);
   color: var(--tc-label);
   font-size: 1.4rem;
   display: flex;
@@ -5688,12 +6001,13 @@ html.map-hold, html.map-hold * {
    line count AND text size at once, and shows the real screen cost of the
    choice. Formatting comes from the shared .msglog-box class (the same rule
    #game-messages uses), so wrapping, padding, and line rhythm can't drift
-   from the real log. The frame carries the border so the inner box's height
-   stays the true --msglog-h. */
+   from the real log. The frame — a black well, like the d-pad specimen's —
+   carries the padding so the inner box's height stays the true --msglog-h.
+   Keep the horizontal inset minimal: it narrows the box and re-wraps the
+   lines away from what the real full-width log shows. */
 .set-msglog-frame {
-  margin-top: 0.9rem;
-  border: 1px solid var(--border);
-  border-radius: 4px;
+  padding: 0.375rem 0.25rem;
+  border-radius: var(--r-ctl);
   background: var(--bg);
 }
 .set-msglog-preview {
@@ -5711,11 +6025,11 @@ html.map-hold, html.map-hold * {
 }
 
 /* Floating size palette (in-game Settings → "Adjust sizes"): the sliders
-   bare over the live map, top-anchored clear of both subjects (log and
-   touch strip sit at the bottom). Because it sits away from its subjects,
-   nothing that needs
-   watching is behind it — so the scrim runs near-opaque for caption
-   legibility over bright glyph fields, with the log's text-shadow as backup. */
+   over the live map, top-anchored clear of both subjects (log and touch
+   strip sit at the bottom). In-game chrome, so it sits at the strip's
+   level (--tc-fill), not the settings sheet's: a lighter card over a
+   sparse night map outshone it. A shadow can't show on black, so a faint
+   rim edges it; opaque, so glyphs never show through the captions. */
 .size-palette {
   position: fixed;
   top: max(0.5rem, var(--safe-top));
@@ -5723,142 +6037,160 @@ html.map-hold, html.map-hold * {
   transform: translateX(-50%);
   z-index: var(--z-game-panel);
   width: min(92%, 24rem);
-  padding: 0.3rem 0.75rem 0.7rem;
-  border: 1px solid rgba(245, 158, 11, 0.3);
-  border-radius: 0.6rem;
-  background: color-mix(in srgb, var(--bg) 96%, transparent);
-  text-shadow: var(--msglog-text-shadow);
+  padding: 0.5rem 1rem 0.9rem;
+  border-radius: var(--r-sheet);
+  background: var(--tc-fill);
+  box-shadow: inset 0 0 0 1px rgba(238, 238, 236, 0.07);
 }
-.size-palette .set-slider { margin-top: 0; }
-/* Contrast raises, palette-scoped: the settings card's dim captions and
-   12%-alpha track read fine on its calm dark page, but over a live glyph
-   field they sink into the noise — brighten text, track, and dot rings
-   here without touching the card. The mark also drops its stock bottom
-   margin (a tall tap column on the card) to pull each label row up under
-   its track — the floating palette trades tap height for compactness. */
-.size-palette .set-slider-cap { margin: 0.35rem 0 0; color: var(--text); }
-.size-palette .set-slider::before { background: rgba(245, 158, 11, 0.35); }
-.size-palette .set-slider-mark {
-  border-color: rgba(245, 158, 11, 0.4);
-  margin-bottom: 2px;
+/* Dimmer knobs and a quieter fill than the settings sheet's: three white
+   pills and amber tracks were the brightest things on a night map. */
+.size-palette .set-slider-dot.active .set-slider-mark { background: var(--color-7); }
+.size-palette .set-slider-dot::before { background: var(--surface2); }
+.size-palette .set-slider-dot:has(~ .active)::before { background: color-mix(in srgb, var(--accent) 70%, var(--bg)); }
+.size-palette .set-slider-dot.active::before {
+  background: linear-gradient(to right, color-mix(in srgb, var(--accent) 70%, var(--bg)) 50%, var(--surface2) 50%);
 }
-.size-palette .set-slider-num { color: var(--text); }
-/* ✕ lives in a header row beside the first caption (not corner-floated,
-   which would overlap the top slider's rightmost dot). Bottom-aligned, not
-   centered: the ✕ button is taller than the caption, and centering would
-   float the caption up off its slider — flex-end keeps its text-to-track
-   gap identical to the other captions', with the row's slack above it. */
+.size-palette .set-slider-dot.active:first-child::before { background: var(--surface2); }
 .size-palette-header {
   display: flex;
   justify-content: space-between;
-  align-items: flex-end;
+  align-items: center;
+  margin-bottom: 0.4rem;
 }
-.size-palette-header .set-slider-cap { margin: 0; }
-/* Look (transparent, dim, press feedback) comes from .doc-close — this rule
-   is palette geometry only. */
+.size-palette-title { color: var(--text-dim); font-size: 0.9375rem; font-weight: 600; }
 .size-palette-close {
-  width: 2rem;
-  height: 2rem;
-  padding: 0;
+  width: 2.25rem;
+  height: 2.25rem;
   margin-right: -0.5rem;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  border-radius: 50%;
+  background: var(--surface2);
+  color: var(--text);
   font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
 }
+.size-palette-close:active { background: var(--press); }
 
 /* Shared look for every settings text field (import/export areas, editor
    inputs); per-field classes keep only their layout. */
 .settings-input {
-  background: var(--bg);
-  border: 1px solid var(--border);
-  border-radius: 6px;
+  background: var(--surface3);
+  border: none;
+  border-radius: var(--r-ctl);
   color: var(--text);
-  font-family: var(--font-mono);
+  caret-color: var(--accent);
   font-size: 16px;  /* not rem: <16px inputs make iOS Safari auto-zoom on focus */
 }
+.settings-input:focus { outline: none; }
+/* Pasted control-set codes are data, not prose */
+.settings-import-field { font-family: var(--font-mono); }
 
-.settings-import { margin-top: 0.6rem; display: flex; flex-direction: column; gap: 0.4rem; }
+.settings-import { display: flex; flex-direction: column; gap: 0.5rem; padding: 0.25rem 1.25rem 1rem; }
 .settings-import-field {
   width: 100%;
   box-sizing: border-box;
-  padding: 0.5rem;
+  padding: 0.6rem 0.75rem;
   resize: vertical;
 }
 .settings-error { color: var(--danger); font-size: 0.75rem; line-height: 1.4; }
 .settings-export-out { flex-basis: 100%; margin-top: 0.3rem; }
 
 /* Control-set editor */
+/* Control-set viewer and editor: the page heading and Name sit on the
+   cards' text column; each tab is a card (one step up from the sheet)
+   holding its key grid in a black well. Light over dark at every level:
+   sheet → tab card → well → keys, the keys being strip keys (the shared
+   token block), since the grid is a copy of the strip. */
+.settings-body > .settings-h { margin-top: 0.75rem; }
 .ed-name-row {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
+  gap: 0.75rem;
   color: var(--text-dim);
-  font-size: 0.8rem;
-  margin-bottom: 0.6rem;
+  font-size: 0.9375rem;
+  margin: 0 0 1rem;
+  padding: 0 1.25rem;
 }
 .ed-name-input {
   flex: 1;
-  padding: 0.4rem 0.55rem;
+  padding: 0.55rem 0.75rem;
   min-width: 0;
 }
-.ed-tabs { display: flex; flex-direction: column; gap: 0.6rem; }
+.ed-tabs { display: flex; flex-direction: column; gap: 0.75rem; }
 .ed-tab {
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  padding: 0.5rem;
+  background: var(--surface2);
+  border-radius: var(--r-bar);
+  padding: 0.75rem;
 }
 .ed-tab-head {
   display: flex;
   align-items: center;
   gap: 0.5rem;
-  margin-bottom: 0.45rem;
+  margin: 0 0.5rem 0.6rem;
 }
-.ed-tab-charlabel { color: var(--text-dim); font-size: 0.75rem; }
+.ed-tab-charlabel { color: var(--text-dim); font-size: 0.9375rem; }
+/* A tab label is a game glyph: mono, in a field like Name's */
 .ed-tab-char {
-  width: 2rem;
+  width: 2.5rem;
   text-align: center;
-  border-radius: 4px;  /* tighter than .settings-input: matches the ed-slot grid */
-  padding: 0.25rem 0;
-  margin-left: 0.35rem;
+  padding: 0.3rem 0;
+  margin-left: 0.5rem;
+  font-family: var(--font-mono);
 }
-.ed-size-toggle { margin-left: auto; }
+.ed-size-toggle {
+  margin-left: auto;
+  padding: 3px;
+  background: var(--surface3);
+  border-radius: var(--r-ctl);
+}
 .ed-size-btn {
-  padding: 0.3rem 0.55rem;
+  min-height: 1.75rem;
+  padding: 0 0.6rem;
   background: transparent;
-  border: 1px solid var(--border);
+  border: none;
   color: var(--text-dim);
   font-family: var(--font-mono);
-  font-size: 0.72rem;
+  font-size: 0.8125rem;
   cursor: pointer;
 }
+.ed-size-btn.active { background: var(--surface4); color: var(--text); }
 .ed-size-btn:active { background: var(--press); }
 
-/* Fused segmented control (Map display picker, editor's 3×3/3×4 toggle):
-   segments overlap their 1px shared edge; the active one wins it via
-   z-index so its accent border draws unbroken on either side. Placed after
-   the per-control rules above so its radius/active rules win the tie. */
+/* Segmented geometry (settings pickers, the editor's 3×3/3×4 toggle): the
+   track carries the 3px inset; segments are concentric thumbs inside it
+   (--r-ctl − 3px). Look per control above. */
 .seg { display: flex; }
-.seg > * { margin-left: -1px; border-radius: 0; }
-.seg > :first-child { margin-left: 0; border-radius: 6px 0 0 6px; }
-.seg > :last-child { border-radius: 0 6px 6px 0; }
-.seg > .active {
-  color: var(--accent);
-  border-color: var(--accent);
-  position: relative;
-  z-index: 1;
+.seg > * { border-radius: calc(var(--r-ctl) - 3px); }
+
+.ed-grid {
+  display: grid;
+  gap: 4px;
+  padding: 6px;
+  background: var(--bg);
+  border-radius: var(--r-ctl);
 }
-.ed-grid { display: grid; gap: 3px; }
 .ed-slot {
   min-height: 2.4rem;
-  background: var(--surface2);
-  border: 1px solid var(--border);
-  border-radius: 4px;
-  color: var(--text);
+  background: var(--tc-fill);
+  border: none;
+  border-radius: var(--r-key);
+  color: var(--tc-label);
   font-family: var(--font-mono);
   font-size: 0.95rem;
   cursor: pointer;
 }
-.ed-slot:not(.static):active { background: var(--press); }
-.ed-slot.empty { color: var(--text-dim); border-style: dashed; background: transparent; }
-.ed-slot.picking { border-color: var(--accent); color: var(--accent); }
+.ed-slot:not(.static):active { background: var(--tc-press); color: var(--accent); }
+/* Empty is the one fair dashed edge: nothing there yet */
+.ed-slot.empty { color: var(--text-faint); background: transparent; border: 1px dashed var(--surface3); }
+/* The slot under edit (or the move source) is the current thing: the
+   active-state gray, full-bright label — in-game chrome's one grammar
+   (see .tc-tab.active). Amber stays for armed/pressed. */
+.ed-slot.picking { background: var(--surface3); color: var(--text); }
 /* Read-only viewer slots are inert divs, not buttons */
 .ed-slot.static { display: grid; place-items: center; cursor: default; }
 
@@ -5866,59 +6198,79 @@ html.map-hold, html.map-hold * {
 .ed-move-hint {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
-  border: 1px dashed var(--accent);
-  border-radius: 8px;
-  background: var(--surface);
-  padding: 0.45rem 0.6rem;
-  margin-top: 0.6rem;
-  color: var(--text-dim);
-  font-size: 0.75rem;
+  gap: 0.75rem;
+  border-radius: var(--r-bar);
+  background: var(--surface2);
+  padding: 0.6rem 0.6rem 0.6rem 1.25rem;
+  margin-top: 0.75rem;
+  color: var(--text);
+  font-size: 0.9375rem;
 }
 .ed-move-hint-text { flex: 1; }
-.ed-move-hint .set-action { flex: 0 0 auto; }
+.ed-move-hint .set-action { flex: 0 0 auto; padding: 0 0.9rem; }
 
-/* Key picker: shared panel under the grids */
+/* Key picker: its own card under the grids */
 .ed-picker {
-  border: 1px solid var(--accent);
-  border-radius: 8px;
-  background: var(--surface);
-  padding: 0.6rem;
-  margin-top: 0.6rem;
+  background: var(--surface2);
+  border-radius: var(--r-bar);
+  padding: 0.9rem 0.75rem 0.75rem;
+  margin-top: 0.75rem;
 }
-.ed-picker-title { color: var(--text); font-size: 0.78rem; margin-bottom: 0.5rem; }
-.ed-picker-textrow { display: flex; gap: 0.4rem; }
+.ed-picker-title { color: var(--text); font-size: 0.9375rem; font-weight: 600; margin: 0 0.5rem 0.15rem; }
+.ed-picker-info { color: var(--text-dim); font-size: 0.8125rem; line-height: 1.4; margin: 0 0.5rem 0.75rem; }
+.ed-picker-textrow { display: flex; gap: 0.5rem; }
 .ed-picker-text {
   flex: 1;
   min-width: 0;
-  padding: 0.4rem 0.55rem;
+  padding: 0.55rem 0.75rem;
+  font-family: var(--font-mono);
 }
 /* Typed text must stay 16px (iOS focus auto-zoom), but the long placeholder
    hint reads better at the picker's own text scale */
-.ed-picker-text::placeholder { font-size: 0.78rem; }
-.ed-picker-set { flex: 0 0 auto; }
+.ed-picker-text::placeholder { font-family: var(--font-ui); font-size: 0.875rem; color: var(--text-faint); }
+.ed-picker .ed-picker-set {
+  flex: 0 0 auto;
+  min-height: 0;
+  padding: 0 1.1rem;
+  background: var(--surface3);
+  border-radius: var(--r-ctl);
+  font-size: 0.9375rem;
+}
 .ed-picker-keys {
   display: grid;
   grid-template-columns: repeat(8, 1fr);
-  gap: 3px;
-  margin-top: 0.5rem;
+  gap: 4px;
+  margin-top: 0.6rem;
+  padding: 6px;
+  background: var(--bg);
+  border-radius: var(--r-ctl);
 }
 .ed-key {
-  min-height: 1.9rem;
-  background: var(--surface2);
-  border: 1px solid var(--border);
-  border-radius: 4px;
-  color: var(--text-dim);
+  min-height: 2.1rem;
+  background: var(--tc-fill);
+  border: none;
+  border-radius: var(--r-key);
+  color: var(--tc-label);
   font-family: var(--font-mono);
-  font-size: 0.72rem;
+  font-size: 0.8125rem;
   cursor: pointer;
 }
-.ed-key:active { background: var(--press); color: var(--accent); }
-/* current = what the slot holds now; armed = first tap of the two-tap send */
-.ed-key.current { border-color: var(--text-dim); }
-.ed-key.armed { border-color: var(--accent); color: var(--accent); background: var(--surface); }
-.ed-picker-info { color: var(--text-dim); font-size: 0.75rem; margin-bottom: 0.5rem; line-height: 1.4; }
-.ed-picker-foot { display: flex; gap: 0.4rem; margin-top: 0.6rem; }
+.ed-key:active { background: var(--tc-press); color: var(--accent); }
+/* current = what the slot holds now (the active-state gray); armed = first
+   tap of the two-tap send (an amber ring + label) */
+.ed-key.current { background: var(--surface3); color: var(--text); }
+.ed-key.armed { box-shadow: inset 0 0 0 2px var(--accent); color: var(--accent); }
+/* Footer: quiet text actions — one row of filled buttons per page (the
+   editor's Cancel/Save) is enough */
+.ed-picker-foot { display: flex; gap: 0.25rem; margin-top: 0.5rem; }
+.ed-picker-foot .set-action {
+  flex: 0 0 auto;
+  background: none;
+  padding: 0 0.6rem;
+  color: var(--accent);
+  font-size: 0.9375rem;
+}
+.ed-picker-foot .set-action:active { background: var(--press); }
 
 /* 3-char macro faces on the touch panel shrink to fit the button */
 .tc-btn.tri { font-size: 0.72rem; letter-spacing: -0.02em; }
@@ -5936,13 +6288,14 @@ html.map-hold, html.map-hold * {
   font-family: var(--font-mono);
   font-size: 0.8rem;
   color: var(--text-dim);
-  background: color-mix(in srgb, var(--bg) 85%, transparent);
-  border: 1px solid var(--border);
+  background: var(--surface);
+  border: none;
   border-radius: 999px;
   cursor: pointer;
 }
 #chat-chip .chat-chip-hash { color: var(--accent); font-weight: 600; }
-#chat-chip.chat-chip-open { border-color: var(--accent); }
+/* Open = the active-state gray step (in-game chrome's one state grammar) */
+#chat-chip.chat-chip-open { background: var(--surface2); color: var(--text); }
 #chat-chip .chat-chip-badge {
   background: var(--accent);
   color: var(--bg);
@@ -6029,17 +6382,16 @@ html.map-hold, html.map-hold * {
   display: flex;
   flex-direction: column;
   /* Content-sized: hugs a short conversation instead of claiming a fixed
-     40% of the screen. The history's max-height caps the rise (~8 lines). */
+     40% of the screen. The history's max-height caps the rise (~8 lines).
+     A full-width band, square-cornered: it sits in the grid flow, not over
+     it, and its fill alone separates it from the HUD above. Chat's accent
+     identity lives in the #chat title and ». */
   background: var(--surface);
-  /* Standard region-seam hairline, same as the HUD/spectator-bar/kbd
-     edges — a full-accent line here out-shouted every other seam on screen.
-     Chat's accent identity lives in the #chat title, chip outline, and ». */
-  border-top: 1px solid var(--border);
 }
 
-/* One rule only — the sheet's top-edge hairline. The header/history/input
-   internals separate by spacing and the input's own box: stacked hairlines
-   read as venetian blinds when the history is short or empty. */
+/* No rules inside: header/history/input separate by spacing and the
+   input's own fill — stacked hairlines read as venetian blinds when the
+   history is short or empty. */
 .chat-header {
   display: flex;
   align-items: center;
@@ -6108,25 +6460,26 @@ html.map-hold, html.map-hold * {
 .chat-input {
   flex: 1;
   min-width: 0;
-  background: var(--bg);
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  padding: 0.45rem 0.6rem;
+  background: var(--surface2);
+  border: none;
+  border-radius: var(--r-ctl);
+  padding: 0.55rem 0.8rem;
   color: var(--text);
+  caret-color: var(--accent);
   font-family: var(--font-mono);
   /* Matches the sheet's type scale. No ≥16px anti-zoom guard needed: the
      viewport meta's user-scalable=no already suppresses iOS Safari's
      focus auto-zoom on small inputs. */
   font-size: 0.8rem;
 }
-.chat-input:focus { outline: none; border-color: var(--accent); }
+.chat-input:focus { outline: none; }
 /* Guest (read-only) role: input locked with a sign-in hint. */
 .chat-input:disabled { opacity: 0.55; }
 .chat-send:disabled { opacity: 0.4; cursor: default; }
 .chat-send {
   background: var(--surface2);
-  border: 1px solid var(--border);
-  border-radius: 6px;
+  border: none;
+  border-radius: var(--r-ctl);
   color: var(--accent);
   font-family: var(--font-mono);
   font-size: 1.1rem;
@@ -6146,9 +6499,8 @@ html.map-hold, html.map-hold * {
   align-items: flex-start;
   gap: 0.6rem;
   background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  padding: 0.6rem 0.7rem;
+  border-radius: var(--r-bar);
+  padding: 0.6rem 0.75rem;
   text-align: left;
 }
 .char-card-tappable { cursor: pointer; }

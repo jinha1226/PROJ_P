@@ -904,9 +904,9 @@ export function buildGameView(opts: GameViewOptions): HTMLElement {
     const bar = document.createElement('div')
     bar.id = 'spectator-bar'
     const exitBtn = document.createElement('button')
-    exitBtn.className = 'lobby-btn-ghost'
+    exitBtn.className = 'lobby-btn-ghost is-back'
     exitBtn.setAttribute('aria-label', 'Back to lobby')
-    exitBtn.textContent = '← Lobby'
+    exitBtn.textContent = 'Lobby'
     exitBtn.addEventListener('click', () => leaveToLobby())
     const chip = document.createElement('div')
     chip.className = 'lobby-account-chip is-guest'

@@ -56,7 +56,7 @@ export function buildOfflineLobbyView(
 
   view.innerHTML = `
     <div class="lobby-header">
-      <button id="lobby-back" class="lobby-btn-ghost" aria-label="Back to login">← Login</button>
+      <button id="lobby-back" class="lobby-btn-ghost is-back" aria-label="Back to login">Login</button>
       <div class="lobby-account-chip is-guest">
         <span class="lobby-chip-tag">⌂ This device</span>
       </div>
@@ -79,7 +79,7 @@ export function buildOfflineLobbyView(
         </form>
       </div>
       <div id="offline-gate-note" class="offline-gate-note" hidden></div>
-      <h2 class="lobby-section-title" id="offline-saves-title">Saved Games</h2>
+      <h2 class="lobby-section-title" id="offline-saves-title">Saved games</h2>
       <div id="offline-saves" class="lobby-list">
         <div class="lobby-loading">Loading…</div>
       </div>
@@ -98,7 +98,7 @@ export function buildOfflineLobbyView(
           </span>
         </div>
       </div>
-      <h2 class="lobby-section-title">On This Device</h2>
+      <h2 class="lobby-section-title">On this device</h2>
       <div class="offline-device">
         <div id="offline-readiness" class="offline-device-row">
           <span id="offline-ready-glyph" class="offline-device-glyph is-dot">●</span>

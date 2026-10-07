@@ -102,7 +102,7 @@ describe('settings overlay', () => {
 
   it('creates, edits, and saves a new set through the editor', () => {
     openSettings()
-    findButton('＋ New set').click()
+    findButton('New set').click()
 
     // editor is showing, seeded from the active (Standard) set
     expect($('.settings-h')!.textContent).toBe('New control set')
@@ -148,7 +148,7 @@ describe('settings overlay', () => {
     seedThreeColSet()
     openSettings()
     $$('.set-row-main')[1].click()  // activate the custom set (3×3 first tabs)
-    findButton('＋ New set').click()
+    findButton('New set').click()
     for (const tab of $$('.ed-tab')) {
       expect(tab.querySelectorAll('.ed-slot')).toHaveLength(12)
     }
@@ -159,7 +159,7 @@ describe('settings overlay', () => {
 
   it('toggling a tab 4→3→4 in the editor keeps the 4th-column keys', () => {
     openSettings()
-    findButton('＋ New set').click()
+    findButton('New set').click()
     const firstTabBox = $('.ed-tab')!
     findButton('3×3', firstTabBox).click()
     findButton('3×4', $('.ed-tab')!).click()
@@ -215,7 +215,7 @@ describe('settings overlay', () => {
 
   it('describes the current key and typed text in the picker info line', () => {
     openSettings()
-    findButton('＋ New set').click()
+    findButton('New set').click()
     $$('.ed-slot')[0].click()  // Standard slot 1 = Tab
     const info = $('.ed-picker-info')!
     expect(info.textContent).toContain('auto-fight')
@@ -231,7 +231,7 @@ describe('settings overlay', () => {
 
   it('assigns a special key on the second tap only', () => {
     openSettings()
-    findButton('＋ New set').click()
+    findButton('New set').click()
     $$('.ed-slot')[0].click()
     const f1 = findButton('F1', $('.ed-picker-keys')!)
     f1.click()
@@ -245,7 +245,7 @@ describe('settings overlay', () => {
 
   it('marks the slot\'s current special key in the picker', () => {
     openSettings()
-    findButton('＋ New set').click()
+    findButton('New set').click()
     $$('.ed-slot')[0].click()  // holds Tab
     const marked = $$('.ed-key.current')
     expect(marked).toHaveLength(1)
@@ -254,7 +254,7 @@ describe('settings overlay', () => {
 
   it('moves a key by swapping it with a tapped destination', () => {
     openSettings()
-    findButton('＋ New set').click()
+    findButton('New set').click()
     $$('.ed-slot')[0].click()
     findButton('Move').click()
     expect($('.ed-move-hint')!.hidden).toBe(false)
@@ -269,7 +269,7 @@ describe('settings overlay', () => {
 
   it('cancels a move by tapping the source slot again', () => {
     openSettings()
-    findButton('＋ New set').click()
+    findButton('New set').click()
     $$('.ed-slot')[0].click()
     findButton('Move').click()
     $$('.ed-slot')[0].click()
@@ -279,7 +279,7 @@ describe('settings overlay', () => {
 
   it('accepts a surrogate-pair emoji tab label but not two characters', () => {
     openSettings()
-    findButton('＋ New set').click()
+    findButton('New set').click()
     const charInput = $<HTMLInputElement>('.ed-tab-char')!
 
     charInput.value = 'ab'
@@ -464,24 +464,20 @@ describe('size sliders', () => {
     expect(segGroup('Message log text size').querySelectorAll('[role="radio"]')).toHaveLength(5)
   })
 
-  it('labels the lines slider dots with their values', () => {
+  it('flanks every slider with decorative end symbols, outside the radiogroup', () => {
     openSettings()
-    const nums = [...segGroup('Message log lines').querySelectorAll('.set-slider-num')]
-    expect(nums.map(n => n.textContent)).toEqual(['3', '4', '5', '6', '7'])
-  })
-
-  it('labels only the endpoint dots of a worded slider', () => {
-    openSettings()
-    const nums = [...segGroup('D-pad size').querySelectorAll('.set-slider-num')]
-    expect(nums.map(n => n.textContent)).toEqual(['Tiny', 'Chunky'])
-  })
-
-  it('renders the font slider ends as "Aa" specimens at the true stop sizes', () => {
-    openSettings()
-    const ends = [...segGroup('Message log text size').querySelectorAll('.set-slider-num')]
-    expect(ends.map(n => n.textContent)).toEqual(['Aa', 'Aa'])
-    expect(ends.map(n => (n as HTMLElement).style.fontSize)).toEqual(['0.65rem', '0.85rem'])
-    for (const n of ends) expect(n.classList.contains('set-slider-spec')).toBe(true)
+    for (const name of ['Message log lines', 'Message log text size', 'D-pad size']) {
+      const group = segGroup(name)
+      const row = group.parentElement!
+      expect(row.classList.contains('set-slider-row')).toBe(true)
+      const ends = [...row.children].filter(c => c.classList.contains('set-slider-end'))
+      expect(ends).toHaveLength(2)
+      expect(row.firstElementChild).toBe(ends[0])
+      expect(row.lastElementChild).toBe(ends[1])
+      for (const e of ends) expect(e.getAttribute('aria-hidden')).toBe('true')
+      // the radios stay the group's only children: values are aria-labels
+      expect(group.querySelectorAll('.set-slider-end')).toHaveLength(0)
+    }
   })
 
   it('tapping a dot stores the pref and moves the marks', () => {

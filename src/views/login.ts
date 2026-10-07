@@ -48,20 +48,24 @@ export function buildLoginView(
   // Reused form contents — wrapped in a `<details>` toggle when the user
   // already has saved sessions, or rendered as a plain Sign-in section when
   // they don't.
+  // One grouped cell: a Server row with its value
+  // trailing, then Username / Password rows named by placeholder and
+  // aria-label rather than a label line above each field.
   const formInnerHtml = `
-    <label class="login-label">
-      Server
-      <select id="server-select"></select>
-    </label>
-    <label class="login-label">
-      Username
-      <input id="login-user" type="text" autocomplete="username"
-             spellcheck="false" autocorrect="off" autocapitalize="off" required />
-    </label>
-    <label class="login-label">
-      Password
-      <input id="login-pass" type="password" autocomplete="current-password" required />
-    </label>
+    <div class="login-form-group">
+      <label class="login-form-row login-form-row--picker">
+        <span class="login-form-name">Server</span>
+        <select id="server-select"></select>
+      </label>
+      <div class="login-form-row">
+        <input id="login-user" type="text" autocomplete="username" placeholder="Username"
+               aria-label="Username" spellcheck="false" autocorrect="off" autocapitalize="off" required />
+      </div>
+      <div class="login-form-row">
+        <input id="login-pass" type="password" autocomplete="current-password" placeholder="Password"
+               aria-label="Password" required />
+      </div>
+    </div>
     <button id="login-btn" type="submit" class="login-btn">Connect</button>
   `
 
@@ -91,7 +95,6 @@ export function buildLoginView(
     `
     : `
       <div class="login-subsection login-signin-section">
-        <div class="login-sub-label">Sign in</div>
         <form id="login-form" autocomplete="on" novalidate>
           ${formInnerHtml}
         </form>
@@ -138,7 +141,7 @@ export function buildLoginView(
           <div class="login-sub-label">Spectate as guest</div>
           <div class="login-spectate-row">
             <select id="spectate-select" class="login-spectate-select" aria-label="Server"></select>
-            <button id="spectate-btn" type="button" class="login-btn login-btn-spectate">Spectate →</button>
+            <button id="spectate-btn" type="button" class="login-btn login-btn-spectate">Spectate</button>
           </div>
           <div id="spectate-error" class="login-error" style="display:none" role="alert"></div>
         </div>
