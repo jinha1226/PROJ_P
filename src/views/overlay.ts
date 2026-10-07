@@ -1,3 +1,5 @@
+import { attachScrollCue } from '../util/scroll-cue'
+
 // Shared dismissal wiring for the full-screen surfaces mounted on document.body
 // (the markdown doc viewer and the crypt). Appends `el` to the body, closes it on
 // Escape, and returns a close() that removes the node and detaches the listener.
@@ -62,18 +64,19 @@ export function mountBackdrop(cls?: string): { backdrop: HTMLElement; close: () 
   return { backdrop, close }
 }
 
-// Shared card-dialog shell (dimmed backdrop + centered card + titled header
-// with ✕), used by the doc viewer and the settings page. Returns the empty
-// body element for the caller to fill, plus close(); Escape (via
-// mountOverlay), the ✕ button, and a backdrop tap all dismiss. The `cls`
-// classes extend the doc-* base styling per surface.
+// Shared sheet shell (dimmed backdrop + full-height bottom sheet + titled
+// header with ✕), used by the doc viewer and the settings page — one
+// anatomy, so a Help doc opened from Settings stacks as sheet over sheet.
+// Returns the empty body element for the caller to fill, plus close();
+// Escape (via mountOverlay), the ✕ button, and a backdrop tap all dismiss.
+// The `cls` classes extend the doc-* base styling per surface.
 export function mountCardOverlay(
   title: string,
   cls: { backdrop?: string; card?: string; body?: string } = {},
 ): { body: HTMLElement; close: () => void } {
-  const { backdrop, close } = mountBackdrop(cls.backdrop)
+  const { backdrop, close } = mountBackdrop('sheet-backdrop' + (cls.backdrop ? ` ${cls.backdrop}` : ''))
   const card = document.createElement('div')
-  card.className = 'doc-card' + (cls.card ? ` ${cls.card}` : '')
+  card.className = 'doc-card sheet-card' + (cls.card ? ` ${cls.card}` : '')
   card.setAttribute('role', 'dialog')
   card.setAttribute('aria-modal', 'true')
   card.setAttribute('aria-label', title)
@@ -95,5 +98,6 @@ export function mountCardOverlay(
   card.appendChild(body)
   backdrop.appendChild(card)
   closeBtn.addEventListener('click', close)
+  attachScrollCue(header, body)
   return { body, close }
 }

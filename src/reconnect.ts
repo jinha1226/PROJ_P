@@ -541,7 +541,7 @@ interface Overlay extends ResumeUi {
 function buildOverlay(onCancel: () => void): Overlay {
   const backdrop = document.createElement('div')
   backdrop.className = 'reconnect-backdrop'
-  if (document.querySelector('.doc-backdrop')) backdrop.classList.add('is-over-sheet')
+  if (document.querySelector('.sheet-backdrop')) backdrop.classList.add('is-over-sheet')
   backdrop.innerHTML = `
     <div class="reconnect-card">
       <div class="reconnect-spinner" aria-hidden="true"></div>

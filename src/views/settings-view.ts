@@ -289,42 +289,45 @@ function markChecked(group: HTMLElement, chosen: Element): void {
 // Numeric prefs whose legal values are a stop table (ui-scale.ts).
 type SliderPrefKey = 'dpadSize' | 'msglogLines' | 'msglogFont'
 
-// Discrete slider bound to a stop-table pref: a radiogroup of tap-stops on a
-// track — the page's ordered-magnitude counterpart to segPref's state
-// adjectives. Laid out with a small
-// and a large symbol inline at the track's ends (`ends`, decorative), ticks
-// under the track at the stops, the knob on the active stop; no captions —
-// each slider's live preview shows the value. The stock stop keeps a ring
-// tick, and the stored value snaps to the nearest stop for display,
-// mirroring ui-scale's clamp. setPref fires the live-apply event; ui-scale
-// rewrites the CSS variables, which is also what updates the previews.
-// Returns the row; the radiogroup inside carries the aria-label.
+// Discrete slider bound to a stop-table pref — the page's ordered-magnitude
+// counterpart to segPref's state adjectives. A native range input over the
+// stop indices, so the browser owns drag, scroll-vs-drag, keyboard and
+// VoiceOver; no gesture code of ours (a tap-stop radiogroup looked like a
+// slider but couldn't be dragged). Laid out with
+// a small and a large symbol inline at the track's ends (`ends`,
+// decorative), ticks under the track at the stops; no captions — each
+// slider's live preview shows the value. No fill left of the knob: WebKit
+// has no CSS hook for it, and it isn't worth script. The stock stop keeps a
+// ring tick, and the stored value snaps to the nearest stop for display,
+// mirroring ui-scale's clamp. setPref fires the live-apply event (and bails
+// on an equal value); ui-scale rewrites the CSS variables, which is also
+// what updates the previews. Returns the row; the input carries the
+// aria-label.
 function sliderPref(
   ariaLabel: string,
   prefKey: SliderPrefKey,
   stops: readonly number[],
   ends: [string, string],
 ): HTMLElement {
-  const slider = el('div', 'set-slider')
-  slider.setAttribute('role', 'radiogroup')
-  slider.setAttribute('aria-label', ariaLabel)
-  slider.style.setProperty('--stops', String(stops.length))
+  const input = el('input', 'set-slider')
+  input.type = 'range'
+  input.min = '0'
+  input.max = String(stops.length - 1)
+  input.step = '1'
+  input.value = String(stops.indexOf(nearestStop(stops, getPref(prefKey))))
+  input.setAttribute('aria-label', ariaLabel)
+  const sync = (): void => input.setAttribute('aria-valuetext', String(stops[Number(input.value)]))
+  sync()
+  input.addEventListener('input', () => {
+    setPref(prefKey, stops[Number(input.value)])
+    sync()
+  })
   const stock = defaultPref(prefKey)
-  const active = nearestStop(stops, getPref(prefKey))
-  for (const value of stops) {
-    // Re-tapping the active dot is a no-op via setPref's own equal-value
-    // bail (no write, no event); markChecked is idempotent.
-    const dot = button('', 'set-slider-dot'
-      + (value === active ? ' active' : '') + (value === stock ? ' default' : ''), () => {
-      setPref(prefKey, value)
-      markChecked(slider, dot)
-    })
-    dot.setAttribute('role', 'radio')
-    dot.setAttribute('aria-checked', String(value === active))
-    dot.setAttribute('aria-label', String(value))
-    dot.appendChild(el('span', 'set-slider-mark'))
-    slider.appendChild(dot)
-  }
+  const ticks = el('div', 'set-slider-ticks')
+  ticks.setAttribute('aria-hidden', 'true')
+  for (const value of stops) ticks.appendChild(el('span', 'set-slider-tick' + (value === stock ? ' default' : '')))
+  const body = el('div', 'set-slider-body')
+  body.append(input, ticks)
   const [start, end] = ends.map((html) => {
     const span = el('span', 'set-slider-end')
     span.setAttribute('aria-hidden', 'true')
@@ -332,7 +335,7 @@ function sliderPref(
     return span
   })
   const row = el('div', 'set-slider-row')
-  row.append(start, slider, end)
+  row.append(start, body, end)
   return row
 }
 

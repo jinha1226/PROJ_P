@@ -372,12 +372,20 @@ html.pz-home-indicator { --safe-bottom: var(--home-indicator-cap); }
 }
 .login-moved-x:active { opacity: 0.5; }
 
+/* The wordmark is set in the game's mono (its letters roll into DCSS
+   glyphs, logo.ts), so it opts out of the login view's --font-ui root explicitly. */
 .login-title {
-  font-size: 1.4rem;
+  --wm-track: 0.12em;
+  font-family: var(--font-mono);
+  font-size: 1.8rem;
   color: var(--accent);
   text-align: center;
   margin-bottom: var(--login-head-gap);
-  letter-spacing: 0.1em;
+  letter-spacing: var(--wm-track);
+  /* Letter-spacing also trails the last letter, centring the word half a
+     step left (measured 2026-10-07: ink 2.75px left of the screen centre
+     at 1.8rem); an equal leading pad re-centres it. */
+  padding-left: var(--wm-track);
 }
 
 /* Tap-to-reroll affordance (class added by decorateLogo). pointer is the desktop
@@ -712,11 +720,14 @@ html.pz-home-indicator { --safe-bottom: var(--home-indicator-cap); }
 .login-subsection { margin-bottom: 1.1rem; }
 .login-subsection:last-child { margin-bottom: 0; }
 
-.login-sub-label {
-  padding: 0 1.25rem;
+/* A group's secondary line sits UNDER it, footer-style, on the card's text
+   inset — never as a label above the next group, where two small gray
+   lines in a row read as one block (the old "Spectate as guest" label
+   under "Add another account"). */
+.login-sub-footer {
+  padding: 0.45rem 1.25rem 0;
   font-size: 0.8125rem;
   color: var(--text-dim);
-  margin-bottom: 0.4rem;
 }
 
 /* Saved accounts: one grouped list, separators inset at both ends. */
@@ -773,11 +784,18 @@ html.pz-home-indicator { --safe-bottom: var(--home-indicator-cap); }
   text-align: center;
 }
 
+/* Player and character names are game data: mono, a step smaller than the
+   UI font they sit among (mono runs wider at the same size). Same rule on every
+   surface that shows one — account cards, lobby and slot rows, the account
+   chip, the spectator bar. */
 .login-account-username {
   grid-area: user;
-  font-size: 1.0625rem;
+  font-family: var(--font-mono);
+  font-size: 1rem;
   color: var(--text);
 }
+/* The offline card's title when it's a label ("New game"), not a name */
+.login-account-username.is-label { font-family: var(--font-ui); font-size: 1.0625rem; }
 
 /* Trailing chevron (a row that goes somewhere), not an arrow glyph */
 .login-account-card::after {
@@ -849,18 +867,27 @@ html.pz-home-indicator { --safe-bottom: var(--home-indicator-cap); }
   border-radius: var(--r-key);
 }
 
+/* "+ Add account": the saved-accounts card's footer line (see
+   .login-sub-footer), tucked under the card — a full row read as one more
+   account. + / − mark closed / open; the form opens beneath. */
+#resume-section { margin-bottom: 0; }  /* only rendered with this section after it */
 .login-add-section > summary {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
   cursor: pointer;
-  padding: 0.6rem 1.25rem 0;
+  padding: 0.55rem 1.25rem 0;
   font-size: 0.9375rem;
   color: var(--text-dim);
   list-style: none;
 }
 .login-add-section > summary:active { opacity: 0.5; }
 .login-add-section > summary::-webkit-details-marker { display: none; }
-/* Leading disclosure chevron, same right/down state pair (and the same
-   border-drawn glyph) as the section headers above it — one grammar per page. */
-.login-add-section > summary::before,
+.login-add-section > summary::before { content: '+'; font-size: 1.15em; line-height: 1; }
+.login-add-section[open] > summary::before { content: '−'; }
+.login-add-section[open] > summary { margin-bottom: 0.8rem; }
+/* "Show all versions": leading disclosure chevron, same right/down state
+   pair (and the same border-drawn glyph) as the section headers. */
 .lobby-more-games > summary::before {
   content: "";
   display: inline-block;
@@ -873,9 +900,7 @@ html.pz-home-indicator { --safe-bottom: var(--home-indicator-cap); }
   opacity: 0.6;  /* same tier as the section-header chevrons */
   transform: rotate(-45deg);
 }
-.login-add-section[open] > summary::before,
 .lobby-more-games[open] > summary::before { transform: translateY(-0.2em) rotate(45deg); }
-.login-add-section[open] > summary { margin-bottom: 0.6rem; }
 
 /* Server pickers hold hostnames: game data, mono. WebKit's menulist
    ignores padding and draws its own arrow, so the picker is unstyled
@@ -1024,8 +1049,9 @@ html.pz-home-indicator { --safe-bottom: var(--home-indicator-cap); }
 
 /* Flex rather than an inline row so spacing is keyed on position, not element
    type: the gear chip is a <button> among the anchors, and gap spaces any
-   child without each one restating the constant. Links in the accent (the
-   rule allows links), no underline. */
+   child without each one restating the constant. Secondary gray, no
+   underline: Connect stays the screen's one amber control besides the
+   wordmark (the unread dot keeps the accent — a state mark). */
 .login-footer {
   margin-top: 1.5rem;
   display: flex;
@@ -1033,7 +1059,7 @@ html.pz-home-indicator { --safe-bottom: var(--home-indicator-cap); }
   align-items: center;
   gap: 1.25rem;
   font-size: 0.9375rem;
-  color: var(--accent);
+  color: var(--text-dim);
 }
 
 .login-footer a {
@@ -1144,21 +1170,23 @@ html.pz-home-indicator { --safe-bottom: var(--home-indicator-cap); }
   cursor: pointer;
 }
 
-/* Every header identity chip (account, guest, offline device, spectator bar)
-   is the one filled pill above; the pill shape distinguishes it from the back
-   button next to it. The guest form is usually static (offline lobby,
-   spectator bar) — but in the lobby of a server with somewhere to switch to
-   it is a button opening the server menu, so only the non-button form
-   disclaims tappability. */
+/* The filled pill above is for a chip that opens something (the account
+   menu, the guest server menu). The guest form is usually static (offline
+   lobby, spectator bar, a guest lobby with nowhere to switch to) and then
+   drops the fill: the same pill on a static label read as a button. */
 .lobby-account-chip.is-guest {
   cursor: default;
   color: var(--text-dim);
+}
+div.lobby-account-chip.is-guest {
+  background: none;
+  padding: 0 0.25rem;
 }
 button.lobby-account-chip.is-guest { cursor: pointer; }
 button.lobby-account-chip:active { background: var(--press); }
 
 /* No accent in a chip (see --accent-line): your account name leads by weight. */
-.lobby-chip-user { color: var(--text); font-weight: 600; }
+.lobby-chip-user { color: var(--text); font-weight: 600; font-family: var(--font-mono); }
 .lobby-chip-sep  { color: var(--text-dim); }
 .lobby-chip-tag  { color: var(--text); }
 .lobby-chip-role {
@@ -1355,7 +1383,8 @@ button.lobby-account-chip:active { background: var(--press); }
 }
 .lobby-more-games > summary:active { opacity: 0.5; }
 
-/* The leading chevron is the login expanders' (.login-add-section). */
+/* The leading chevron is drawn with the login styles (.lobby-more-games
+   > summary::before, next to .login-add-section). */
 .lobby-more-games > summary::-webkit-details-marker { display: none; }
 
 /* Advisory line under the expanded version list — only rendered when the
@@ -1462,7 +1491,8 @@ button.lobby-account-chip:active { background: var(--press); }
 }
 .lobby-game-user {
   color: var(--text);
-  font-size: 1.0625rem;
+  font-family: var(--font-mono);  /* a name: game data (.login-account-username) */
+  font-size: 1rem;
   font-weight: 600;
   flex: 0 1 auto;
   min-width: 0;
@@ -1706,6 +1736,9 @@ button.lobby-account-chip:active { background: var(--press); }
   color: var(--text-dim);
   font-size: 1rem;
 }
+/* The row is baseline-aligned; sink the icon so it centres on the label's
+   first line like the text glyphs do. */
+.offline-device-glyph svg { vertical-align: -0.15em; }
 .offline-device-glyph.is-dot { font-size: 0.8rem; }
 .offline-device-glyph.is-ok { color: var(--ok); }
 .offline-device-glyph.is-warn { color: var(--warn); }
@@ -1888,8 +1921,9 @@ button.lobby-account-chip:active { background: var(--press); }
 .lobby-exit-link:active { background: var(--press); }
 
 /* ── In-app document modal (About / What's new) ───────────── */
-/* Floats above login/lobby; rendered from ABOUT.md / CHANGELOG.md. Backdrop and
-   card mirror the exit dialog. */
+/* Floats above login/lobby; rendered from ABOUT.md / CHANGELOG.md. The
+   .doc-backdrop/.doc-card base also serves the crypt's centred character
+   card; the sheet form (.sheet-*, below) is mountCardOverlay's. */
 .doc-backdrop {
   position: fixed;
   inset: 0;
@@ -1911,8 +1945,23 @@ button.lobby-account-chip:active { background: var(--press); }
   box-shadow: var(--modal-shadow);
   overflow: hidden;
 }
-/* Centred title, a circular ✕ at the trailing edge;
-   no rule under the header — the body scrolls under it on the same fill. */
+/* Every mountCardOverlay surface (docs, Settings) is one bottom sheet: full
+   height under the status bar, top corners rounded. No grabber — there's no
+   drag-to-dismiss (it would fight the body's own scroll); ✕, Escape and a
+   scrim tap close it. */
+.sheet-backdrop {
+  align-items: flex-end;
+  padding: max(0.875rem, calc(var(--safe-top) + 0.5rem)) var(--safe-right) 0 var(--safe-left);
+}
+.sheet-card {
+  height: 100%;
+  border-radius: var(--r-sheet) var(--r-sheet) 0 0;
+}
+/* Centred title, a circular ✕ at the trailing edge,
+   its edge on the body's 1rem gutter. The body scrolls under the header on
+   the same fill; while it does, the header draws the scroll-edge hairline
+   (attachScrollCue) — the lobby/crypt bars' cue, in the hairline token of
+   a surface (--border is the seam on black). */
 .doc-header {
   position: relative;
   display: flex;
@@ -1921,11 +1970,13 @@ button.lobby-account-chip:active { background: var(--press); }
   min-height: 3.5rem;
   padding: 0.6rem 3.75rem;
   flex-shrink: 0;
+  transition: box-shadow 150ms;
 }
+.doc-header.is-scrolled { box-shadow: 0 1px 0 var(--separator); }
 .doc-title { color: var(--text); font-size: 1.0625rem; font-weight: 600; }
 .doc-close {
   position: absolute;
-  right: 0.75rem;
+  right: 1rem;
   top: 50%;
   transform: translateY(-50%);
   width: 2.25rem;
@@ -2074,9 +2125,9 @@ button.lobby-account-chip:active { background: var(--press); }
   z-index: var(--z-map-above-overlay);
   max-width: min(92%, 30rem);
   padding: 0.45rem 0.8rem;
-  border-radius: 0.5rem;
-  border: 1px solid var(--border);
-  background: color-mix(in srgb, var(--bg) 85%, transparent);
+  border-radius: var(--r-ctl);
+  border: none;
+  background: color-mix(in srgb, var(--surface2) 92%, transparent);
   color: var(--text-dim);
   font-size: 0.8rem;
   line-height: 1.35;
@@ -3438,9 +3489,9 @@ html.map-hold, html.map-hold * {
   width: 2.4rem;
   height: 2.4rem;
   padding: 0;
-  background: rgba(10, 9, 8, 0.72);
-  border: 1px solid var(--border);
-  border-radius: 0.6rem;
+  background: color-mix(in srgb, var(--surface2) 85%, transparent);
+  border: none;
+  border-radius: var(--r-ctl);
   color: var(--color-7); /* DCSS lightgrey — reads as chrome, not content */
 }
 .screen-export-btn[hidden] { display: none; }
@@ -4514,7 +4565,7 @@ html.map-hold, html.map-hold * {
 /* Spectator bar: occupies the same `touch` slot the d-pad would, so swapping
    from playing to spectating doesn't change overall vertical layout.
    Layout mirrors the lobby header ("← Lobby" ghost button on the left,
-   "Spectating · @user" pill on the right). */
+   "Spectating · @user" label on the right). */
 #spectator-bar {
   --bar-pad: 0.3rem;
   grid-area: touch;
@@ -4534,6 +4585,7 @@ html.map-hold, html.map-hold * {
    Truncation loses nothing: the HUD title line shows the full name. */
 #spectator-bar .lobby-account-chip { min-width: 0; }
 #spectator-bar .lobby-chip-tag {
+  font-family: var(--font-mono);  /* the watched player's name */
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -5538,22 +5590,19 @@ html.map-hold, html.map-hold * {
   .hud-grid .hg-caption + span { margin-left: 1ch; }
 }
 
-/* Landscape on short viewports: compact the login card so it fits
-   without scrolling on a phone in landscape (≤500px tall). */
+/* Landscape on short viewports: compact the login column vertically so it
+   fits without scrolling on a phone in landscape (≤500px tall). Vertical
+   only: the column keeps portrait's width, and the grouped cells keep
+   their 1.25rem text inset (separators, tags and pickers align on it). */
 @media (orientation: landscape) and (max-height: 500px) {
-  .login-card { padding: 1rem 1.25rem; max-width: 380px; }
+  .login-card { padding: 0.5rem 0; }
   .login-card { --login-head-gap: 0.6rem; --login-group-gap: 0.85rem; }
-  .login-title { font-size: 1.2rem; }
+  .login-title { font-size: 1.5rem; }
   .login-subsection { margin-bottom: 0.7rem; }
   .login-label { margin-bottom: 0.5rem; font-size: 0.8rem; }
   .login-label input,
-  .login-label select,
-  .login-spectate-select { font-size: 0.9rem; padding: 0.4rem 0.6rem; }
-  .login-btn { padding: 0.5rem; font-size: 0.95rem; }
-  .login-account-list { gap: 0.35rem; }
-  .login-account-card { padding: 0.45rem 0.6rem; }
+  .login-label select { font-size: 0.9rem; padding: 0.4rem 0.6rem; }
   .login-account-username { font-size: 0.9rem; }
-  .login-account-tag { padding: 0.2rem 0.4rem; font-size: 0.72rem; }
   .login-footer { margin-top: 0.75rem; font-size: 0.75rem; }
 }
 
@@ -5672,19 +5721,8 @@ html.map-hold, html.map-hold * {
 .lobby-notice-actions button:active { background: var(--press); }
 
 /* ── Settings overlay (src/views/settings-view.ts) ───────────── */
-/* Reuses the doc-viewer shell (.doc-backdrop/.doc-card) one tier lower, as
-   a bottom sheet: full height under the status bar, top corners rounded.
-   No grabber — there's no drag-to-dismiss (it would fight the body's own
-   scroll); ✕, Escape and a scrim tap close it. */
-.settings-backdrop {
-  z-index: var(--z-settings);
-  align-items: flex-end;
-  padding: max(0.875rem, calc(var(--safe-top) + 0.5rem)) var(--safe-right) 0 var(--safe-left);
-}
-.settings-card {
-  height: 100%;
-  border-radius: var(--r-sheet) var(--r-sheet) 0 0;
-}
+/* The doc viewer's sheet (.sheet-backdrop/.sheet-card), one tier lower. */
+.settings-backdrop { z-index: var(--z-settings); }
 .settings-body {
   overflow-y: auto;
   padding: 0.25rem 1rem calc(1.5rem + var(--safe-bottom));
@@ -5877,19 +5915,21 @@ html.map-hold, html.map-hold * {
 /* Discrete sliders: the page's second control vocabulary — segments are
    state adjectives, sliders are ordered magnitudes (sizes, counts). Their
    anatomy: small and large end
-   symbols inline with the track, ticks under it at the stops, a pill knob
-   on the active stop, the track filled up to it. Each stop is an equal
-   flex cell (a radio); the track spans the end stops' centres plus half a
-   knob, so the knob never overhangs either end. The stock stop's tick is a
-   ring, findable without a reset button. */
+   symbols inline with the track, ticks under it at the stops, a pill knob.
+   A native range input (settings-view.ts sliderPref) restyled: the knob's
+   centre travels the track inset by half a knob, so the ticks row takes the
+   same inset. The stock stop's tick is a ring, findable without a reset
+   button. Plain track, no fill (sliderPref says why). */
 .set-slider-row {
   --knob-w: 2.375rem;
   --knob-h: 1.5rem;
-  --track-y: 1.1rem;  /* track centre within a stop cell */
+  --slider-h: 2.75rem;  /* the input's box: a 44pt touch target */
+  --slider-track: var(--surface4);
+  --slider-knob: #fff;
   display: flex;
   align-items: center;
   gap: 0.75rem;
-  margin-top: 0.875rem;
+  margin-top: 0.5rem;
 }
 .settings-cell > .set-slider-row:first-child { margin-top: 0; }
 .set-slider-end {
@@ -5898,81 +5938,96 @@ html.map-hold, html.map-hold * {
   display: flex;
   align-items: center;
   justify-content: center;
-  margin-bottom: 0.4rem;  /* centre on the track, not on the tick row */
   color: var(--text-dim);
 }
 .set-slider-letter { font-weight: 600; line-height: 1; }
+.set-slider-body {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+}
 .set-slider {
+  -webkit-appearance: none;
+  appearance: none;
   position: relative;
-  flex: 1;
-  display: flex;
-}
-.set-slider-dot {
-  position: relative;
-  flex: 1;
+  z-index: 1;  /* the knob covers its own stop's tick */
+  display: block;
+  width: 100%;
+  height: var(--slider-h);
+  margin: 0;
   background: transparent;
-  border: none;
   cursor: pointer;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  padding: 0 0 0.4rem;
 }
-/* Each stop paints its own slice of the track: filled (accent) up to and
-   including the left half of the active stop, unfilled after. */
-.set-slider-dot::before {
-  content: '';
-  position: absolute;
-  left: 0;
-  right: 0;
-  top: calc(var(--track-y) - 3px);
+.set-slider::-webkit-slider-runnable-track {
   height: 6px;
-  background: var(--surface4);
+  border-radius: 3px;
+  background: var(--slider-track);
 }
-.set-slider-dot:first-child::before { left: calc(50% - var(--knob-w) / 2); border-radius: 3px 0 0 3px; }
-.set-slider-dot:last-child::before { right: calc(50% - var(--knob-w) / 2); border-radius: 0 3px 3px 0; }
-.set-slider-dot:has(~ .active)::before { background: var(--accent); }
-.set-slider-dot.active::before { background: linear-gradient(to right, var(--accent) 50%, var(--surface4) 50%); }
-.set-slider-dot.active:first-child::before { background: var(--surface4); }
-/* Ticks hang under the track; the knob covers its own stop's. */
-.set-slider-mark {
-  position: relative;
+.set-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: var(--knob-w);
+  height: var(--knob-h);
+  margin-top: calc(3px - var(--knob-h) / 2);
+  border: none;
+  border-radius: 999px;
+  background: var(--slider-knob);
+  box-shadow: 0 0.5px 4px rgba(0, 0, 0, 0.15), 0 6px 13px rgba(0, 0, 0, 0.15);
+}
+.set-slider::-moz-range-track {
+  height: 6px;
+  border-radius: 3px;
+  background: var(--slider-track);
+}
+.set-slider::-moz-range-thumb {
+  width: var(--knob-w);
+  height: var(--knob-h);
+  border: none;
+  border-radius: 999px;
+  background: var(--slider-knob);
+  box-shadow: 0 0.5px 4px rgba(0, 0, 0, 0.15), 0 6px 13px rgba(0, 0, 0, 0.15);
+}
+.set-slider:focus-visible { outline: 1px solid var(--accent); outline-offset: 2px; border-radius: var(--r-ctl); }
+/* Ticks hang under the track at the knob-centre stops (zero-width cells,
+   inset half a knob, so each dot centres on its stop). */
+.set-slider-ticks {
+  position: absolute;
+  left: calc(var(--knob-w) / 2);
+  right: calc(var(--knob-w) / 2);
+  top: calc(var(--slider-h) / 2 + 7px);
+  display: flex;
+  justify-content: space-between;
+  pointer-events: none;
+}
+.set-slider-tick { width: 0; display: flex; justify-content: center; }
+.set-slider-tick::before {
+  content: '';
+  flex: none;
   width: 4px;
   height: 4px;
-  margin-top: calc(var(--track-y) + 9px);
   border-radius: 50%;
   background: var(--text-faint);
 }
-.set-slider-dot.default .set-slider-mark { background: none; box-shadow: 0 0 0 1.5px var(--text-dim); }
-.set-slider-dot.active .set-slider-mark {
-  position: absolute;
-  top: calc(var(--track-y) - var(--knob-h) / 2);
-  left: calc(50% - var(--knob-w) / 2);
-  width: var(--knob-w);
-  height: var(--knob-h);
-  margin: 0;
-  border-radius: 999px;
-  background: #fff;
-  box-shadow: 0 0.5px 4px rgba(0, 0, 0, 0.15), 0 6px 13px rgba(0, 0, 0, 0.15);
-}
+.set-slider-tick.default::before { background: none; box-shadow: 0 0 0 1.5px var(--text-dim); }
 
 /* D-pad size preview: the whole 3×3 pad at true size, centered above the
    slider — one button alone can't convey the pad's overall footprint. The
    box reserves the LARGEST stop's height (--pz-dpad-max, written by
    ui-scale.ts from the stop table before any view mounts — no fallback
    literal here, it would be a second authority that drifts) so the slider
-   below never shifts under the finger tapping it; leftover space splits
+   below never shifts under the finger dragging it; leftover space splits
    evenly above and below. */
 .set-dpad-preview {
   display: flex;
   justify-content: center;
   align-items: center;
   height: calc(var(--pz-dpad-max) * 3 + 4px + 1.5rem);
-  /* A black well: the specimen is a copy of the strip, which sits on the
-     page's black — strip keys on a gray card would read inverted. */
-  background: var(--bg);
-  border-radius: var(--r-ctl);
 }
+/* No black well around it (it was mostly empty space): the specimen sits
+   on the card, its keys at the card's control step — the strip's own
+   near-black fill would read as holes in a gray card. It previews size,
+   not the strip's colours. */
+.set-dpad-preview > .set-dpad-pad { --tc-fill: var(--surface3); }
 /* Cell size and colors come from the shared #touch-controls token block
    above. Not the real .tc-dpad/.tc-dpad-btn classes: the landscape media
    query restyles those into the translucent map-float look, which would
@@ -6042,15 +6097,9 @@ html.map-hold, html.map-hold * {
   background: var(--tc-fill);
   box-shadow: inset 0 0 0 1px rgba(238, 238, 236, 0.07);
 }
-/* Dimmer knobs and a quieter fill than the settings sheet's: three white
-   pills and amber tracks were the brightest things on a night map. */
-.size-palette .set-slider-dot.active .set-slider-mark { background: var(--color-7); }
-.size-palette .set-slider-dot::before { background: var(--surface2); }
-.size-palette .set-slider-dot:has(~ .active)::before { background: color-mix(in srgb, var(--accent) 70%, var(--bg)); }
-.size-palette .set-slider-dot.active::before {
-  background: linear-gradient(to right, color-mix(in srgb, var(--accent) 70%, var(--bg)) 50%, var(--surface2) 50%);
-}
-.size-palette .set-slider-dot.active:first-child::before { background: var(--surface2); }
+/* Dimmer knobs and tracks than the settings sheet's: three white pills
+   were the brightest things on a night map. */
+.size-palette .set-slider-row { --slider-knob: var(--color-7); --slider-track: var(--surface2); }
 .size-palette-header {
   display: flex;
   justify-content: space-between;
@@ -6311,7 +6360,8 @@ html.map-hold, html.map-hold * {
    Over the map the opaque chip fill would fully blot out whichever cell sits
    under it, so swap it for the message-log scrim (same var → tiles-mode
    lightening applies here too) and let the log's text-shadow carry
-   legibility instead. */
+   legibility instead. With no fill, the accent ring is what marks it as a
+   button — without it the chip reads as bare text on the map. */
 #chat-chip.chat-chip-float {
   grid-area: map;
   position: absolute;
@@ -6319,6 +6369,7 @@ html.map-hold, html.map-hold * {
   right: 0.4rem;
   z-index: var(--z-map-overlay);
   background: var(--msglog-bg);
+  border: 1px solid color-mix(in srgb, var(--accent) 55%, transparent);
   text-shadow: var(--msglog-text-shadow);
 }
 /* The badge is dark-on-accent; the inherited black glow just smudges it. */

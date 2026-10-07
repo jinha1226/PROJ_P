@@ -45,6 +45,15 @@ const SLOT_DOLL_SCALE = 2
 // Failure notices show the message alone, not "Error: message".
 const errMsg = (e: unknown): string => (e instanceof Error ? e.message : String(e))
 
+// Device-row icons, drawn in the settings sliders' stroke style rather than
+// as font glyphs (✎ ⇅ rendered at mismatched weights per fallback font).
+const rowIcon = (body: string): string =>
+  '<svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor"'
+  + ` stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">${body}</svg>`
+const PENCIL_ICON = rowIcon('<path d="M10.5 2.5l3 3L6 13l-3.5.5L3 10z"/><path d="M9 4l3 3"/>')
+const TRANSFER_ICON = rowIcon(
+  '<path d="M5 13V3M2.5 5.5L5 3l2.5 2.5"/><path d="M11 3v10M8.5 10.5L11 13l2.5-2.5"/>')
+
 export function buildOfflineLobbyView(
   onPlay: (name: string) => void,
   onBack: () => void,
@@ -109,7 +118,7 @@ export function buildOfflineLobbyView(
           <button type="button" id="offline-download" class="offline-device-btn is-accent" hidden></button>
         </div>
         <div class="offline-device-row">
-          <span class="offline-device-glyph">✎</span>
+          <span class="offline-device-glyph" aria-hidden="true">${PENCIL_ICON}</span>
           <span class="offline-device-lines">
             <span class="offline-device-label">Options file</span>
             <span class="offline-device-sub">init.txt</span>
@@ -117,7 +126,7 @@ export function buildOfflineLobbyView(
           <button type="button" id="offline-rc" class="offline-device-btn">Edit</button>
         </div>
         <div class="offline-device-row">
-          <span class="offline-device-glyph">⇅</span>
+          <span class="offline-device-glyph" aria-hidden="true">${TRANSFER_ICON}</span>
           <span class="offline-device-lines">
             <span class="offline-device-label">Backup</span>
             <span class="offline-device-sub">Saves, morgues, scores, and options</span>

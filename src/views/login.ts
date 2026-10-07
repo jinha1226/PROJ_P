@@ -87,7 +87,7 @@ export function buildLoginView(
   const addAccountSection = hasSessions
     ? `
       <details id="add-account" class="login-subsection login-add-section">
-        <summary class="login-add-toggle">Add another account</summary>
+        <summary class="login-add-toggle">Add account</summary>
         <form id="login-form" autocomplete="on" novalidate class="login-add-form">
           ${formInnerHtml}
         </form>
@@ -138,12 +138,13 @@ export function buildLoginView(
         ${addAccountSection}
 
         <div class="login-subsection login-spectate-section">
-          <div class="login-sub-label">Spectate as guest</div>
           <div class="login-spectate-row">
             <select id="spectate-select" class="login-spectate-select" aria-label="Server"></select>
-            <button id="spectate-btn" type="button" class="login-btn login-btn-spectate">Spectate</button>
+            <button id="spectate-btn" type="button" class="login-btn login-btn-spectate"
+                    aria-describedby="spectate-note">Spectate</button>
           </div>
           <div id="spectate-error" class="login-error" style="display:none" role="alert"></div>
+          <div id="spectate-note" class="login-sub-footer">No account needed.</div>
         </div>
         </details>
       </section>
@@ -228,7 +229,7 @@ export function buildLoginView(
   }
   // Only when the server is one the form can select — a username against
   // the wrong server is worse than an empty field. With other accounts
-  // saved the form sits inside the collapsed "Add another account"
+  // saved the form sits inside the collapsed "Add account"
   // disclosure; open it, or the prefill is invisible.
   if (prefill && KNOWN_SERVERS.some(s => s.wsUrl === prefill.wsUrl)) {
     formSelect.value = prefill.wsUrl
@@ -355,6 +356,8 @@ export function buildLoginView(
         ? Object.values(chars).sort((a, b) => b.when - a.when)[0]
         : undefined
       hasChar = rec !== undefined
+      // A character's name is game data (mono); the fallbacks are labels.
+      title.classList.toggle('is-label', !rec)
       if (!rec) {
         // No saves, or saves the browser knows nothing about (imported
         // pack, wiped localStorage) — the lobby labels the latter by stem.
