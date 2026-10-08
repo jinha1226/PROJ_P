@@ -2,7 +2,7 @@ import { httpBaseOf, WsConnection } from '../ws/connection'
 import type { ServerMsg } from '../ws/types'
 import { listSessions, saveSession, type StoredSession } from '../auth/session'
 import { SESSION_EXPIRED_NOTICE, tokenLogin } from '../auth/token-login'
-import { findServer, KNOWN_SERVERS, SPECTATE_SERVERS, labelFor, type KnownServer } from '../servers'
+import { findServer, KNOWN_SERVERS, SPECTATE_SERVERS, labelFor } from '../servers'
 import { getLastSpectateServer, getPref, setPref, setLastSpectateServer, LOGIN_SPRITES_CHANGED_EVENT } from '../prefs'
 import { openAboutDoc, openChangelogDoc, unreadDotHtml } from './docs'
 import { openSettings } from './settings-view'
@@ -209,7 +209,11 @@ export function buildLoginView(
   // without an account is the likeliest person to use it, and "CDI" means
   // nothing to them. The compressed row has the width for a hostname anyway
   // (measured) — the tag belongs in the lobby chip, which genuinely doesn't.
-  fillServerSelect(spectateSelect, SPECTATE_SERVERS)
+  for (const s of SPECTATE_SERVERS) {
+    const o2 = document.createElement('option')
+    o2.value = s.wsUrl; o2.textContent = s.label
+    spectateSelect.appendChild(o2)
+  }
 
   // Spectate dropdown prefers the saved pref (last explicit guest pick),
   // falling back to the most-recently-used session's server when that
@@ -536,7 +540,22 @@ export function buildLoginView(
     const btn = body.querySelector<HTMLButtonElement>('#login-btn')!
     const register = body.querySelector<HTMLAnchorElement>('.login-sheet-register')!
 
-    fillServerSelect(select, KNOWN_SERVERS)
+    // Region as group headers, not in the option text: "host · region"
+    // overran the closed row for 7 of 9 servers at 402px and clipped the
+    // region (measured 2026-10-08).
+    const groups = new Map<string, HTMLOptGroupElement>()
+    for (const s of KNOWN_SERVERS) {
+      let g = groups.get(s.region)
+      if (!g) {
+        g = document.createElement('optgroup')
+        g.label = s.region
+        groups.set(s.region, g)
+        select.appendChild(g)
+      }
+      const o = document.createElement('option')
+      o.value = s.wsUrl; o.textContent = s.label
+      g.appendChild(o)
+    }
     // The signed-out identity, else the most-recently-used session's server.
     const initial = refill?.wsUrl ?? listSessions()[0]?.wsUrl
     if (initial && findServer(initial)) select.value = initial
@@ -702,26 +721,6 @@ export function buildLoginView(
   }
 
   return view
-}
-
-// Both server pickers (sign-in sheet, spectate row), so the same servers
-// list in the same order. Region as group headers, not in the option text:
-// "host · region" overran the closed row for 7 of 9 servers at 402px and
-// clipped the region (measured 2026-10-08).
-function fillServerSelect(select: HTMLSelectElement, servers: KnownServer[]): void {
-  const groups = new Map<string, HTMLOptGroupElement>()
-  for (const s of servers) {
-    let g = groups.get(s.region)
-    if (!g) {
-      g = document.createElement('optgroup')
-      g.label = s.region
-      groups.set(s.region, g)
-      select.appendChild(g)
-    }
-    const o = document.createElement('option')
-    o.value = s.wsUrl; o.textContent = s.label
-    g.appendChild(o)
-  }
 }
 
 // Install a one-shot handler that fires on the first login_success / login_fail.

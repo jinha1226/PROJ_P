@@ -4,7 +4,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { fakeStorage } from '../test/fake-storage'
 import { FakeWS } from '../test/fake-ws'
 import type { ServerMsg } from '../ws/types'
-import { KNOWN_SERVERS, SPECTATE_SERVERS } from '../servers'
+import { KNOWN_SERVERS } from '../servers'
 
 vi.stubGlobal('localStorage', fakeStorage())
 
@@ -91,19 +91,13 @@ describe('sign-in sheet', () => {
     disposeView(view)
   })
 
-  it('groups both server pickers by region, every server once, in one order', () => {
+  it('groups the server picker by region, every known server once', () => {
     const view = mount()
     view.querySelector<HTMLButtonElement>('#add-account')!.click()
-    const grouped = (sel: string): string[] => {
-      const groups = [...document.querySelectorAll<HTMLOptGroupElement>(`${sel} optgroup`)]
-      expect(new Set(groups.map(g => g.label)).size).toBe(groups.length)
-      return groups.flatMap(g => [...g.querySelectorAll('option')].map(o => o.value))
-    }
-    const signIn = grouped('#server-select')
-    const spectate = grouped('#spectate-select')
-    expect([...signIn].sort()).toEqual(KNOWN_SERVERS.map(s => s.wsUrl).sort())
-    expect([...spectate].sort()).toEqual(SPECTATE_SERVERS.map(s => s.wsUrl).sort())
-    expect(spectate).toEqual(signIn.filter(u => spectate.includes(u)))
+    const groups = [...document.querySelectorAll<HTMLOptGroupElement>('#server-select optgroup')]
+    expect(new Set(groups.map(g => g.label)).size).toBe(groups.length)
+    const options = groups.flatMap(g => [...g.querySelectorAll('option')].map(o => o.value))
+    expect(options.sort()).toEqual(KNOWN_SERVERS.map(s => s.wsUrl).sort())
     disposeView(view)
   })
 

@@ -6,7 +6,7 @@
 // places like the lobby header. `region` is the howto's stated location
 // (checked 2026-10-08; comments below), coarsened to what a pick-the-
 // nearest choice needs: US hosts by coast, Europe as one. It groups the
-// sign-in and spectate pickers (login.ts), in first-appearance order.
+// sign-in picker (login.ts), in first-appearance order.
 export interface KnownServer {
   label: string
   tag: string
