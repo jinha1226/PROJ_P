@@ -11,7 +11,8 @@ import { attachScrollCue } from '../util/scroll-cue'
 const stack: Array<() => void> = []
 
 function onKey(e: KeyboardEvent): void {
-  if (e.key === 'Escape') closeTopOverlay()
+  // An IME (CJK, dictation) uses Escape to cancel its composition.
+  if (e.key === 'Escape' && !e.isComposing) closeTopOverlay()
 }
 
 // Close the topmost overlay — the same one the Escape listener targets.
@@ -56,11 +57,20 @@ export function mountOverlay(el: HTMLElement, onClose?: () => void): () => void 
 // append their own dialog content and own its ARIA roles — this is the
 // shared bottom half of mountCardOverlay, split out for dialogs that ARE
 // their own card (the crypt's character-card modal).
-export function mountBackdrop(cls?: string): { backdrop: HTMLElement; close: () => void } {
+export function mountBackdrop(cls?: string, onClose?: () => void): { backdrop: HTMLElement; close: () => void } {
   const backdrop = document.createElement('div')
   backdrop.className = cls ? `doc-backdrop ${cls}` : 'doc-backdrop'
-  const close = mountOverlay(backdrop)
-  backdrop.addEventListener('click', (e) => { if (e.target === backdrop) close() })
+  const close = mountOverlay(backdrop, onClose)
+  // Only a press that also began on the scrim dismisses: a text selection
+  // dragged out of a field ends in a click on the common ancestor — the
+  // backdrop.
+  let pressedScrim = false
+  backdrop.addEventListener('pointerdown', (e) => { pressedScrim = e.target === backdrop })
+  backdrop.addEventListener('click', (e) => {
+    const pressed = pressedScrim
+    pressedScrim = false
+    if (e.target === backdrop && pressed) close()
+  })
   return { backdrop, close }
 }
 
@@ -73,8 +83,9 @@ export function mountBackdrop(cls?: string): { backdrop: HTMLElement; close: () 
 export function mountCardOverlay(
   title: string,
   cls: { backdrop?: string; card?: string; body?: string } = {},
-): { body: HTMLElement; close: () => void } {
-  const { backdrop, close } = mountBackdrop('sheet-backdrop' + (cls.backdrop ? ` ${cls.backdrop}` : ''))
+  onClose?: () => void,
+): { backdrop: HTMLElement; body: HTMLElement; close: () => void } {
+  const { backdrop, close } = mountBackdrop('sheet-backdrop' + (cls.backdrop ? ` ${cls.backdrop}` : ''), onClose)
   const card = document.createElement('div')
   card.className = 'doc-card' + (cls.card ? ` ${cls.card}` : '')
   card.setAttribute('role', 'dialog')
@@ -99,5 +110,5 @@ export function mountCardOverlay(
   backdrop.appendChild(card)
   closeBtn.addEventListener('click', close)
   attachScrollCue(header, body)
-  return { body, close }
+  return { backdrop, body, close }
 }

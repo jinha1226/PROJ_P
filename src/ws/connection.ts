@@ -18,6 +18,13 @@ export interface GameConnection {
   onClose: StateHandler
 }
 
+// A WebTiles server's HTTP origin, derived from its socket URL: swap the ws
+// scheme for http and drop the trailing /socket (webtiles/server.py serves
+// /, /socket and /gamedata from one host and port).
+export function httpBaseOf(wsUrl: string): string {
+  return wsUrl.replace(/^ws/, 'http').replace(/\/socket\/?$/, '')
+}
+
 // Default handshake bound for connect() — generous for a cellular TLS
 // handshake, short enough that a hung attempt can't eat a retry budget.
 const CONNECT_TIMEOUT_MS = 10_000
@@ -48,10 +55,9 @@ export class WsConnection implements GameConnection {
   }
 
   // HTTP base for version-pinned gamedata assets (tile atlases served at
-  // /gamedata/<version>/). Derived from the socket URL: swap the ws scheme
-  // for http and drop the trailing /socket.
+  // /gamedata/<version>/): httpBaseOf.
   get httpBase(): string {
-    return this.url.replace(/^ws/, 'http').replace(/\/socket\/?$/, '')
+    return httpBaseOf(this.url)
   }
 
   // Resolves on open. Every other outcome rejects AND leaves no socket

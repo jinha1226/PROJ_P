@@ -808,7 +808,8 @@ html.pz-home-indicator { --safe-bottom: var(--home-indicator-cap); }
   grid-area: tag;
   /* Accent here is the primary-action mark at card strength (see
      --accent-line): for a returning player these cards ARE the way in —
-     Connect is folded away — and a full fill per card would shout. */
+     sign-in is a text action under them — and a full fill per card would
+     shout. */
   background: color-mix(in srgb, var(--accent) 15%, transparent);
   color: var(--accent);
   border-radius: var(--r-key);
@@ -887,23 +888,67 @@ html.pz-home-indicator { --safe-bottom: var(--home-indicator-cap); }
   border-radius: var(--r-key);
 }
 
-/* "Add account": a text action tucked under the saved-accounts card — a
-   full row read as one more account. It sits where a footnote would
+/* "Add account" with saved accounts: a text action tucked under their card
+   — a full row read as one more account. It sits where a footnote would
    (.login-sub-footer), so the accent tint is what marks it tappable. No
-   +/− glyph: a − beside "Add" read as "remove account", and with the tint
-   a + only repeated the word; the form opening beneath shows the state. */
+   + glyph: with the tint it only repeated the word. (First run, it is the
+   group's .login-btn fill instead.) */
 #resume-section { margin-bottom: 0; }  /* only rendered with this section after it */
-.login-add-section > summary {
-  display: flex;
-  cursor: pointer;
+.login-add-btn {
+  position: relative;
+  display: block;
   padding: 0.55rem 1.25rem 0;
+  background: none;
+  border: none;
+  font-family: inherit;
   font-size: 0.9375rem;
   color: var(--accent);
-  list-style: none;
+  cursor: pointer;
 }
-.login-add-section > summary:active { opacity: 0.5; }
-.login-add-section > summary::-webkit-details-marker { display: none; }
-.login-add-section[open] > summary { margin-bottom: 0.8rem; }
+/* Taller hit area than the line, into the gap below (never as far as the
+   Spectate cell under it). */
+.login-add-btn::after { content: ''; position: absolute; inset: 0 0 -0.6rem; }
+.login-add-btn:active { opacity: 0.5; }
+
+/* The sign-in sheet (login.ts openSignInSheet): .sheet-backdrop's floating
+   sheet at content height, sitting on the keyboard. --kb is how much of the
+   layout viewport the keyboard covers (set from visualViewport); while it
+   is up, the home-indicator pad is under the keyboard and drops. */
+/* Doubled class: .sheet-backdrop's padding shorthand comes later in the file */
+.sheet-backdrop.login-sheet-backdrop { padding-bottom: calc(0.5rem + var(--kb, 0px)); }
+.doc-card.login-sheet { height: auto; max-height: 100%; }
+/* Focused as a whole (tabindex -1) for screen readers, never by keyboard */
+.doc-card.login-sheet:focus { outline: none; }
+.login-sheet-body {
+  min-height: 0;
+  overflow-y: auto;
+  padding: 0 1rem calc(1rem + var(--safe-bottom));
+}
+.kb-up .login-sheet-body { padding-bottom: 1rem; }
+/* Cards in a sheet sit one surface step up */
+.login-sheet .login-form-group { background: var(--surface2); margin-bottom: 0; }
+.login-sheet .login-btn { margin-top: 1rem; }
+.login-sheet-msg {
+  margin: 0 0 0.9rem;
+  padding: 0 0.5rem;
+  text-align: center;
+  font-size: 0.9375rem;
+  line-height: 1.4;
+  color: var(--text-dim);
+}
+.login-sheet-error {
+  padding: 0.5rem 1.25rem 0;
+  font-size: 0.8125rem;
+  color: var(--danger);
+}
+.login-sheet-foot {
+  margin: 0;
+  padding-top: 0.85rem;
+  text-align: center;
+  font-size: 0.8125rem;
+  color: var(--text-dim);
+}
+.login-sheet-register { color: var(--accent); text-decoration: none; }
 /* "Show all versions": leading disclosure chevron, same right/down state
    pair as the section headers (shape: the shared chevron rule). */
 .lobby-more-games > summary::before {
@@ -1401,7 +1446,7 @@ button.lobby-account-chip:active { background: var(--press); }
 .lobby-more-games > summary:active { opacity: 0.5; }
 
 /* The leading chevron is drawn with the login styles (.lobby-more-games
-   > summary::before, next to .login-add-section). */
+   > summary::before, next to .login-add-btn). */
 .lobby-more-games > summary::-webkit-details-marker { display: none; }
 
 /* Advisory line under the expanded version list — only rendered when the
