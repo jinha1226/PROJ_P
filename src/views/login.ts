@@ -518,8 +518,15 @@ export function buildLoginView(
         if (signedIn) return
         // Dismissed without signing in: the reason it opened stays on the
         // screen, and focus returns to the control that opens it again.
+        // Never ringed for a touch player: after the server <select>'s iOS
+        // picker, WebKit rings this programmatic focus (on-device,
+        // 2026-10-08; desktop WebKit doesn't reproduce).
         if (againNotice) showNotice()
-        if (view.isConnected) view.querySelector<HTMLElement>('#add-account')?.focus({ preventScroll: true })
+        const touch = window.matchMedia?.('(pointer: coarse)').matches
+        if (view.isConnected) {
+          view.querySelector<HTMLElement>('#add-account')
+            ?.focus({ preventScroll: true, ...(touch && { focusVisible: false }) })
+        }
       },
     )
     closeSheet = close
