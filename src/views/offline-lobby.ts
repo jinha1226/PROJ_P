@@ -53,6 +53,10 @@ const rowIcon = (body: string): string =>
 const PENCIL_ICON = rowIcon('<path d="M10.5 2.5l3 3L6 13l-3.5.5L3 10z"/><path d="M9 4l3 3"/>')
 const TRANSFER_ICON = rowIcon(
   '<path d="M5 13V3M2.5 5.5L5 3l2.5 2.5"/><path d="M11 3v10M8.5 10.5L11 13l2.5-2.5"/>')
+// The menu card's packless fallbacks (paintMenuIcons swaps in the pack's
+// sprites): New game's +, Scores and morgues' dagger.
+const PLUS_ICON = rowIcon('<path d="M8 3v10M3 8h10"/>')
+const DAGGER_ICON = rowIcon('<path d="M8 2v11M4.5 5.5h7M8 13v1.5"/>')
 
 export function buildOfflineLobbyView(
   onPlay: (name: string) => void,
@@ -94,13 +98,13 @@ export function buildOfflineLobbyView(
       </div>
       <div class="offline-device" id="offline-menu-card" hidden>
         <div id="offline-new-row" class="offline-device-row offline-nav-row" role="button" tabindex="0" hidden>
-          <span class="offline-device-glyph offline-menu-icon" data-menu-icon="STARTUP_STONESOUP" aria-hidden="true">+</span>
+          <span class="offline-device-glyph offline-menu-icon" data-menu-icon="STARTUP_STONESOUP" aria-hidden="true">${PLUS_ICON}</span>
           <span class="offline-device-lines">
             <span class="offline-device-label">New game</span>
           </span>
         </div>
         <div id="offline-records-row" class="offline-device-row offline-nav-row" role="button" tabindex="0" hidden>
-          <span class="offline-device-glyph offline-menu-icon" data-menu-icon="STARTUP_HIGH_SCORES" aria-hidden="true">†</span>
+          <span class="offline-device-glyph offline-menu-icon" data-menu-icon="STARTUP_HIGH_SCORES" aria-hidden="true">${DAGGER_ICON}</span>
           <span class="offline-device-lines">
             <span class="offline-device-label">Scores and morgues</span>
             <span class="offline-device-sub" id="offline-records-sub"></span>
@@ -511,7 +515,7 @@ export function buildOfflineLobbyView(
   // Local pack only. The packless page must read as finished, not as missing
   // art — it is the first impression, and also what cache eviction or a
   // backup imported onto a new device shows beside existing saved games: the
-  // menu card's boxes start with a text glyph in the settings rows' idiom
+  // menu card's boxes start with a drawn icon in the device rows' idiom
   // (the rune cells' placeholder-then-swap pattern), the bar's empty box
   // collapses. Painted at mount and again by runDownload (an in-lobby
   // install paints without a remount) — every icon every time, hidden rows
@@ -534,10 +538,10 @@ export function buildOfflineLobbyView(
         }, 1).catch(() => null)
         if (!el) continue
         // sourceSprite's self-heal removes a bake that fails to decode;
-        // put the glyph back rather than leave the column blank. Kept on
-        // the box: a repaint finds an <img> where the text was.
-        const glyph = box.dataset.menuGlyph ??= box.textContent ?? ''
-        el.addEventListener('error', () => { box.textContent = glyph })
+        // put the fallback icon back rather than leave the column blank.
+        // Kept on the box: a repaint finds an <img> where the icon was.
+        const glyph = box.dataset.menuGlyph ??= box.innerHTML
+        el.addEventListener('error', () => { box.innerHTML = glyph })
         box.replaceChildren(el)
       }
     } catch { /* decoration only */ }

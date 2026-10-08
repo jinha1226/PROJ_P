@@ -663,8 +663,8 @@ html.pz-home-indicator { --safe-bottom: var(--home-indicator-cap); }
    Notes/Files/Reminders section headers): the header row is the control, a
    trailing chevron points right collapsed / down open (no rotation animation
    — by choice).
-   The chevron is the ::before pseudo pushed to the end via flex `order`, since
-   ::after is already the rule line. The tap target is widened by an
+   The chevron is the ::before pseudo pushed to the end via flex `order`
+   (::after is a flex spacer). The tap target is widened by an
    absolutely positioned child (.login-disclosure-hit; a click on it toggles
    the details like any summary content) rather than padding + negative
    margins: margins collapse through <details>/<section> engine-dependently,
@@ -672,8 +672,8 @@ html.pz-home-indicator { --safe-bottom: var(--home-indicator-cap); }
    overlapped and the lower one stole the upper one's taps. The overlay is
    bounded to the gap on each side — the whole head gap above the first
    header, HALF the group gap between headers (each neighbour takes its half,
-   so two collapsed rows can never meet), the label's own 0.7rem below an
-   open header (empty space above its content). Portrait: 44px on the first
+   so two collapsed rows can never meet), 0.7rem below an open header
+   (a little past the label's 0.5rem margin). Portrait: 44px on the first
    row, ~38px on the second; landscape's tighter gaps yield less, by design.
    No other tap target lies inside those gaps. */
 .login-group-toggle > summary {
@@ -959,7 +959,16 @@ html.pz-home-indicator { --safe-bottom: var(--home-indicator-cap); }
 }
 .login-form-name { flex: 1; font-size: 1.0625rem; color: var(--text); }
 .login-form-row--picker { padding-right: 0; }
-.login-form-row select { flex: none; padding-left: 0.75rem; text-align: right; color: var(--text-dim); }
+/* Shrinkable: at 320px (Display Zoom) a long hostname ran past the cell and
+   clipped the ⌃⌄ arrow; it truncates instead. */
+.login-form-row select {
+  flex: 0 1 auto;
+  min-width: 0;
+  padding-left: 0.75rem;
+  text-align: right;
+  text-overflow: ellipsis;
+  color: var(--text-dim);
+}
 .login-form-row input {
   flex: 1;
   min-width: 0;
@@ -974,26 +983,29 @@ html.pz-home-indicator { --safe-bottom: var(--home-indicator-cap); }
 }
 .login-form-row input::placeholder { color: var(--text-faint); }
 
-/* Labelled field outside a form group (offline lobby's character name) */
+/* Labelled field outside a form group (offline lobby's character name,
+   inside the .offline-name-form card): label, field box and the buttons
+   below share the card's padding edge. The field is a control in a card,
+   so one surface step up (on the card's own fill it vanished); the name
+   typed into it is game data, so mono. */
 .login-label {
   display: flex;
   flex-direction: column;
   gap: 0.4rem;
   margin-bottom: 0.85rem;
-  padding: 0 1.25rem;
   font-size: 0.8125rem;
   color: var(--text-dim);
 }
 .login-label input {
-  margin: 0 -1.25rem;
   height: 2.75rem;
-  padding: 0 1.25rem;
-  background: var(--surface);
+  padding: 0 0.75rem;
+  background: var(--surface2);
   border: none;
-  border-radius: var(--r-bar);
+  border-radius: var(--r-ctl);
   color: var(--text);
   caret-color: var(--accent);
-  font-size: 1.0625rem;
+  font-family: var(--font-mono);
+  font-size: 1rem;
   outline: none;
 }
 
@@ -1114,11 +1126,10 @@ html.pz-home-indicator { --safe-bottom: var(--home-indicator-cap); }
   display: flex;
   flex-direction: column;
   gap: 0.75rem;
-  /* 0.5rem gutter (was 1rem), matching the records list: rows provide
-     their own air, and the reclaimed width goes to the slot rows' info
-     line (char^god beside a doll) and spectate-row fact runs. */
-  padding: 0 max(0.5rem, var(--safe-right))
-           max(1rem, var(--safe-bottom)) max(0.5rem, var(--safe-left));
+  /* The 16pt gutter the header bar and the login column use (shared with
+     the records list), so cards line up under the nav bar's controls. */
+  padding: 0 max(1rem, var(--safe-right))
+           max(1rem, var(--safe-bottom)) max(1rem, var(--safe-left));
 }
 
 /* Tablets: edge-to-edge rows read fine at phone widths but stretch into
@@ -1405,15 +1416,9 @@ button.lobby-account-chip:active { background: var(--press); }
   font-weight: 600;
   color: var(--text-dim);
   /* Adds to .lobby-scroll's 0.75rem gap: more space above a section title
-     than below it, so the title binds to its own section's content. */
-  margin: 0.75rem 0 -0.25rem;
-}
-
-.lobby-section-divider {
-  font-size: 0.8125rem;
-  color: var(--text-dim);
-  text-align: center;
-  padding: 0.4rem 0 0.2rem;
+     than below it, so the title binds to its own section's content. Block
+     margins only: the inline ones are .lobby-scroll > *'s centring. */
+  margin-block: 0.75rem -0.25rem;
 }
 
 .lobby-notice {
@@ -1439,10 +1444,16 @@ button.lobby-account-chip:active { background: var(--press); }
   min-height: 3.5rem;
   background: var(--surface);
   border: none;
-  padding: 0.6rem 2.5rem 0.6rem 1.25rem;
+  /* Trailing 2rem: the chevron (::after) spans ~20–26px from the edge, so
+     text ends ~6px clear of it. Wider cost
+     the slot rows' milestone line its last word at 393pt. */
+  padding: 0.6rem 2rem 0.6rem 1.25rem;
   cursor: pointer;
   position: relative;
 }
+/* Slot rows lead with the doll's 64px box, which already holds transparent
+   air around the sprite: the full 1.25rem lead padded that side twice. */
+.offline-slot-row { padding-left: 0.75rem; }
 .lobby-game-row:first-child { border-top-left-radius: var(--r-bar); border-top-right-radius: var(--r-bar); }
 .lobby-game-row:last-child { border-bottom-left-radius: var(--r-bar); border-bottom-right-radius: var(--r-bar); }
 .lobby-game-row + .lobby-game-row::before {
@@ -1502,8 +1513,8 @@ button.lobby-account-chip:active { background: var(--press); }
 }
 /* Weight on a name means "your character" (the offline slot rows) — the
    spectate list's strangers are regular. */
-#lobby-list .lobby-game-user { font-weight: 400; }
-#lobby-list .lobby-game-row.is-idle .lobby-game-user { color: var(--text-dim); }
+:is(#lobby-list, #lobby-idle-list) .lobby-game-user { font-weight: 400; }
+#lobby-idle-list .lobby-game-user { color: var(--text-dim); }
 
 /* A game the server reports a save for (lobby.ts makeGameBtn): a headline
    button carries the server's description as a second line, a version-list
@@ -1519,15 +1530,19 @@ button.lobby-account-chip:active { background: var(--press); }
 }
 /* A version with a save: the one accent mark a gray button carries */
 .lobby-btn-secondary.has-save { box-shadow: inset 0 0 0 1.5px var(--accent-line); }
-/* The character line is game data: mono, whole; the version a dim suffix */
+/* Every field of the server's lobby entry is game data, mono — the
+   reference WebTiles lobby is one mono table, Idle and Specs columns
+   included: the name (.lobby-game-user), the character line, the idle
+   time, the spectator count. Our own framing (section titles, buttons)
+   use --font-ui. The character line is kept whole; the version a dim suffix. */
 .lobby-game-info { font-family: var(--font-mono); font-size: 0.8125rem; color: var(--text-dim); }
 .lobby-game-info .lobby-game-version { margin-left: 0.6ch; color: var(--text-faint); }
-.lobby-game-idle { flex: 0 0 auto; white-space: nowrap; font-size: 0.8125rem; color: var(--text-dim); }
+.lobby-game-idle { flex: 0 0 auto; white-space: nowrap; font-family: var(--font-mono); font-size: 0.8125rem; color: var(--text-dim); }
 .lobby-game-idle:empty { display: none; }
 
 /* The spectator count trails the row: what you scan for when choosing a
    game to watch. Brightness, not accent — a stranger's game is content. */
-.lobby-game-spectators { flex: none; font-size: 0.8125rem; color: var(--text-dim); }
+.lobby-game-spectators { flex: none; font-family: var(--font-mono); font-size: 0.8125rem; color: var(--text-dim); }
 
 /* ── Offline lobby (views/offline-lobby.ts) ──────────────────
    Shares the online lobby's shell (header/list/rows); these are the
@@ -1573,7 +1588,7 @@ button.lobby-account-chip:active { background: var(--press); }
 .offline-lobby { --glyph-col: 2rem; }
 .offline-menu-icon { flex: none; display: flex; justify-content: center; width: var(--glyph-col); }
 .offline-menu-icon > * { flex: none; }
-/* Packless, the bar's empty box collapses; a card row's holds a text glyph
+/* Packless, the bar's empty box collapses; a card row's holds a drawn icon
    (paintMenuIcons), so it is never empty. */
 .offline-menu-icon:not(.offline-device-glyph):empty { display: none; }
 /* The bar takes the menu rows' left geometry (padding, glyph column, gap),
@@ -1640,6 +1655,7 @@ button.lobby-account-chip:active { background: var(--press); }
 /* Third slot-row line = latest milestone, rendered only when one was
    captured (the two above it are the shared .lobby-game-* row lines). */
 .offline-slot-milestone {
+  font-family: var(--font-mono);  /* the game's own milestone text */
   font-size: 0.8125rem;
   color: var(--text-dim);
   overflow: hidden;
@@ -1717,8 +1733,11 @@ button.lobby-account-chip:active { background: var(--press); }
   min-height: 3.2rem;
 }
 /* Separators start at the label column (past the glyph) and stop at the
-   trailing margin — the grouped-list rule. */
-.offline-device > * + .offline-device-row::before {
+   trailing margin — the grouped-list rule. A row gets one when ANY earlier
+   sibling is visible: hidden children sit anywhere in these cards (a hidden
+   first row; the closed name form parked between New game and Scores and
+   morgues), so an adjacent-sibling test dropped real separators. */
+.offline-device > :not([hidden]) ~ .offline-device-row::before {
   content: '';
   position: absolute;
   top: 0;
@@ -1727,8 +1746,6 @@ button.lobby-account-chip:active { background: var(--press); }
   height: 0.5px;
   background: var(--separator);
 }
-/* A [hidden] first row still matches the sibling combinator above. */
-.offline-device > [hidden] + .offline-device-row::before { display: none; }
 .offline-device-glyph {
   width: var(--glyph-col); /* .offline-menu-icon block */
   text-align: center;
@@ -1737,7 +1754,7 @@ button.lobby-account-chip:active { background: var(--press); }
   font-size: 1rem;
 }
 /* The row is baseline-aligned; sink the icon so it centres on the label's
-   first line like the text glyphs do. */
+   first line like the readiness dot's text glyph does. */
 .offline-device-glyph svg { vertical-align: -0.15em; }
 .offline-device-glyph.is-dot { font-size: 0.8rem; }
 .offline-device-glyph.is-ok { color: var(--ok); }
@@ -1873,6 +1890,10 @@ button.lobby-account-chip:active { background: var(--press); }
   flex-direction: column;
   gap: 0.9rem;
 }
+/* With the game's recap in it, the card widens: the recap is fit to the
+   card's width (fitToWidth), and at alert width it came out ~9px (main's
+   wider card: 10–14px; long recaps hit the 7px floor). Measured 2026-10-07. */
+.lobby-exit-card:has(.lobby-exit-summary) { max-width: 30rem; }
 .lobby-exit-reason {
   padding: 0 0.5rem;
   font-size: 1.0625rem;
@@ -1882,7 +1903,7 @@ button.lobby-account-chip:active { background: var(--press); }
   color: var(--text);
 }
 /* The game's own recap, in a black well: game text inside chrome sits on
-   the game's black (the settings log preview and d-pad specimen do too). */
+   the game's black (the settings log preview does too). */
 .lobby-exit-summary {
   margin: 0;
   padding: 0.6rem 0.65rem;
@@ -4918,8 +4939,11 @@ html.map-hold, html.map-hold * {
 /* Sticky modifiers, by brightness and shape rather than hue: held = the
    active-state gray step + full label; locked adds an amber underline. Two
    warm fills (amber held, yellow locked) left the difference to hue alone,
-   and a near-white held key was the brightest thing on the night map. */
+   and a near-white held key was the brightest thing on the night map.
+   touch.ts refreshMods sets .active (once) OR .locked, never both, so the
+   locked rule carries the gray step itself. */
 .tc-shift.active,
+.tc-shift.locked,
 .tc-ctrl.active {
   background: var(--surface2);
   color: var(--text);
@@ -5046,7 +5070,8 @@ html.map-hold, html.map-hold * {
 }
 
 /* Same modifier grammar as the strip's (.tc-shift.active / .locked). */
-.kbd-key.mod.active {
+.kbd-key.mod.active,
+.kbd-key.mod.locked {
   background: var(--surface2);
   color: var(--text);
 }
@@ -5599,9 +5624,6 @@ html.map-hold, html.map-hold * {
   .login-card { --login-head-gap: 0.6rem; --login-group-gap: 0.85rem; }
   .login-title { font-size: 1.5rem; }
   .login-subsection { margin-bottom: 0.7rem; }
-  .login-label { margin-bottom: 0.5rem; font-size: 0.8rem; }
-  .login-label input,
-  .login-label select { font-size: 0.9rem; padding: 0.4rem 0.6rem; }
   .login-account-username { font-size: 0.9rem; }
   .login-footer { margin-top: 0.75rem; font-size: 0.75rem; }
 }
@@ -6686,7 +6708,7 @@ html.map-hold, html.map-hold * {
   display: flex;
   margin-left: auto;
   padding: 2px;
-  background: var(--surface);
+  background: var(--surface2);
   border-radius: 999px;
 }
 .records-sort-btn {
@@ -6694,17 +6716,15 @@ html.map-hold, html.map-hold * {
   border: none;
   border-radius: 999px;
   color: var(--text-dim);
-  font-family: var(--font-mono);
-  font-size: 0.8rem;
+  font-size: 0.875rem;
   padding: calc(0.35rem - 2px) 0.7rem;
   cursor: pointer;
 }
 .records-sort-btn:active { background: var(--press); }
-/* Selected = raised thumb + bright label, both luminance cues (--text is
-   ~1.9:1 over --text-dim; an orange label was ~1.2:1, hue only). No accent:
-   this is the header chips' family. --press says why the thumb isn't
-   surface2. */
-.records-sort-btn.is-active { background: var(--press); color: var(--text); }
+/* Selected = the Settings segmented control's thumb (.settings-seg): the
+   raised gray + bright, heavier label, all luminance cues (an orange label
+   was ~1.2:1, hue only). No accent: this is the header chips' family. */
+.records-sort-btn.is-active { background: var(--surface4); color: var(--text); font-weight: 600; }
 .records-list {
   display: flex;
   flex-direction: column;
@@ -6738,23 +6758,18 @@ html.map-hold, html.map-hold * {
 .records-morgue-dl,
 .records-morgue-del {
   flex: 0 0 auto;
+  /* 36px: the ‹ Back button's height (.lobby-btn-ghost min-height 2.25rem),
+     so the trio never sets the pinned bar's row height. A taller child made
+     the morgue's bar taller and dropped ‹ Back as it stacked over the
+     records list (measured in WebKit at 402px, when Back was 32px). Keep
+     the two equal; don't fix a mismatch by capping the header height — a
+     long username wraps the lobby's account chip to 40.8px and the bar is
+     expected to grow with it. */
   min-width: 36px;
   min-height: 36px;
-  /* …but they must not set the header's row height: the pinned bar sizes to
-     its tallest child, and every other shell's row is the ← Back button
-     (.lobby-btn-ghost, min-height 32px — 34.8 in Chromium's metrics), so a
-     36px child made the morgue's bar 4px taller and
-     dropped ← Back 2px as it stacked over the records list (measured in
-     WebKit at 402px: records 60px/back y=16, morgue 64px/y=18). The negative
-     block margin is (32 - 36) / 2: the tap box and its :active fill stay
-     36px, overflowing into the bar's own padding, while the row it
-     contributes to is 32px. Don't fix this by capping the header height
-     instead — a long username wraps the lobby's account chip to 40.8px and
-     the bar is expected to grow with it. */
-  margin-block: -2px;
   background: transparent;
   border: 1px solid transparent;
-  border-radius: 6px;
+  border-radius: var(--r-key);
   color: var(--text-dim);
   font-size: 0.9rem;
   cursor: pointer;
@@ -6762,7 +6777,7 @@ html.map-hold, html.map-hold * {
 @media (hover: hover) {
   .records-morgue-zoom:hover,
   .records-morgue-dl:hover,
-  .records-morgue-del:hover { border-color: var(--border); }
+  .records-morgue-del:hover { background: var(--surface); }
 }
 .records-morgue-zoom:active,
 .records-morgue-dl:active,
@@ -6784,10 +6799,8 @@ html.map-hold, html.map-hold * {
   min-width: 0;
   /* Match the 36px ⌧/↓ buttons this row replaces — the confirm pair is
      shorter, and without this the pinned header shrinks and the page
-     shifts up for the swap's duration. Same 36px box, same -2px correction,
-     for the same reason (see the trio's rule above). */
+     shifts up for the swap's duration (see the trio's rule above). */
   min-height: 36px;
-  margin-block: -2px;
 }
 /* Normal reading size (same as the % / inventory overlays); the 80-col dump
    overflows sideways and .crypt-scroll pans both axes (overflow-y:auto forces

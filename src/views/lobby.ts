@@ -124,6 +124,8 @@ export function buildLobbyView(
       <div id="lobby-list" class="lobby-list">
         <div class="lobby-loading">Loading…</div>
       </div>
+      <h2 class="lobby-section-title" id="lobby-idle-title" hidden>Idle</h2>
+      <div id="lobby-idle-list" class="lobby-list" hidden></div>
     </div>
   `
 
@@ -135,6 +137,8 @@ export function buildLobbyView(
   )
 
   const listEl = view.querySelector<HTMLElement>('#lobby-list')!
+  const idleTitleEl = view.querySelector<HTMLElement>('#lobby-idle-title')!
+  const idleListEl = view.querySelector<HTMLElement>('#lobby-idle-list')!
   const gamesEl = view.querySelector<HTMLElement>('#lobby-games')
   const noticeEl = view.querySelector<HTMLElement>('#lobby-notice')!
 
@@ -473,11 +477,9 @@ export function buildLobbyView(
     return btn
   }
 
+  // Two sections, each its own card: Active games, then Idle (hidden while
+  // empty). A divider inside one card broke the card's corners.
   function renderList(): void {
-    if (games.size === 0) {
-      listEl.innerHTML = '<div class="lobby-empty">No active games.</div>'
-      return
-    }
     const all = [...games.values()]
     const active = all.filter(g => !idleSinceMs.has(String(g.id)))
     const idle = all.filter(g => idleSinceMs.has(String(g.id)))
@@ -490,15 +492,11 @@ export function buildLobbyView(
       (idleSinceMs.get(String(b.id)) ?? 0) - (idleSinceMs.get(String(a.id)) ?? 0),
     )
 
-    listEl.innerHTML = ''
+    listEl.innerHTML = active.length === 0 ? '<div class="lobby-empty">No active games.</div>' : ''
     for (const g of active) listEl.appendChild(buildRow(g))
-    if (active.length > 0 && idle.length > 0) {
-      const div = document.createElement('div')
-      div.className = 'lobby-section-divider'
-      div.textContent = '─ idle ─'
-      listEl.appendChild(div)
-    }
-    for (const g of idle) listEl.appendChild(buildRow(g))
+    idleListEl.innerHTML = ''
+    for (const g of idle) idleListEl.appendChild(buildRow(g))
+    idleTitleEl.hidden = idleListEl.hidden = idle.length === 0
   }
 
   // Line 2 keeps the character string whole ("MiFi XL:27 Zot:5" reads as one
