@@ -305,7 +305,11 @@ html.pz-home-indicator { --safe-bottom: var(--home-indicator-cap); }
 .login-card {
   /* The card's two vertical gaps, shared with the disclosure headers' tap
      overlays (see .login-group-toggle), which may extend only into them. */
-  --login-head-gap: 1.25rem;  /* title / avatar shelf → first group */
+  /* Title → avatar shelf → first group. Unequal in CSS, equal on screen
+     (~38px ink to ink, measured 2026-10-08): the sprite cells carry
+     transparent air above the dolls, the title's line box space below. */
+  --login-brand-gap: 1.6rem;
+  --login-head-gap: 2.25rem;
   --login-group-gap: 1.6rem;  /* group → group */
   /* No card of its own: the page is the surface, the groups' cells sit on
      it (one step up), as a settings list does. */
@@ -389,6 +393,7 @@ html.pz-home-indicator { --safe-bottom: var(--home-indicator-cap); }
      at 1.8rem); an equal leading pad re-centres it. */
   padding-left: var(--wm-track);
 }
+.login-title:has(+ .login-avatars:not(:empty)) { margin-bottom: var(--login-brand-gap); }
 
 /* Tap-to-reroll affordance (class added by decorateLogo). pointer is the desktop
    hint; touch-action/user-select kill the iOS double-tap zoom, tap delay, and
@@ -674,8 +679,8 @@ html.pz-home-indicator { --safe-bottom: var(--home-indicator-cap); }
    margins: margins collapse through <details>/<section> engine-dependently,
    and a measured WebKit build summed them so two collapsed headers' boxes
    overlapped and the lower one stole the upper one's taps. The overlay is
-   bounded to the gap on each side — the whole head gap above the first
-   header, HALF the group gap between headers (each neighbour takes its half,
+   bounded to the gap on each side — up to 1.25rem of the head gap above
+   the first header, HALF the group gap between headers (each neighbour takes its half,
    so two collapsed rows can never meet), 0.7rem below an open header
    (a little past the label's 0.5rem margin). Portrait: 44px on the first
    row, ~38px on the second; landscape's tighter gaps yield less, by design.
@@ -692,7 +697,7 @@ html.pz-home-indicator { --safe-bottom: var(--home-indicator-cap); }
 }
 .login-group-toggle > summary:active { opacity: 0.5; }
 .login-group-toggle > summary::-webkit-details-marker { display: none; }
-.login-group:first-of-type > .login-group-toggle > summary { --hit-up: var(--login-head-gap); }
+.login-group:first-of-type > .login-group-toggle > summary { --hit-up: min(var(--login-head-gap), 1.25rem); }
 .login-group-toggle:not([open]) > summary {
   --hit-down: calc(var(--login-group-gap) / 2);
   margin-bottom: 0;
@@ -5556,7 +5561,7 @@ html.map-hold, html.map-hold * {
    their 1.25rem text inset (separators, tags and pickers align on it). */
 @media (orientation: landscape) and (max-height: 500px) {
   .login-card { padding: 0.5rem 0; }
-  .login-card { --login-head-gap: 0.6rem; --login-group-gap: 0.85rem; }
+  .login-card { --login-brand-gap: 0.6rem; --login-head-gap: 0.6rem; --login-group-gap: 0.85rem; }
   .login-title { font-size: 1.5rem; }
   .login-subsection { margin-bottom: 0.7rem; }
   .login-account-username { font-size: 0.9rem; }
