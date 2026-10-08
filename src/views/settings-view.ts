@@ -2,12 +2,12 @@
 // shell classes, opened from the login footer and from the HUD id line's
 // ⚙ chip in-game. The home page is a stack of sections (map display,
 // touch controls, help); a section may take over the body for a
-// sub-page (the control-set editor) and return via renderHome. Changes apply
+// sub-page (the control-set editor) and return via backHome. Changes apply
 // live via window events, fired by the stores themselves (control-sets.ts
 // mutators, setPref in prefs.ts): CONTROLS_CHANGED_EVENT (touch panel
 // re-renders), RENDER_MODE_CHANGED_EVENT (game view swaps renderers).
 
-import { mountCardOverlay, mountOverlay } from './overlay'
+import { mountBackdrop, mountCardOverlay, mountOverlay, type CloseIntercept } from './overlay'
 import {
   cloneSet, deleteControlSet, encodeControlSet, getActiveControlSet,
   importControlSet, isValidTabName, listControlSets, newSetId, saveControlSet,
@@ -27,13 +27,24 @@ import { openGesturesDoc } from './docs'
 // card — harmless, mountOverlay's close() is idempotent.
 let closeSettings: (() => void) | null = null
 
+// The showing page's say over the card's close requests (overlay.ts
+// CloseIntercept): sub-pages take Escape/back as one step back, and the
+// editor holds ✕/scrim while it has unsaved edits. Null on the home page.
+let pageIntercept: CloseIntercept | null = null
+
+// The home page's scroll offset when a sub-page (which opens at its own top)
+// took over the body, recorded by leaveHome and restored by backHome so you
+// land back at the set list rather than wherever the sub-page's height
+// clamped it.
+let homeScroll = 0
+
 export function openSettings(): void {
   closePalette?.()  // one surface at a time; a stale palette would desync
   const { body, close } = mountCardOverlay('Settings', {
     backdrop: 'settings-backdrop',
     card: 'settings-card',
     body: 'settings-body',
-  })
+  }, undefined, via => pageIntercept?.(via) ?? false)
   closeSettings = close
   renderHome(body)
 }
@@ -114,6 +125,7 @@ function freshClone(base: ControlSet): ControlSet {
 // floating palette over the live game.
 function renderHome(body: HTMLElement): void {
   body.innerHTML = ''
+  pageIntercept = null
   renderDisplaySection(body)
   renderMonsterListSection(body)
   if (document.getElementById('game-view')) {
@@ -125,6 +137,16 @@ function renderHome(body: HTMLElement): void {
   renderControlsSection(body)
   renderSpritesSection(body)
   renderHelpSection(body)
+}
+
+// Sub-page navigation (viewer, editor); see homeScroll.
+function leaveHome(body: HTMLElement): void {
+  homeScroll = body.scrollTop
+}
+
+function backHome(body: HTMLElement): void {
+  renderHome(body)
+  body.scrollTop = homeScroll
 }
 
 // --- touch-controls section (control-set list) --------------------------------
@@ -151,6 +173,8 @@ function renderDpadSection(body: HTMLElement): void {
   cell.appendChild(preview)
   cell.appendChild(dpadSlider())
 }
+
+const DELETE_ARM_MS = 4000
 
 function renderControlsSection(body: HTMLElement): void {
   const cell = section(body, 'Control sets', {
@@ -188,9 +212,15 @@ function renderControlsSection(body: HTMLElement): void {
     row.appendChild(more)
     list.appendChild(row)
 
-    actions.appendChild(button('View', 'set-action', () => renderViewer(body, set)))
+    actions.appendChild(button('View', 'set-action', () => {
+      leaveHome(body)
+      renderViewer(body, set)
+    }))
     if (!set.builtin) {
-      actions.appendChild(button('Edit', 'set-action', () => renderEditor(body, set, false)))
+      actions.appendChild(button('Edit', 'set-action', () => {
+        leaveHome(body)
+        renderEditor(body, set, false)
+      }))
     }
     actions.appendChild(button('Duplicate', 'set-action', () => {
       saveControlSet(freshClone(set))
@@ -203,6 +233,11 @@ function renderControlsSection(body: HTMLElement): void {
         if (del.dataset.armed !== '1') {
           del.dataset.armed = '1'
           del.textContent = 'Really delete?'
+          // An arming left alone lapses, so a later stray tap can't confirm it.
+          setTimeout(() => {
+            delete del.dataset.armed
+            del.textContent = 'Delete'
+          }, DELETE_ARM_MS)
           return
         }
         deleteControlSet(set.id)
@@ -242,6 +277,7 @@ function renderControlsSection(body: HTMLElement): void {
 
   actionsBar.appendChild(button('New set', 'set-action-row', () => {
     // Start from whatever is active — the closest thing to "what I have now".
+    leaveHome(body)
     renderEditor(body, freshClone(getActiveControlSet()), true)
   }))
   actionsBar.appendChild(button('Import…', 'set-action-row', () => {
@@ -382,12 +418,12 @@ function openSizePalette(): void {
   const palette = el('div', 'size-palette')
   // Keep slider taps from stealing keyboard focus off the game view.
   palette.addEventListener('mousedown', (e) => e.preventDefault())
-  const close = mountOverlay(palette)
-  const dismiss = (): void => {
+  // Cleanup rides onClose, so Escape (which closes via the overlay stack,
+  // never through dismiss) releases the watch and the handle too.
+  const dismiss = mountOverlay(palette, () => {
     unmountWatch.disconnect()
     closePalette = null
-    close()
-  }
+  })
   closePalette = dismiss
   // The game ending would strand the palette over the lobby — close along
   // with the game view.
@@ -595,8 +631,8 @@ function renderViewer(body: HTMLElement, set: ControlSet): void {
     tabsHost.appendChild(box)
   }
 
-  const foot = el('div', 'settings-actions')
-  foot.appendChild(button('Back', 'settings-btn', () => renderHome(body)))
+  const foot = el('div', 'settings-actions is-pinned')
+  foot.appendChild(button('Back', 'settings-btn', () => backHome(body)))
   if (set.builtin) {
     // Same path as New set: an unsaved clone, saved (and activated) only
     // on the editor's own Save.
@@ -607,6 +643,12 @@ function renderViewer(body: HTMLElement, set: ControlSet): void {
       renderEditor(body, set, false)))
   }
   body.appendChild(foot)
+  body.scrollTop = 0
+  pageIntercept = (via) => {
+    if (via === 'dismiss') return false
+    backHome(body)
+    return true
+  }
 }
 
 // --- editor ------------------------------------------------------------------
@@ -636,6 +678,15 @@ function cropGrid(grid: (SlotDef | null)[], cols: 3 | 4): (SlotDef | null)[] {
   return slots
 }
 
+// Ready an editor bubble to follow its slot's row in an .ed-grid: it spans
+// the full row, and --notch-x centres the notch on column `col` of `cols`
+// equal tracks separated by the grid's --ed-gap.
+function placeBubble(bubble: HTMLElement, col: number, cols: number): HTMLElement {
+  bubble.style.setProperty('--notch-x',
+    `calc((100% - ${cols - 1} * var(--ed-gap)) * ${(col + 0.5) / cols} + ${col} * var(--ed-gap))`)
+  return bubble
+}
+
 function renderEditor(body: HTMLElement, set: ControlSet, isNew: boolean): void {
   body.innerHTML = ''
   // A new set always opens at 3×4 — the full canvas — regardless of the
@@ -663,14 +714,11 @@ function renderEditor(body: HTMLElement, set: ControlSet, isNew: boolean): void 
   const tabsHost = el('div', 'ed-tabs')
   body.appendChild(tabsHost)
 
-  // Move-in-progress banner, shown between the grids and the picker
-  const moveHint = el('div', 'ed-move-hint')
-  moveHint.hidden = true
-  body.appendChild(moveHint)
-
-  // Key picker — one shared panel below the grids; assigns into `picking`.
-  const picker = el('div', 'ed-picker')
-  picker.hidden = true
+  // The key picker (assigns into `picking`) and the move-in-progress hint
+  // are bubbles: renderTabs slots whichever is live into the edited tab's
+  // grid right under the slot's row, notch pointing up at the slot.
+  const picker = el('div', 'ed-picker ed-bubble')
+  const moveHint = el('div', 'ed-move-hint ed-bubble')
 
   function renderTabs(): void {
     tabsHost.innerHTML = ''
@@ -698,7 +746,11 @@ function renderEditor(body: HTMLElement, set: ControlSet, isNew: boolean): void 
       for (const cols of [3, 4] as const) {
         const sb = button(`3×${cols}`, 'ed-size-btn' + (tab.cols === cols ? ' active' : ''), () => {
           tab.cols = cols
-          if (picking?.tab === ti) closePicker()
+          // A bubble whose slot this just hid (4th column, now 3×3) goes
+          const hidden = (at: typeof picking): boolean =>
+            at?.tab === ti && at.cell % MAX_COLS >= cols
+          if (hidden(picking)) picking = null
+          if (hidden(moving)) moving = null
           renderTabs()
         })
         sizeToggle.appendChild(sb)
@@ -721,7 +773,9 @@ function renderEditor(body: HTMLElement, set: ControlSet, isNew: boolean): void 
               cancelMove()
               return
             }
-            openPicker(ti, cell)
+            // A second tap on the slot under edit closes its bubble
+            if (picking?.tab === ti && picking.cell === cell) closePicker()
+            else openPicker(ti, cell)
           })
           if (slot) {
             const title = slotTitle(slot)
@@ -731,6 +785,10 @@ function renderEditor(body: HTMLElement, set: ControlSet, isNew: boolean): void 
           if (marked && marked.tab === ti && marked.cell === cell) sb.classList.add('picking')
           grid.appendChild(sb)
         }
+        const at = picking ?? moving
+        if (at && at.tab === ti && Math.floor(at.cell / MAX_COLS) === r) {
+          grid.appendChild(placeBubble(picking ? picker : moveHint, at.cell % MAX_COLS, tab.cols))
+        }
       }
       box.appendChild(grid)
       tabsHost.appendChild(box)
@@ -739,7 +797,6 @@ function renderEditor(body: HTMLElement, set: ControlSet, isNew: boolean): void 
 
   function openPicker(tab: number, cell: number): void {
     picking = { tab, cell }
-    picker.hidden = false
     buildPicker()
     renderTabs()
     picker.scrollIntoView({ block: 'nearest' })
@@ -747,7 +804,6 @@ function renderEditor(body: HTMLElement, set: ControlSet, isNew: boolean): void 
 
   function closePicker(): void {
     picking = null
-    picker.hidden = true
     renderTabs()
   }
 
@@ -767,26 +823,18 @@ function renderEditor(body: HTMLElement, set: ControlSet, isNew: boolean): void 
     moveHint.appendChild(el('span', 'ed-move-hint-text',
       `Moving ${faceLabel(slot)} — tap the key to swap it with.`))
     moveHint.appendChild(button('Cancel', 'set-action', cancelMove))
-    moveHint.hidden = false
-    closePicker()  // re-renders tabs, now highlighting the move source
+    closePicker()  // re-renders tabs: the hint takes the picker's place
   }
 
   function cancelMove(): void {
     moving = null
-    moveHint.hidden = true
     renderTabs()
   }
 
   function buildPicker(): void {
     picker.innerHTML = ''
     if (!picking) return
-    const tab = tabs[picking.tab]
-    const row = Math.floor(picking.cell / MAX_COLS) + 1
-    const col = (picking.cell % MAX_COLS) + 1
-    picker.appendChild(el('div', 'ed-picker-title',
-      `Tab ${tab.name} · row ${row}, key ${col}`))
-
-    const current = tab.grid[picking.cell]
+    const current = tabs[picking.tab].grid[picking.cell]
 
     // Description line — the tooltip replacement (no title tooltips on iOS).
     // Narrates the current assignment, the text being typed, or an armed
@@ -810,7 +858,8 @@ function renderEditor(body: HTMLElement, set: ControlSet, isNew: boolean): void 
     const textInput = noAutofix(el('input', 'ed-picker-text settings-input'))
     textInput.maxLength = MAX_MACRO_LEN
     textInput.placeholder = "key(s), e.g. 'o' or 'za.'"
-    if (current?.text) textInput.value = current.text
+    // Starts empty, never holding the current text: typing after a prefilled
+    // "5" made the macro "5o" (the info line names the current assignment).
     const setText = (): void => { if (textInput.value) assign({ text: textInput.value }) }
     textInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); setText() } })
     textInput.addEventListener('input', () => {
@@ -843,30 +892,79 @@ function renderEditor(body: HTMLElement, set: ControlSet, isNew: boolean): void 
     const foot = el('div', 'ed-picker-foot')
     if (current) foot.appendChild(button('Move', 'set-action', armMove))
     foot.appendChild(button('Clear key', 'set-action', () => assign(null)))
-    foot.appendChild(button('Cancel', 'set-action', closePicker))
+    // "Close", not "Cancel": the editor's own Cancel sits just below
+    foot.appendChild(button('Close', 'set-action', closePicker))
     picker.appendChild(foot)
   }
 
-  body.appendChild(picker)
-
-  const foot = el('div', 'settings-actions')
-  foot.appendChild(button('Cancel', 'settings-btn', () => renderHome(body)))
-  foot.appendChild(button('Save', 'settings-btn settings-btn-primary', () => {
-    const name = nameInput.value.trim() || set.name
-    const saved: ControlSet = {
+  // What Save stores; its JSON against the opening state is the dirty test.
+  function edited(): ControlSet {
+    return {
       id: set.id,
-      name,
+      name: nameInput.value.trim() || set.name,
       tabs: tabs.map(tab => ({
         name: tab.name,
         cols: tab.cols,
         slots: cropGrid(tab.grid, tab.cols),
       })) as ControlSet['tabs'],
     }
+  }
+  const isDirty = (): boolean => JSON.stringify(edited()) !== pristine
+
+  // Leaving by Cancel, Escape or back: asks first when there are edits.
+  function leave(): void {
+    if (isDirty()) confirmDiscard(() => backHome(body))
+    else backHome(body)
+  }
+
+  const foot = el('div', 'settings-actions is-pinned')
+  foot.appendChild(button('Cancel', 'settings-btn', leave))
+  foot.appendChild(button('Save', 'settings-btn settings-btn-primary', () => {
+    const saved = edited()
     saveControlSet(saved)
     if (isNew) setActiveControlSet(saved.id)  // you just built it — use it
-    renderHome(body)
+    backHome(body)
   }))
   body.appendChild(foot)
 
   renderTabs()
+  const pristine = JSON.stringify(edited())
+  body.scrollTop = 0
+  // Escape/back steps out one level: bubble, then the editor itself. ✕ and
+  // the scrim leave Settings outright — after asking, if there are edits.
+  pageIntercept = (via) => {
+    if (via === 'back') {
+      if (picking) closePicker()
+      else if (moving) cancelMove()
+      else leave()
+      return true
+    }
+    if (!isDirty()) return false
+    confirmDiscard(() => closeSettings?.())
+    return true
+  }
+}
+
+// The app's alert, asking before unsaved edits are thrown away. Stacks over
+// the Settings sheet as its own overlay, so Escape or a scrim tap keeps
+// editing; only Discard runs `onDiscard`.
+function confirmDiscard(onDiscard: () => void): void {
+  const { backdrop, close } = mountBackdrop()  // .doc-backdrop: --z-doc, over the sheet
+  const card = el('div', 'settings-alert')
+  card.setAttribute('role', 'alertdialog')
+  card.setAttribute('aria-modal', 'true')
+  const title = el('p', 'settings-alert-title', 'Discard changes?')
+  title.id = 'settings-alert-title'
+  card.setAttribute('aria-labelledby', title.id)
+  card.appendChild(title)
+  const actions = el('div', 'settings-alert-actions')
+  const keep = button('Keep editing', 'settings-alert-btn settings-alert-keep', close)
+  actions.appendChild(keep)
+  actions.appendChild(button('Discard', 'settings-alert-btn settings-alert-discard', () => {
+    close()
+    onDiscard()
+  }))
+  card.appendChild(actions)
+  backdrop.appendChild(card)
+  keep.focus()
 }

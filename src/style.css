@@ -1886,10 +1886,12 @@ button.lobby-account-chip:active { background: var(--press); }
   padding: var(--safe-frame-pad);
   background: var(--modal-scrim);
 }
-/* The app's alert — card, title, buttons — shared by the exit dialog and
-   the reconnect question (.is-question, reconnect.ts askForceTerminate). */
+/* The app's alert — card, title, buttons — shared by the exit dialog, the
+   reconnect question (.is-question, reconnect.ts askForceTerminate) and
+   Settings' discard question (settings-view.ts confirmDiscard). */
 .lobby-exit-card,
-.is-question .reconnect-card {
+.is-question .reconnect-card,
+.settings-alert {
   width: 100%;
   max-width: 21.25rem;
   padding: 1.4rem 0.75rem 0.75rem;
@@ -1898,7 +1900,8 @@ button.lobby-account-chip:active { background: var(--press); }
   box-shadow: var(--modal-shadow);
 }
 .lobby-exit-reason,
-.is-question .reconnect-status {
+.is-question .reconnect-status,
+.settings-alert-title {
   padding: 0 0.5rem;
   font-size: 1.0625rem;
   font-weight: 600;
@@ -1908,7 +1911,8 @@ button.lobby-account-chip:active { background: var(--press); }
 }
 .lobby-exit-close,
 .lobby-exit-link,
-.is-question .reconnect-btn {
+.is-question .reconnect-btn,
+.settings-alert-btn {
   min-height: 3rem;
   border: none;
   border-radius: var(--r-ctl);
@@ -1941,6 +1945,15 @@ button.lobby-account-chip:active { background: var(--press); }
   line-height: 1.5;
   color: var(--text);
 }
+/* Discard question: the safe way out bold on the left, the destructive
+   action in red on the right (as .reconnect-force-*) */
+.settings-alert { display: flex; flex-direction: column; gap: 1.1rem; }
+.settings-alert-title { margin: 0; }
+.settings-alert-actions { display: flex; gap: 0.5rem; }
+.settings-alert-btn { flex: 1; }
+.settings-alert-keep { color: var(--text); font-weight: 600; }
+.settings-alert-discard { color: var(--danger); }
+.settings-alert-btn:active { background: var(--press); }
 /* Close left, the morgue link right — the reference dialog's order, kept
    for returning players' muscle memory; both are filled buttons sharing
    the row. */
@@ -5826,6 +5839,22 @@ html.map-hold, html.map-hold * {
 }
 
 .settings-actions { display: flex; gap: 0.5rem; margin-top: 1rem; }
+/* Sub-page footers (set viewer, editor) stay on screen over the page's
+   scroll, on the sheet's own fill. A sticky box pins above its scroller's
+   bottom padding, which would leave a strip of content scrolling past
+   below it — so the footer takes over that padding. scroll-padding keeps
+   scrollIntoView targets (the editor's bubble, a focused field) clear of it. */
+.settings-body:has(> .settings-actions.is-pinned) {
+  padding-bottom: 0;
+  scroll-padding-bottom: calc(5.25rem + var(--safe-bottom));
+}
+.settings-actions.is-pinned {
+  position: sticky;
+  bottom: 0;
+  z-index: 1;
+  padding: 0.75rem 0 calc(0.75rem + var(--safe-bottom));
+  background: var(--surface);
+}
 .settings-btn {
   flex: 1;
   min-height: 3rem;
@@ -6146,8 +6175,9 @@ html.map-hold, html.map-hold * {
 .seg > * { border-radius: calc(var(--r-ctl) - 3px); }
 
 .ed-grid {
+  --ed-gap: 4px;  /* placeBubble's notch maths reads it */
   display: grid;
-  gap: 4px;
+  gap: var(--ed-gap);
   padding: 6px;
   background: var(--bg);
   border-radius: var(--r-ctl);
@@ -6172,30 +6202,45 @@ html.map-hold, html.map-hold * {
 /* Read-only viewer slots are inert divs, not buttons */
 .ed-slot.static { display: grid; place-items: center; cursor: default; }
 
-/* Move-in-progress banner between the grids and the picker */
+/* The picker and move hint are bubbles in the grid itself, a full-width
+   row under the edited slot's row, the tab card's fill reaching into the
+   well, with a notch (a rotated square) pointing up at the slot. The extra
+   top margin is the notch's room; its tip stops just short of the slot. */
+.ed-bubble {
+  position: relative;
+  grid-column: 1 / -1;
+  margin: 6px 0 2px;
+  background: var(--surface2);
+  border-radius: var(--r-ctl);
+}
+.ed-bubble::before {
+  content: '';
+  position: absolute;
+  top: -6px;
+  left: var(--notch-x);
+  width: 12px;
+  height: 12px;
+  background: inherit;
+  border-radius: 2px 0 0 0;
+  transform: translateX(-50%) rotate(45deg);
+}
 .ed-move-hint {
   display: flex;
   align-items: center;
   gap: 0.75rem;
-  border-radius: var(--r-bar);
-  background: var(--surface2);
-  padding: 0.6rem 0.6rem 0.6rem 1.25rem;
-  margin-top: 0.75rem;
+  padding: 0.6rem 0.6rem 0.6rem 0.75rem;
   color: var(--text);
+  font-family: var(--font-ui);
   font-size: 0.9375rem;
+  line-height: 1.35;
 }
 .ed-move-hint-text { flex: 1; }
 .ed-move-hint .set-action { flex: 0 0 auto; padding: 0 0.9rem; }
 
-/* Key picker: its own card under the grids */
-.ed-picker {
-  background: var(--surface2);
-  border-radius: var(--r-bar);
-  padding: 0.9rem 0.75rem 0.75rem;
-  margin-top: 0.75rem;
-}
-.ed-picker-title { color: var(--text); font-size: 0.9375rem; font-weight: 600; margin: 0 0.5rem 0.15rem; }
-.ed-picker-info { color: var(--text-dim); font-size: 0.8125rem; line-height: 1.4; margin: 0 0.5rem 0.75rem; }
+.ed-picker { padding: 0.75rem 0.6rem 0.5rem; font-family: var(--font-ui); }
+/* The bubble's top line: the slot's current assignment (or the key being
+   typed or armed) */
+.ed-picker-info { color: var(--text); font-size: 0.875rem; line-height: 1.4; margin: 0 0.25rem 0.6rem; }
 .ed-picker-textrow { display: flex; gap: 0.5rem; }
 .ed-picker-text {
   flex: 1;

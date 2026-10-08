@@ -241,7 +241,7 @@ describe('settings overlay', () => {
     expect($('.ed-picker-info')!.textContent).toContain('tap again')
     f1.click()
     expect($$('.ed-slot')[0].textContent).toBe('F1')
-    expect($('.ed-picker')!.hidden).toBe(true)
+    expect($('.ed-picker')).toBeNull()
   })
 
   it('marks the slot\'s current special key in the picker', () => {
@@ -258,14 +258,15 @@ describe('settings overlay', () => {
     findButton('New set').click()
     $$('.ed-slot')[0].click()
     findButton('Move').click()
-    expect($('.ed-move-hint')!.hidden).toBe(false)
-    expect($('.ed-picker')!.hidden).toBe(true)
+    // the hint takes the picker's place, under the source slot's row
+    expect($('.ed-move-hint')!.previousElementSibling).toBe($$('.ed-slot')[3])
+    expect($('.ed-picker')).toBeNull()
     expect($$('.ed-slot')[0].classList.contains('picking')).toBe(true)
 
     $$('.ed-slot')[1].click()  // swap ⇥ with 5
     const faces = $$('.ed-slot').map(s => s.textContent)
     expect(faces.slice(0, 2)).toEqual(['5', '⇥'])
-    expect($('.ed-move-hint')!.hidden).toBe(true)
+    expect($('.ed-move-hint')).toBeNull()
   })
 
   it('cancels a move by tapping the source slot again', () => {
@@ -274,8 +275,162 @@ describe('settings overlay', () => {
     $$('.ed-slot')[0].click()
     findButton('Move').click()
     $$('.ed-slot')[0].click()
-    expect($('.ed-move-hint')!.hidden).toBe(true)
+    expect($('.ed-move-hint')).toBeNull()
     expect($$('.ed-slot')[0].textContent).toBe('⇥')  // unchanged
+  })
+
+  it('opens the picker as a bubble under the tapped slot\'s row', () => {
+    openSettings()
+    findButton('New set').click()
+    // re-queried: every edit re-renders the tab boxes
+    const secondTab = () => $$('.ed-tab')[1]
+    const slots = () => [...secondTab().querySelectorAll<HTMLElement>('.ed-slot')]
+    slots()[5].click()  // row 2, column 2
+    const picker = $('.ed-picker')!
+    expect(picker.parentElement).toBe(secondTab().querySelector('.ed-grid'))
+    expect(picker.previousElementSibling).toBe(slots()[7])  // after row 2's last key
+    expect(picker.style.getPropertyValue('--notch-x')).toContain('* 0.375')  // (1 + 0.5) / 4
+    expect($$('.ed-picker')).toHaveLength(1)
+
+    slots()[5].click()  // the same slot again closes it
+    expect($('.ed-picker')).toBeNull()
+  })
+
+  it('keeps a move armed across size toggles unless its slot gets hidden', () => {
+    openSettings()
+    findButton('New set').click()
+    $$('.ed-slot')[0].click()
+    findButton('Move').click()
+    findButton('3×3', $('.ed-tab')!).click()  // source in column 1 stays visible
+    expect($('.ed-move-hint')).not.toBeNull()
+    findButton('Cancel', $('.ed-move-hint')!).click()
+
+    findButton('3×4', $('.ed-tab')!).click()
+    $$('.ed-slot')[3].click()  // column 4
+    findButton('Move').click()
+    findButton('3×3', $('.ed-tab')!).click()
+    expect($('.ed-move-hint')).toBeNull()
+    expect($$('.ed-slot')[0].textContent).toBe('⇥')  // nothing swapped
+  })
+
+  it('starts the picker\'s text field empty, so typing replaces the key', () => {
+    openSettings()
+    findButton('New set').click()
+    $$('.ed-slot')[1].click()  // holds "5"
+    const pickerInput = $<HTMLInputElement>('.ed-picker-text')!
+    expect(pickerInput.value).toBe('')
+    pickerInput.value = 'o'
+    findButton('Set').click()
+    expect($$('.ed-slot')[1].textContent).toBe('o')
+  })
+})
+
+describe('settings sub-page navigation', () => {
+  const esc = () => document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }))
+  const onHome = () => $$('.settings-h').some(h => h.textContent === 'Control sets')
+  const settingsOpen = () => $('.settings-backdrop') !== null
+  const alert = () => $('.settings-alert')
+
+  it('steps back one level per Escape: bubble, editor, then Settings', () => {
+    openSettings()
+    findButton('New set').click()
+    $$('.ed-slot')[0].click()
+    esc()
+    expect($('.ed-picker')).toBeNull()
+    expect($('.ed-name-input')).not.toBeNull()  // still editing
+    esc()
+    expect(onHome()).toBe(true)  // nothing edited: no question
+    expect(alert()).toBeNull()
+    esc()
+    expect(settingsOpen()).toBe(false)
+  })
+
+  it('cancels an armed move on Escape, staying in the editor', () => {
+    openSettings()
+    findButton('New set').click()
+    $$('.ed-slot')[0].click()
+    findButton('Move').click()
+    esc()
+    expect($('.ed-move-hint')).toBeNull()
+    expect($('.ed-name-input')).not.toBeNull()
+  })
+
+  it('steps back from the viewer on Escape', () => {
+    openSettings()
+    $$('.set-row-more')[0].click()
+    findButton('View', $$('.set-row-actions')[0]).click()
+    esc()
+    expect(onHome()).toBe(true)
+    expect(settingsOpen()).toBe(true)
+  })
+
+  it('asks before Cancel or Escape throws away edits', () => {
+    openSettings()
+    findButton('New set').click()
+    $<HTMLInputElement>('.ed-name-input')!.value = 'Changed'
+
+    esc()
+    expect(alert()).not.toBeNull()
+    findButton('Keep editing').click()
+    expect(alert()).toBeNull()
+    expect($('.ed-name-input')).not.toBeNull()
+
+    findButton('Cancel', $('.settings-actions')!).click()
+    expect(alert()).not.toBeNull()
+    esc()  // Escape on the alert keeps editing too
+    expect(alert()).toBeNull()
+    expect($('.ed-name-input')).not.toBeNull()
+
+    findButton('Cancel', $('.settings-actions')!).click()
+    findButton('Discard').click()
+    expect(onHome()).toBe(true)
+    expect(listControlSets()).toHaveLength(1)  // nothing saved
+  })
+
+  it('asks before ✕ closes Settings over edits, and closes at once without', () => {
+    openSettings()
+    findButton('New set').click()
+    $$('.ed-slot')[0].click()
+    findButton('Clear key').click()
+    $<HTMLButtonElement>('.doc-close')!.click()
+    expect(alert()).not.toBeNull()
+    expect(settingsOpen()).toBe(true)
+    findButton('Discard').click()
+    expect(settingsOpen()).toBe(false)
+    expect(alert()).toBeNull()
+
+    openSettings()
+    findButton('New set').click()
+    $<HTMLButtonElement>('.doc-close')!.click()
+    expect(settingsOpen()).toBe(false)
+  })
+
+  it('opens sub-pages at their top and returns to the list\'s scroll offset', () => {
+    openSettings()
+    const body = $('.settings-body')!
+    body.scrollTop = 420
+    findButton('New set').click()
+    expect(body.scrollTop).toBe(0)
+    findButton('Cancel', $('.settings-actions')!).click()
+    expect(body.scrollTop).toBe(420)
+  })
+
+  it('lets an armed Delete lapse', () => {
+    vi.useFakeTimers()
+    try {
+      openSettings()
+      $$('.set-row-more')[0].click()
+      findButton('Duplicate').click()
+      $$('.set-row-more')[1].click()
+      const del = findButton('Delete')
+      del.click()
+      vi.advanceTimersByTime(5000)
+      expect(del.textContent).toBe('Delete')
+      del.click()  // re-arms rather than deleting
+      expect(listControlSets()).toHaveLength(2)
+    } finally {
+      vi.useRealTimers()
+    }
   })
 
   it('accepts a surrogate-pair emoji tab label but not two characters', () => {
@@ -586,6 +741,19 @@ describe('floating size palette', () => {
     expect(document.querySelector('.size-palette')).not.toBeNull()
     document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }))
     expect(document.querySelector('.size-palette')).toBeNull()
+  })
+
+  it('releases its game-view watch when Escape closes it', () => {
+    mountFakeGameView()
+    openSettings()
+    adjustButtons()[0].click()
+    const disconnect = vi.spyOn(MutationObserver.prototype, 'disconnect')
+    try {
+      document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }))
+      expect(disconnect).toHaveBeenCalled()
+    } finally {
+      disconnect.mockRestore()
+    }
   })
 
   it('closes itself when the game view unmounts', async () => {
