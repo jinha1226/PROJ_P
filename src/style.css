@@ -709,21 +709,13 @@ html.pz-home-indicator { --safe-bottom: var(--home-indicator-cap); }
   top: calc(-1 * var(--hit-up));
   bottom: calc(-1 * var(--hit-down));
 }
+/* Shape: the shared chevron rule (at .login-account-card::after) */
 .login-group-toggle > summary::after {
-  content: "";
   flex: none;
-  width: 0.6em;
-  height: 0.6em;
-  margin: 0 0.3em 0 auto;
-  border-right: 1.5px solid currentColor;
-  border-bottom: 1.5px solid currentColor;
-  /* --text-dim at 60%: ~3.3:1 over the card surface, the non-text-control
-     floor, about iOS tertiaryLabel. */
-  opacity: 0.6;
-  transform: rotate(-45deg);
+  margin: 0 0.1rem 0 auto;
 }
 /* Pointing down, the V's optical centre sits below the box centre — lift it. */
-.login-group-toggle[open] > summary::after { transform: translateY(-0.15em) rotate(45deg); }
+.login-group-toggle[open] > summary::after { transform: translateY(-0.125rem) rotate(45deg); }
 
 .login-subsection { margin-bottom: 1.1rem; }
 .login-subsection:last-child { margin-bottom: 0; }
@@ -789,12 +781,17 @@ html.pz-home-indicator { --safe-bottom: var(--home-indicator-cap); }
   height: 0.5px;
   background: var(--separator);
 }
-/* The trailing chevron of a row that goes somewhere, every list's; each
-   row places it (grid cell, flex end, or absolute on the 20px margin). */
+/* The one chevron: every list's row that goes somewhere, the disclosure
+   headers' and "Show all versions". Each site places it. A trailing one
+   puts its tip on the 20px margin, where the separators end: rotated, the
+   tip overhangs the box edge by (√2 − 1) × 4px ≈ 0.1rem, so the box ends
+   1.35rem from the cell edge (margin-right 0.1rem inside 1.25rem padding). */
 .login-account-card:not(:disabled)::after,
 .lobby-game-row::after,
 .offline-nav-row::after,
-.settings-nav::after {
+.settings-nav::after,
+.login-group-toggle > summary::after,
+.lobby-more-games > summary::before {
   content: "";
   width: 0.5rem;
   height: 0.5rem;
@@ -836,7 +833,7 @@ html.pz-home-indicator { --safe-bottom: var(--home-indicator-cap); }
 
 /* Trailing chevron (shape: the shared chevron rule above); "…" while
    disabled */
-.login-account-card::after { grid-area: arrow; margin-right: 0.2rem; }
+.login-account-card::after { grid-area: arrow; margin-right: 0.1rem; }
 .login-account-card:disabled::after { content: "…"; color: var(--text-dim); }
 
 /* Offline entry card (login.ts renderOfflineCard): account-card chrome with a
@@ -891,7 +888,8 @@ html.pz-home-indicator { --safe-bottom: var(--home-indicator-cap); }
 
 /* "+ Add account": the saved-accounts card's footer line (see
    .login-sub-footer), tucked under the card — a full row read as one more
-   account. + / − mark closed / open; the form opens beneath. */
+   account. The + stays when open — a − beside "Add" read as "remove
+   account"; the form opening beneath shows the state. */
 #resume-section { margin-bottom: 0; }  /* only rendered with this section after it */
 .login-add-section > summary {
   display: flex;
@@ -906,27 +904,21 @@ html.pz-home-indicator { --safe-bottom: var(--home-indicator-cap); }
 .login-add-section > summary:active { opacity: 0.5; }
 .login-add-section > summary::-webkit-details-marker { display: none; }
 .login-add-section > summary::before { content: '+'; font-size: 1.15em; line-height: 1; }
-.login-add-section[open] > summary::before { content: '−'; }
 .login-add-section[open] > summary { margin-bottom: 0.8rem; }
 /* "Show all versions": leading disclosure chevron, same right/down state
-   pair (and the same border-drawn glyph) as the section headers. */
+   pair as the section headers (shape: the shared chevron rule). */
 .lobby-more-games > summary::before {
-  content: "";
   display: inline-block;
-  width: 0.5em;
-  height: 0.5em;
   margin: 0 0.9ch 0 0.1em;
   vertical-align: 0.05em;
-  border-right: 1.5px solid currentColor;
-  border-bottom: 1.5px solid currentColor;
-  opacity: 0.6;  /* same tier as the section-header chevrons */
-  transform: rotate(-45deg);
 }
 .lobby-more-games[open] > summary::before { transform: translateY(-0.2em) rotate(45deg); }
 
 /* Server pickers hold hostnames: game data, mono. WebKit's menulist
    ignores padding and draws its own arrow, so the picker is unstyled
-   (appearance: none) with a drawn ⌃⌄ at the trailing edge; its height is
+   (appearance: none) with a drawn ⌃⌄ whose ink ends on the 20px trailing
+   margin, with the row chevrons (the SVG's 0.7px inset + 1.2rem); its
+   stroke repeats --text-dim (a data URI can't read a var). Its height is
    pinned with `height` — WebKit honours that on a menulist and ignores
    min-height (measured). */
 .login-spectate-select,
@@ -935,7 +927,7 @@ html.pz-home-indicator { --safe-bottom: var(--home-indicator-cap); }
   appearance: none;
   height: 2.75rem;
   padding: 0 2.25rem 0 1.25rem;
-  background: transparent url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='16' viewBox='0 0 10 16'%3E%3Cpath d='M1.5 6 5 2.5 8.5 6M1.5 10 5 13.5 8.5 10' fill='none' stroke='%239d9f99' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") no-repeat right 1.1rem center;
+  background: transparent url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='16' viewBox='0 0 10 16'%3E%3Cpath d='M1.5 6 5 2.5 8.5 6M1.5 10 5 13.5 8.5 10' fill='none' stroke='%239d9f99' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") no-repeat right 1.2rem center;
   border: none;
   color: var(--text);
   font-family: var(--font-mono);
@@ -1610,7 +1602,7 @@ button.lobby-account-chip:active { background: var(--press); }
    declared further down the file, and would win at equal specificity. */
 .offline-device-row.offline-nav-row { align-items: center; cursor: pointer; }
 .offline-nav-row .offline-device-label { font-size: 1.0625rem; }
-.offline-nav-row::after { flex: none; margin-right: 0.2rem; }
+.offline-nav-row::after { flex: none; margin-right: 0.1rem; }
 :root:not(.press-cancelled) .offline-nav-row:not(.is-disabled):active { background: var(--press); transition: background-color 0s var(--press-delay); }
 .offline-nav-row:focus-visible { outline: 1px solid var(--accent); outline-offset: -1px; }
 .offline-nav-row.is-disabled { opacity: 0.5; cursor: default; }
