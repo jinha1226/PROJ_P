@@ -202,11 +202,7 @@ export function buildLoginView(
   // whose session record is gone — a reconnect cancel and the age cutoff
   // (no notice) included — so the notice alone says what happened.
   const refill = prefill && findServer(prefill.wsUrl) ? prefill : undefined
-  const showNotice = (): void => {
-    if (!notice) return
-    errorEl.textContent = notice
-    errorEl.style.display = ''
-  }
+  const showNotice = (): void => { if (notice) showError(notice) }
   if (!refill) showNotice()
 
   // Hostnames, not the server tags: this is the home screen, where a visitor
@@ -501,6 +497,7 @@ export function buildLoginView(
     const vv = window.visualViewport
     let pending: WsConnection | null = null
     let signedIn = false
+    const coarse = window.matchMedia?.('(pointer: coarse)').matches ?? false
     const { backdrop, body, close } = mountCardOverlay(
       againNotice ? 'Sign in again' : 'Add account',
       { backdrop: 'login-sheet-backdrop', card: 'login-sheet', body: 'login-sheet-body' },
@@ -518,10 +515,9 @@ export function buildLoginView(
         // picker, WebKit rings this programmatic focus (on-device,
         // 2026-10-08; desktop WebKit doesn't reproduce).
         if (againNotice) showNotice()
-        const touch = window.matchMedia?.('(pointer: coarse)').matches
         if (view.isConnected) {
           view.querySelector<HTMLElement>('#add-account')
-            ?.focus({ preventScroll: true, ...(touch && { focusVisible: false }) })
+            ?.focus({ preventScroll: true, ...(coarse && { focusVisible: false }) })
         }
       },
     )
@@ -578,7 +574,7 @@ export function buildLoginView(
     // focus, so a screen reader moves into it without raising a keyboard.
     const card = body.parentElement!
     if (againNotice) card.setAttribute('aria-describedby', 'login-sheet-msg')
-    if (!againNotice && !window.matchMedia?.('(pointer: coarse)').matches) {
+    if (!againNotice && !coarse) {
       (userInput.value ? passInput : userInput).focus()
     } else {
       card.tabIndex = -1

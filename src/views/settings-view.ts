@@ -29,7 +29,8 @@ let closeSettings: (() => void) | null = null
 
 // The showing page's say over the card's close requests (overlay.ts
 // CloseIntercept): sub-pages take Escape/back as one step back, and the
-// editor holds ✕/scrim while it has unsaved edits. Null on the home page.
+// editor holds ✕/scrim while it has unsaved edits. Null on the home page
+// and once the sheet has closed (so a closed editor isn't kept alive by it).
 let pageIntercept: CloseIntercept | null = null
 
 // The home page's scroll offset when a sub-page (which opens at its own top)
@@ -44,7 +45,7 @@ export function openSettings(): void {
     backdrop: 'settings-backdrop',
     card: 'settings-card',
     body: 'settings-body',
-  }, undefined, via => pageIntercept?.(via) ?? false)
+  }, () => { pageIntercept = null }, via => pageIntercept?.(via) ?? false)
   closeSettings = close
   renderHome(body)
 }
@@ -949,7 +950,13 @@ function renderEditor(body: HTMLElement, set: ControlSet, isNew: boolean): void 
 // the Settings sheet as its own overlay, so Escape or a scrim tap keeps
 // editing; only Discard runs `onDiscard`.
 function confirmDiscard(onDiscard: () => void): void {
-  const { backdrop, close } = mountBackdrop()  // .doc-backdrop: --z-doc, over the sheet
+  // Focus returns to the control that raised the alert, so a Keep leaves the
+  // editor exactly as it was (after a Discard that control goes with the
+  // editor). The backdrop is .doc-backdrop: --z-doc, over the sheet.
+  const opener = document.activeElement
+  const { backdrop, close } = mountBackdrop(undefined, () => {
+    if (opener instanceof HTMLElement && opener.isConnected) opener.focus({ preventScroll: true })
+  })
   const card = el('div', 'settings-alert')
   card.setAttribute('role', 'alertdialog')
   card.setAttribute('aria-modal', 'true')
