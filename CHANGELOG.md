@@ -7,6 +7,13 @@ formatting and HTML chrome differ. Drift is a bug.
 
 # What's new
 
+## 2026-10-08
+
+- *Your surroundings suddenly seem different.*
+- Added `^F` and `?` to the `M` menu.
+- Improved the control set editor.
+- Other improvements.
+
 ## 2026-10-04
 
 - Improved spell and ability menu layouts for phones and tablets.
