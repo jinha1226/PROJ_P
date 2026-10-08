@@ -79,7 +79,8 @@
      apply color to the background rather than to symbols or text"): a FILL
      is a view's one primary action; small marks are state (✓, unread,
      armed, pressed, the caret); links and tappable text-only actions (New
-     set, Spectate, Install); the wordmark. Never a static
+     set, Spectate, Add account, Install), except a
+     site-footer link row (.login-footer); the wordmark. Never a static
      label, title or name — names lead by weight. In-game chrome's state
      grammar: a gray step up = current/active, accent = armed/pressed.
      Dialog buttons stay neutral (destructive red, preferred bold). */
@@ -886,24 +887,22 @@ html.pz-home-indicator { --safe-bottom: var(--home-indicator-cap); }
   border-radius: var(--r-key);
 }
 
-/* "+ Add account": the saved-accounts card's footer line (see
-   .login-sub-footer), tucked under the card — a full row read as one more
-   account. The + stays when open — a − beside "Add" read as "remove
-   account"; the form opening beneath shows the state. */
+/* "Add account": a text action tucked under the saved-accounts card — a
+   full row read as one more account. It sits where a footnote would
+   (.login-sub-footer), so the accent tint is what marks it tappable. No
+   +/− glyph: a − beside "Add" read as "remove account", and with the tint
+   a + only repeated the word; the form opening beneath shows the state. */
 #resume-section { margin-bottom: 0; }  /* only rendered with this section after it */
 .login-add-section > summary {
   display: flex;
-  align-items: center;
-  gap: 0.45rem;
   cursor: pointer;
   padding: 0.55rem 1.25rem 0;
   font-size: 0.9375rem;
-  color: var(--text-dim);
+  color: var(--accent);
   list-style: none;
 }
 .login-add-section > summary:active { opacity: 0.5; }
 .login-add-section > summary::-webkit-details-marker { display: none; }
-.login-add-section > summary::before { content: '+'; font-size: 1.15em; line-height: 1; }
 .login-add-section[open] > summary { margin-bottom: 0.8rem; }
 /* "Show all versions": leading disclosure chevron, same right/down state
    pair as the section headers (shape: the shared chevron rule). */
@@ -1055,8 +1054,10 @@ html.pz-home-indicator { --safe-bottom: var(--home-indicator-cap); }
 /* Flex rather than an inline row so spacing is keyed on position, not element
    type: the gear chip is a <button> among the anchors, and gap spaces any
    child without each one restating the constant. Secondary gray, no
-   underline: Connect stays the screen's one amber control besides the
-   wordmark (the unread dot keeps the accent — a state mark). */
+   underline — the one exception to tinted links (see the accent's jobs in
+   :root): a centred row of short links at the page foot reads as links by
+   position, so a tint would add noise, not information. The unread dot
+   keeps the accent — a state mark. */
 .login-footer {
   margin-top: 1.5rem;
   display: flex;
