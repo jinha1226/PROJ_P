@@ -1208,10 +1208,16 @@ button.lobby-account-chip:active { background: var(--press); }
   color: var(--text-dim);
 }
 .lobby-account-chip.is-guest .lobby-chip-sep { opacity: 0.55; }
+/* A pull-down menu's chevron.down, in the chrome's stroked-V chevron (a
+   ▾ glyph rendered ~4px wide at chip size) */
 .lobby-chip-caret {
-  color: var(--text-dim);
-  margin-left: 0.1rem;
-  font-size: 0.7rem;
+  flex: none;
+  width: 0.4rem;
+  height: 0.4rem;
+  margin: 0 0.2rem 0.2rem 0.35rem;
+  border-right: 1.5px solid var(--text-dim);
+  border-bottom: 1.5px solid var(--text-dim);
+  transform: rotate(45deg);
 }
 
 /* The corner badge rides the pill's curve, not its bounding box's corner. */

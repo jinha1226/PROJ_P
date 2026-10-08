@@ -77,7 +77,7 @@ export function buildLobbyView(
         <button id="lobby-server-chip" class="lobby-account-chip is-guest" type="button"
                 aria-haspopup="menu" aria-expanded="false" aria-label="Guest on ${escHtml(serverTag)}">
           ${guestChipInner}
-          <span class="lobby-chip-caret">▾</span>
+          <span class="lobby-chip-caret" aria-hidden="true"></span>
         </button>
         <div id="lobby-server-menu" class="lobby-account-menu" hidden>
           ${SPECTATE_SERVERS.map(s => `
@@ -97,7 +97,7 @@ export function buildLobbyView(
           <span class="lobby-chip-user">${escHtml(username)}</span>
           <span class="lobby-chip-sep">·</span>
           <span class="lobby-chip-tag">${escHtml(serverTag)}</span>
-          <span class="lobby-chip-caret">▾</span>
+          <span class="lobby-chip-caret" aria-hidden="true"></span>
           ${unreadDotHtml('unread-dot-corner')}
         </button>
         <div id="lobby-account-menu" class="lobby-account-menu" hidden>

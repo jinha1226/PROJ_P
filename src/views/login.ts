@@ -144,7 +144,7 @@ export function buildLoginView(
                     aria-describedby="spectate-note">Spectate</button>
           </div>
           <div id="spectate-error" class="login-error" style="display:none" role="alert"></div>
-          <div id="spectate-note" class="login-sub-footer">No account needed.</div>
+          <div id="spectate-note" class="login-sub-footer">Guest login.</div>
         </div>
         </details>
       </section>
