@@ -35,6 +35,7 @@ import { openGameRecords } from './records-view'
 import { liveDollRecipe, materializeDollSidecars, readGameRecords } from '../offline/game-records'
 import type { XlogRecord } from '../offline/xlog'
 import { attachScrollCue } from '../util/scroll-cue'
+import { strokeIcon } from '../util/svg-icon'
 
 // Slot-row doll size: 64px (32px cell × 2) — the character is the row's
 // subject, and a 32px multiple keeps the pixel grid even on 2x and 3x
@@ -45,11 +46,10 @@ const SLOT_DOLL_SCALE = 2
 // Failure notices show the message alone, not "Error: message".
 const errMsg = (e: unknown): string => (e instanceof Error ? e.message : String(e))
 
-// Device-row icons, drawn in the settings sliders' stroke style rather than
-// as font glyphs (✎ ⇅ rendered at mismatched weights per fallback font).
+// Device-row icons, drawn as stroke icons rather than as font glyphs (✎ ⇅
+// rendered at mismatched weights per fallback font).
 const rowIcon = (body: string): string =>
-  '<svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor"'
-  + ` stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">${body}</svg>`
+  strokeIcon(16, 16, body, ' stroke-width="1.5" stroke-linejoin="round"')
 const PENCIL_ICON = rowIcon('<path d="M10.5 2.5l3 3L6 13l-3.5.5L3 10z"/><path d="M9 4l3 3"/>')
 const TRANSFER_ICON = rowIcon(
   '<path d="M5 13V3M2.5 5.5L5 3l2.5 2.5"/><path d="M11 3v10M8.5 10.5L11 13l2.5-2.5"/>')
@@ -540,8 +540,8 @@ export function buildOfflineLobbyView(
         // sourceSprite's self-heal removes a bake that fails to decode;
         // put the fallback icon back rather than leave the column blank.
         // Kept on the box: a repaint finds an <img> where the icon was.
-        const glyph = box.dataset.menuGlyph ??= box.innerHTML
-        el.addEventListener('error', () => { box.innerHTML = glyph })
+        const fallback = box.dataset.menuFallback ??= box.innerHTML
+        el.addEventListener('error', () => { box.innerHTML = fallback })
         box.replaceChildren(el)
       }
     } catch { /* decoration only */ }

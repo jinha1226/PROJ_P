@@ -140,7 +140,7 @@ export function buildLoginView(
         <div class="login-subsection login-spectate-section">
           <div class="login-spectate-row">
             <select id="spectate-select" class="login-spectate-select" aria-label="Server"></select>
-            <button id="spectate-btn" type="button" class="login-btn login-btn-spectate"
+            <button id="spectate-btn" type="button" class="login-btn-spectate"
                     aria-describedby="spectate-note">Spectate</button>
           </div>
           <div id="spectate-error" class="login-error" style="display:none" role="alert"></div>

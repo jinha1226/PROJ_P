@@ -89,7 +89,6 @@
      follows the reference client instead (.overlay-float). */
   --modal-scrim:  rgba(0, 0, 0, 0.45);
   --modal-shadow: 0 12px 40px rgba(0, 0, 0, 0.55);
-  --alert-w: 21.25rem;  /* the exit card and the reconnect question */
 
   /* Radii by shape class, not by component: a key or inner well, a small
      control, any full-width bar (cards and buttons alike), a sheet or
@@ -634,8 +633,8 @@ html.pz-home-indicator { --safe-bottom: var(--home-indicator-cap); }
 .crypt-card-backdrop .char-card {
   width: 100%;
   max-width: 26rem;
-  /* The backdrop is a fixed, centered flex box with no scroll of its own
-     (like .doc-card): a tall card — long blurb + two rune rows on a
+  /* The backdrop is a fixed, centered flex box with no scroll of its own:
+     a tall card — long blurb + two rune rows on a
      landscape phone — must scroll inside itself or its headline clips
      off the top. */
   max-height: 100%;
@@ -646,28 +645,30 @@ html.pz-home-indicator { --safe-bottom: var(--home-indicator-cap); }
 
 /* Two top-level mode groups (Play online / Play offline — login.ts), as
    grouped-list section headers: sentence case, gray, on the cells' text
-   column (20px in), the disclosure chevron at the trailing margin; the
-   sub-labels inside a group (Spectate as guest) one size down. */
+   column (20px in), the disclosure chevron at the trailing margin. */
 .login-group { margin-bottom: var(--login-group-gap); }
 .login-group:last-of-type { margin-bottom: 0; }
 
-.login-group-label {
-  display: flex;
-  align-items: center;
-  gap: 0.6rem;
+/* Every grouped list's section header (login groups, lobby sections,
+   Settings) */
+.login-group-label, .lobby-section-title, .settings-h {
   padding: 0 1.25rem;
   font-size: 1rem;
   font-weight: 600;
   color: var(--text-dim);
+}
+.login-group-label {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
   margin-bottom: 0.5rem;
 }
-.login-group-label::after { content: ""; flex: 1; }
 /* The two mode groups as iOS-style disclosure sections (HIG DisclosureGroup:
    Notes/Files/Reminders section headers): the header row is the control, a
    trailing chevron points right collapsed / down open (no rotation animation
    — by choice).
-   The chevron is the ::before pseudo pushed to the end via flex `order`
-   (::after is a flex spacer). The tap target is widened by an
+   The chevron is the ::after pseudo, pushed to the end by an auto
+   margin. The tap target is widened by an
    absolutely positioned child (.login-disclosure-hit; a click on it toggles
    the details like any summary content) rather than padding + negative
    margins: margins collapse through <details>/<section> engine-dependently,
@@ -703,22 +704,21 @@ html.pz-home-indicator { --safe-bottom: var(--home-indicator-cap); }
   top: calc(-1 * var(--hit-up));
   bottom: calc(-1 * var(--hit-down));
 }
-.login-group-toggle > summary::before {
+.login-group-toggle > summary::after {
   content: "";
-  order: 2;
   flex: none;
   width: 0.6em;
   height: 0.6em;
-  margin-right: 0.3em;
+  margin: 0 0.3em 0 auto;
   border-right: 1.5px solid currentColor;
   border-bottom: 1.5px solid currentColor;
-  /* A tier below the account cards' → (full --text-dim): ~3.3:1 over the
-     card surface, the non-text-control floor, about iOS tertiaryLabel. */
+  /* --text-dim at 60%: ~3.3:1 over the card surface, the non-text-control
+     floor, about iOS tertiaryLabel. */
   opacity: 0.6;
   transform: rotate(-45deg);
 }
 /* Pointing down, the V's optical centre sits below the box centre — lift it. */
-.login-group-toggle[open] > summary::before { transform: translateY(-0.15em) rotate(45deg); }
+.login-group-toggle[open] > summary::after { transform: translateY(-0.15em) rotate(45deg); }
 
 .login-subsection { margin-bottom: 1.1rem; }
 .login-subsection:last-child { margin-bottom: 0; }
@@ -759,10 +759,16 @@ html.pz-home-indicator { --safe-bottom: var(--home-indicator-cap); }
   width: 100%;
 }
 .login-account-list .login-account-card { border-radius: 0; }
+/* The grouped cell: rows share one rounded surface */
+.login-spectate-row, .login-form-group, .offline-device {
+  background: var(--surface);
+  border-radius: var(--r-bar);
+  overflow: hidden;
+}
 /* The grouped-list row separator, every list's: inset at both ends — the
    row's text column, and the card's 20px content margin where trailing
    chevrons sit (see --separator). A list whose text
-   column sits elsewhere sets --sep-inset on its ::before. */
+   column sits elsewhere sets --sep-inset on the list. */
 .login-account-list .login-account-card + .login-account-card::before,
 .login-form-row + .login-form-row::before,
 .lobby-game-row + .lobby-game-row::before,
@@ -777,6 +783,19 @@ html.pz-home-indicator { --safe-bottom: var(--home-indicator-cap); }
   right: 1.25rem;
   height: 0.5px;
   background: var(--separator);
+}
+/* The trailing chevron of a row that goes somewhere, every list's; each
+   row places it (grid cell, flex end, or absolute on the 20px margin). */
+.login-account-card:not(:disabled)::after,
+.lobby-game-row::after,
+.offline-nav-row::after,
+.settings-nav::after {
+  content: "";
+  width: 0.5rem;
+  height: 0.5rem;
+  border-right: 2px solid var(--text-faint);
+  border-bottom: 2px solid var(--text-faint);
+  transform: rotate(-45deg);
 }
 
 :root:not(.press-cancelled) .login-account-card:active { background: var(--press); transition: background-color 0s var(--press-delay); }
@@ -810,25 +829,10 @@ html.pz-home-indicator { --safe-bottom: var(--home-indicator-cap); }
 /* The offline card's title when it's a label ("New game"), not a name */
 .login-account-username.is-label { font-family: var(--font-ui); font-size: 1.0625rem; }
 
-/* Trailing chevron (a row that goes somewhere), not an arrow glyph */
-.login-account-card::after {
-  content: "";
-  grid-area: arrow;
-  width: 0.5rem;
-  height: 0.5rem;
-  margin-right: 0.2rem;
-  border-right: 2px solid var(--text-faint);
-  border-bottom: 2px solid var(--text-faint);
-  transform: rotate(-45deg);
-}
-.login-account-card:disabled::after {
-  content: "…";
-  width: auto;
-  height: auto;
-  border: none;
-  transform: none;
-  color: var(--text-dim);
-}
+/* Trailing chevron (shape: the shared chevron rule above); "…" while
+   disabled */
+.login-account-card::after { grid-area: arrow; margin-right: 0.2rem; }
+.login-account-card:disabled::after { content: "…"; color: var(--text-dim); }
 
 /* Offline entry card (login.ts renderOfflineCard): account-card chrome with a
    two-line middle — the most recent character (or "New game") as the title +
@@ -937,23 +941,12 @@ html.pz-home-indicator { --safe-bottom: var(--home-indicator-cap); }
 /* Spectating stays a first-class path, but a one-line one: the server
    picker and the go action share one cell instead of stacking under a
    label (37px back for the offline group, measured at 402x874). */
-.login-spectate-row {
-  display: flex;
-  align-items: stretch;
-  background: var(--surface);
-  border-radius: var(--r-bar);
-  overflow: hidden;
-}
+.login-spectate-row { display: flex; align-items: stretch; }
 .login-spectate-row .login-spectate-select { flex: 1 1 auto; min-width: 0; }
 
 /* The sign-in form: one grouped cell — a Server row (name leading, picker
    trailing), then the two fields, separators inset at both ends. */
-.login-form-group {
-  margin-bottom: 1rem;
-  background: var(--surface);
-  border-radius: var(--r-bar);
-  overflow: hidden;
-}
+.login-form-group { margin-bottom: 1rem; }
 .login-form-row {
   position: relative;
   display: flex;
@@ -1028,7 +1021,8 @@ html.pz-home-indicator { --safe-bottom: var(--home-indicator-cap); }
   padding: 0 1rem;
 }
 
-.login-btn:disabled {
+.login-btn:disabled,
+.login-btn-spectate:disabled {
   opacity: 0.5;
   cursor: default;
 }
@@ -1037,7 +1031,7 @@ html.pz-home-indicator { --safe-bottom: var(--home-indicator-cap); }
    latter, so buttons that disable themselves while a connection is in flight
    add this class to breathe instead. Animates only opacity — never size — so
    nothing in the row moves mid-tap. */
-.login-btn.login-busy:disabled {
+.login-busy:disabled {
   animation: login-busy-pulse 0.9s ease-in-out infinite alternate;
 }
 @keyframes login-busy-pulse {
@@ -1045,23 +1039,21 @@ html.pz-home-indicator { --safe-bottom: var(--home-indicator-cap); }
   to { opacity: 0.3; }
 }
 @media (prefers-reduced-motion: reduce) {
-  .login-btn.login-busy:disabled { animation: none; }
+  .login-busy:disabled { animation: none; }
 }
 
-/* Two classes: the shared fill rule sits later in the file (.lobby-btn-primary).
-   A text action at the cell's trailing end, past a separator. */
-.login-btn.login-btn-spectate {
+/* A text action at the cell's trailing end, past a separator */
+.login-btn-spectate {
   flex: none;
-  width: auto;
-  min-height: 0;
   padding: 0 1.25rem;
   background: none;
   border: none;
-  border-radius: 0;
   box-shadow: inset 0.5px 0 0 var(--separator);
   color: var(--accent);
-  font-weight: 400;
+  font-size: 1.0625rem;
+  cursor: pointer;
 }
+.login-btn-spectate:not(:disabled):active { background: var(--press); }
 
 /* Flex rather than an inline row so spacing is keyed on position, not element
    type: the gear chip is a <button> among the anchors, and gap spaces any
@@ -1283,7 +1275,6 @@ button.lobby-account-chip:active { background: var(--press); }
    gray-filled buttons take --press. */
 .login-btn:not(:disabled):active,
 .lobby-btn-primary:not(:disabled):active { opacity: 0.85; }
-.login-btn.login-btn-spectate:not(:disabled):active,
 .lobby-btn-trunk:not(:disabled):active,
 .lobby-btn-secondary:not(:disabled):active { background: var(--press); opacity: 1; }
 .lobby-btn-primary {
@@ -1418,14 +1409,9 @@ button.lobby-account-chip:active { background: var(--press); }
   color: var(--text-dim);
 }
 
-/* Same grammar as the login screen's .login-group-label (size, weight, on
-   the cells' text column) minus its chevron — these sections don't
-   collapse. */
+/* The shared section header (at .login-group-label) minus its chevron —
+   these sections don't collapse. */
 .lobby-section-title {
-  padding: 0 1.25rem;
-  font-size: 1rem;
-  font-weight: 600;
-  color: var(--text-dim);
   /* Adds to .lobby-scroll's 0.75rem gap: more space above a section title
      than below it, so the title binds to its own section's content. Block
      margins only: the inline ones are .lobby-scroll > *'s centring. */
@@ -1469,17 +1455,12 @@ button.lobby-account-chip:active { background: var(--press); }
 .lobby-game-row:last-child { border-bottom-left-radius: var(--r-bar); border-bottom-right-radius: var(--r-bar); }
 
 /* Trailing chevron on the 20px margin, where the separators end */
-.lobby-game-row::after {
-  content: "";
+.lobby-game-row::after,
+.settings-nav::after {
   position: absolute;
   right: 1.35rem;
   top: 50%;
-  width: 0.5rem;
-  height: 0.5rem;
   margin-top: -0.25rem;
-  border-right: 2px solid var(--text-faint);
-  border-bottom: 2px solid var(--text-faint);
-  transform: rotate(-45deg);
   pointer-events: none;
 }
 
@@ -1618,16 +1599,7 @@ button.lobby-account-chip:active { background: var(--press); }
    declared further down the file, and would win at equal specificity. */
 .offline-device-row.offline-nav-row { align-items: center; cursor: pointer; }
 .offline-nav-row .offline-device-label { font-size: 1.0625rem; }
-.offline-nav-row::after {
-  content: "";
-  flex: none;
-  width: 0.5rem;
-  height: 0.5rem;
-  margin-right: 0.2rem;
-  border-right: 2px solid var(--text-faint);
-  border-bottom: 2px solid var(--text-faint);
-  transform: rotate(-45deg);
-}
+.offline-nav-row::after { flex: none; margin-right: 0.2rem; }
 :root:not(.press-cancelled) .offline-nav-row:not(.is-disabled):active { background: var(--press); transition: background-color 0s var(--press-delay); }
 .offline-nav-row:focus-visible { outline: 1px solid var(--accent); outline-offset: -1px; }
 .offline-nav-row.is-disabled { opacity: 0.5; cursor: default; }
@@ -1717,12 +1689,8 @@ button.lobby-account-chip:active { background: var(--press); }
    game, Scores and morgues) and ON THIS DEVICE (the installed engine + tiles
    pack, then what you made: options file, backup). One heading: GAME DATA /
    YOUR DATA were two near-synonym headings over three rows, and each row's
-   own label already says whose data it is. */
-.offline-device {
-  background: var(--surface);
-  border-radius: var(--r-bar);
-  overflow: hidden;
-}
+   own label already says whose data it is. The card is the shared grouped
+   cell (.login-form-group's rule). */
 .offline-device-row {
   position: relative;
   display: flex;
@@ -1739,9 +1707,7 @@ button.lobby-account-chip:active { background: var(--press); }
    sibling is visible: hidden children sit anywhere in these cards (a hidden
    first row; the closed name form parked between New game and Scores and
    morgues), so an adjacent-sibling test dropped real separators. */
-.offline-device > :not([hidden]) ~ .offline-device-row::before {
-  --sep-inset: calc(1.25rem + var(--glyph-col) + 0.6rem);
-}
+.offline-device { --sep-inset: calc(1.25rem + var(--glyph-col) + 0.6rem); }
 .offline-device-glyph {
   width: var(--glyph-col); /* .offline-menu-icon block */
   text-align: center;
@@ -1871,26 +1837,19 @@ button.lobby-account-chip:active { background: var(--press); }
   padding: var(--safe-frame-pad);
   background: var(--modal-scrim);
 }
-/* The app's dialog card: --alert-w is shared with the reconnect question
-   (.reconnect-card.is-question), so the two dialogs are one width. */
-.lobby-exit-card {
+/* The app's alert — card, title, buttons — shared by the exit dialog and
+   the reconnect question (.is-question, reconnect.ts askForceTerminate). */
+.lobby-exit-card,
+.is-question .reconnect-card {
   width: 100%;
-  max-width: var(--alert-w);
-  max-height: 100%;
-  overflow-y: auto;
+  max-width: 21.25rem;
+  padding: 1.4rem 0.75rem 0.75rem;
   background: var(--surface);
   border-radius: var(--r-sheet);
   box-shadow: var(--modal-shadow);
-  padding: 1.4rem 0.75rem 0.75rem;
-  display: flex;
-  flex-direction: column;
-  gap: 0.9rem;
 }
-/* With the game's recap in it, the card widens: the recap is fit to the
-   card's width (fitToWidth), and at alert width it came out ~9px (main's
-   wider card: 10–14px; long recaps hit the 7px floor). Measured 2026-10-07. */
-.lobby-exit-card:has(.lobby-exit-summary) { max-width: 30rem; }
-.lobby-exit-reason {
+.lobby-exit-reason,
+.is-question .reconnect-status {
   padding: 0 0.5rem;
   font-size: 1.0625rem;
   font-weight: 600;
@@ -1898,6 +1857,27 @@ button.lobby-account-chip:active { background: var(--press); }
   text-align: center;
   color: var(--text);
 }
+.lobby-exit-close,
+.lobby-exit-link,
+.is-question .reconnect-btn {
+  min-height: 3rem;
+  border: none;
+  border-radius: var(--r-ctl);
+  background: var(--surface2);
+  font-size: 1.0625rem;
+  cursor: pointer;
+}
+.lobby-exit-card {
+  max-height: 100%;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 0.9rem;
+}
+/* With the game's recap in it, the card widens: the recap is fit to the
+   card's width (fitToWidth), and at alert width it came out ~9px (10–14px
+   at this width; long recaps hit the 7px floor). Measured 2026-10-07. */
+.lobby-exit-card:has(.lobby-exit-summary) { max-width: 30rem; }
 /* The game's own recap, in a black well: game text inside chrome sits on
    the game's black (the settings log preview does too). */
 .lobby-exit-summary {
@@ -1922,15 +1902,9 @@ button.lobby-account-chip:active { background: var(--press); }
 .lobby-exit-close,
 .lobby-exit-link {
   flex: 1;
-  min-height: 3rem;
   display: flex;
   align-items: center;
   justify-content: center;
-  border: none;
-  border-radius: var(--r-ctl);
-  background: var(--surface2);
-  font-size: 1.0625rem;
-  cursor: pointer;
 }
 .lobby-exit-close { color: var(--text); font-weight: 600; }
 .lobby-exit-link { color: var(--accent); text-decoration: none; }
@@ -1939,8 +1913,8 @@ button.lobby-account-chip:active { background: var(--press); }
 
 /* ── In-app document modal (About / What's new) ───────────── */
 /* Floats above login/lobby; rendered from ABOUT.md / CHANGELOG.md. The
-   .doc-backdrop/.doc-card base also serves the crypt's centred character
-   card; the sheet form (.sheet-*, below) is mountCardOverlay's. */
+   .doc-backdrop base also serves the crypt's centred character card;
+   .sheet-backdrop and .doc-card are mountCardOverlay's sheet. */
 .doc-backdrop {
   position: fixed;
   inset: 0;
@@ -1954,7 +1928,7 @@ button.lobby-account-chip:active { background: var(--press); }
 .doc-card {
   width: 100%;
   max-width: 34rem;
-  max-height: 100%;
+  height: 100%;
   display: flex;
   flex-direction: column;
   background: var(--surface);
@@ -1976,9 +1950,6 @@ button.lobby-account-chip:active { background: var(--press); }
   padding: max(0.875rem, calc(var(--safe-top) + 0.5rem))
            max(0.5rem, var(--safe-right)) 0.5rem max(0.5rem, var(--safe-left));
 }
-.sheet-card {
-  height: 100%;
-}
 /* Centred title, a circular ✕ at the trailing edge,
    its edge on the body's 1rem gutter. The body scrolls under the header on
    the same fill; while it does, the header draws the scroll-edge hairline
@@ -1996,18 +1967,14 @@ button.lobby-account-chip:active { background: var(--press); }
 }
 .doc-header.is-scrolled { box-shadow: 0 1px 0 var(--separator); }
 .doc-title { color: var(--text); font-size: 1.0625rem; font-weight: 600; }
-.doc-close {
-  position: absolute;
-  right: 1rem;
-  top: 50%;
-  transform: translateY(-50%);
+/* The circular ✕ (sheet headers, the size palette) */
+.doc-close, .size-palette-close {
   width: 2.25rem;
   height: 2.25rem;
   display: flex;
   align-items: center;
   justify-content: center;
   padding: 0;
-  font-size: 0.95rem;
   font-weight: 600;
   color: var(--text);
   background: var(--surface2);
@@ -2016,8 +1983,15 @@ button.lobby-account-chip:active { background: var(--press); }
   cursor: pointer;
 }
 /* A 44pt target around the 36pt circle */
-.doc-close::after { content: ''; position: absolute; inset: -4px; }
-.doc-close:active { background: var(--press); }
+.doc-close::after, .size-palette-close::after { content: ''; position: absolute; inset: -4px; }
+.doc-close:active, .size-palette-close:active { background: var(--press); }
+.doc-close {
+  position: absolute;
+  right: 1rem;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 0.95rem;
+}
 .doc-body {
   overflow-y: auto;
   padding: 0.75rem 1rem calc(1.5rem + var(--safe-bottom));
@@ -4497,18 +4471,10 @@ html.map-hold, html.map-hold * {
 
 /* ── Unified touch controls ─────────────────────────────────── */
 /* The game-key palette: the strip, and everything that draws the strip's
-   keys elsewhere (virtual keyboard, the settings d-pad specimen, the
-   control-set editor's grids and key picker, the describe actions bar)
-   and the in-game chrome that floats at the strip's level (size palette).
-   One block, so the copies can't drift from the strip. */
-#touch-controls,
-#kbd-overlay,
-.set-dpad-pad,
-.ed-grid,
-.ed-picker-keys,
-.layout-actions,
-#menu-controls,
-.size-palette {
+   keys elsewhere or floats at its level. On :root so every consumer reads
+   the strip's own values; a surface that needs a variant re-declares one
+   locally (.set-dpad-preview). */
+:root {
   /* D-pad cell size (consumed by .tc-dpad / .tc-dpad-btn) — also sets the
      whole strip's height via the max-height calc below, so the settings
      slider scales the macro panel along with the d-pad. User-adjustable:
@@ -5595,9 +5561,11 @@ html.map-hold, html.map-hold * {
 /* Floats over the frozen game view while auto-resume replays login + play
    after an unexpected socket drop (iOS app-swap). The backdrop blocks
    input to the game, so it stays honestly modal: a light dim, the status
-   in a capsule at the top (at the bottom over an open sheet), a centred
-   dialog only while the force-close question is up (reconnect.ts
-   buildOverlay has the classes). */
+   in a capsule at the top, a centred dialog only while the force-close
+   question is up (.is-question). Over an open sheet the capsule docks at
+   the bottom, clear of the sheet's header: both backdrops are body
+   children, and the sheet is always the earlier one (this backdrop blocks
+   every opener). */
 .reconnect-backdrop {
   position: fixed;
   inset: 0;
@@ -5608,7 +5576,7 @@ html.map-hold, html.map-hold * {
   padding: var(--safe-frame-pad);
   background: rgba(0, 0, 0, 0.3);
 }
-.reconnect-backdrop.is-over-sheet { align-items: flex-end; }
+.sheet-backdrop ~ .reconnect-backdrop { align-items: flex-end; }
 .reconnect-backdrop.is-question { align-items: center; background: var(--modal-scrim); }
 .reconnect-card {
   display: flex;
@@ -5620,14 +5588,11 @@ html.map-hold, html.map-hold * {
   border-radius: 1.6rem;
   box-shadow: var(--modal-shadow);
 }
+/* The question's card, title and buttons: the app's alert (.lobby-exit-card) */
 .is-question .reconnect-card {
   flex-direction: column;
   align-items: stretch;
   gap: 0.4rem;
-  width: var(--alert-w);
-  padding: 1.4rem 0.75rem 0.75rem;
-  background: var(--surface);
-  border-radius: var(--r-sheet);
 }
 /* A thin neutral ring with an amber arc — the one moving thing on screen. */
 .reconnect-spinner {
@@ -5649,12 +5614,6 @@ html.map-hold, html.map-hold * {
   font-weight: 500;
   line-height: 1.3;
 }
-.is-question .reconnect-status {
-  padding: 0 0.5rem;
-  font-size: 1.0625rem;
-  font-weight: 600;
-  text-align: center;
-}
 .reconnect-question {
   padding: 0 0.5rem;
   color: var(--text);
@@ -5672,14 +5631,8 @@ html.map-hold, html.map-hold * {
   color: var(--text);
   background: var(--surface3);
   border: none;
-  border-radius: 1.2rem;
+  border-radius: 999px;
   cursor: pointer;
-}
-.is-question .reconnect-btn {
-  min-height: 3rem;
-  font-size: 1.0625rem;
-  background: var(--surface2);
-  border-radius: var(--r-ctl);
 }
 .reconnect-btn:active { background: var(--press); }
 /* Destructive in red, the safe way out bold (below it, the cancel-style
@@ -5706,22 +5659,16 @@ html.map-hold, html.map-hold * {
 .lobby-notice-actions button:active { background: var(--press); }
 
 /* ── Settings overlay (src/views/settings-view.ts) ───────────── */
-/* The doc viewer's sheet (.sheet-backdrop/.sheet-card), one tier lower. */
+/* The doc viewer's sheet (.sheet-backdrop/.doc-card), one tier lower. */
 .settings-backdrop { z-index: var(--z-settings); }
 .settings-body {
   overflow-y: auto;
   padding: 0.25rem 1rem calc(1.5rem + var(--safe-bottom));
   color: var(--text);
 }
-/* Section headers sit on the cell's text column (20px in from its edge),
-   sentence case, gray; the explanation is a footer under the cell. */
-.settings-h {
-  font-size: 1rem;
-  font-weight: 600;
-  color: var(--text-dim);
-  margin: 0 0 0.5rem;
-  padding: 0 1.25rem;
-}
+/* Section headers (the shared rule at .login-group-label); the explanation
+   is a footer under the cell. */
+.settings-h { margin: 0 0 0.5rem; }
 .settings-sec + .settings-sec { margin-top: 1.6rem; }
 .settings-sec:first-child { margin-top: 0.5rem; }
 .settings-cell {
@@ -5730,18 +5677,13 @@ html.map-hold, html.map-hold * {
   padding: 0.875rem 1.25rem;
   overflow: hidden;
 }
-/* A lone segmented control sits on the sheet itself */
-.settings-cell.is-bare { background: none; padding: 0; border-radius: 0; overflow: visible; }
 .settings-cell.is-list { padding: 0; }
-.settings-hint {
-  color: var(--text-dim);
-  font-size: 0.8125rem;
-  line-height: 1.4;
-  margin: 0 0 0.75rem;
-}
 .settings-footer {
   margin: 0.5rem 0 0;
   padding: 0 1.25rem;
+  color: var(--text-dim);
+  font-size: 0.8125rem;
+  line-height: 1.4;
   /* no one-word last lines under a cell */
   text-wrap: pretty;
 }
@@ -5751,29 +5693,29 @@ html.map-hold, html.map-hold * {
    margin). */
 .set-list, .set-action-rows { display: flex; flex-direction: column; }
 .set-row, .set-action-row, .settings-nav { position: relative; }
-.set-row + .set-row::before,
-.set-row-actions + .set-row::before,
-.set-action-rows > *::before { --sep-inset: var(--row-text-x, 1.25rem); }
 /* Control-set list: tap a row to activate; ⋯ reveals per-set actions. The
    leading ✓ column puts every row's text at --row-text-x. */
-.set-list, .set-action-rows { --row-text-x: 3.05rem; }
+.set-list, .set-action-rows { --row-text-x: 3.05rem; --sep-inset: var(--row-text-x); }
 .set-row { display: flex; align-items: stretch; }
+/* Whole-row buttons: the set rows, text-action rows and nav rows */
+.set-row-main, .set-action-row, .settings-nav {
+  min-height: 2.75rem;
+  text-align: left;
+  background: none;
+  border: none;
+  font-size: 1.0625rem;
+  cursor: pointer;
+}
+:root:not(.press-cancelled) :is(.set-row-main, .set-action-row, .settings-nav):active { background: var(--press); transition: background-color 0s var(--press-delay); }
 .set-row-main {
   flex: 1;
   display: flex;
   align-items: center;
   gap: 0.55rem;
   min-width: 0;
-  min-height: 2.75rem;
-  text-align: left;
-  background: none;
-  border: none;
   padding: 0 0 0 1.25rem;
   color: var(--text);
-  font-size: 1.0625rem;
-  cursor: pointer;
 }
-:root:not(.press-cancelled) .set-row-main:active { background: var(--press); transition: background-color 0s var(--press-delay); }
 .set-radio { width: 1.25rem; flex-shrink: 0; color: var(--accent); font-weight: 600; }
 .set-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .set-badge {
@@ -5810,43 +5752,15 @@ html.map-hold, html.map-hold * {
 /* Export's transient "Copied ✓" morph */
 .set-action.flash { color: var(--accent); }
 /* New set / Import…: text-only action rows on the list's text column */
-.set-action-row {
-  min-height: 2.75rem;
-  padding: 0 1.25rem 0 var(--row-text-x);
-  text-align: left;
-  background: none;
-  border: none;
-  color: var(--accent);
-  font-size: 1.0625rem;
-  cursor: pointer;
-}
-:root:not(.press-cancelled) .set-action-row:active { background: var(--press); transition: background-color 0s var(--press-delay); }
-/* Row that opens something else: label + trailing chevron */
+.set-action-row { padding: 0 1.25rem 0 var(--row-text-x); color: var(--accent); }
+/* Row that opens something else: label + trailing chevron (placed with
+   .lobby-game-row's) */
 .settings-nav {
   display: block;
   width: 100%;
-  min-height: 2.75rem;
   padding: 0 2.5rem 0 1.25rem;
-  text-align: left;
-  background: none;
-  border: none;
   color: var(--text);
-  font-size: 1.0625rem;
-  cursor: pointer;
 }
-.settings-nav::after {
-  content: '';
-  position: absolute;
-  right: 1.35rem;
-  top: 50%;
-  width: 0.5rem;
-  height: 0.5rem;
-  margin-top: -0.25rem;
-  border-right: 2px solid var(--text-faint);
-  border-bottom: 2px solid var(--text-faint);
-  transform: rotate(-45deg);
-}
-:root:not(.press-cancelled) .settings-nav:active { background: var(--press); transition: background-color 0s var(--press-delay); }
 
 .settings-actions { display: flex; gap: 0.5rem; margin-top: 1rem; }
 .settings-btn {
@@ -5873,11 +5787,7 @@ html.map-hold, html.map-hold * {
 /* Segmented control (Map display, Monster list, Character sprites): a
    track one step up from the sheet, the selection a raised gray thumb —
    brightness, not hue. Segments are .settings-btn reshaped (see .seg). */
-.settings-seg {
-  padding: 3px;
-  background: var(--surface2);
-  border-radius: var(--r-ctl);
-}
+.settings-seg { background: var(--surface2); }
 .settings-seg .settings-btn {
   min-height: 2.125rem;
   background: transparent;
@@ -6005,8 +5915,7 @@ html.map-hold, html.map-hold * {
    near-black fill would read as holes in a gray card. It previews size,
    not the strip's colours. */
 .set-dpad-preview > .set-dpad-pad { --tc-fill: var(--surface3); }
-/* Cell size and colors come from the shared #touch-controls token block
-   above. Not the real .tc-dpad/.tc-dpad-btn classes: the landscape media
+/* Cell size and colors come from the game-key palette tokens on :root. Not the real .tc-dpad/.tc-dpad-btn classes: the landscape media
    query restyles those into the translucent map-float look, which would
    hit the settings specimen too. */
 .set-dpad-pad {
@@ -6072,7 +5981,7 @@ html.map-hold, html.map-hold * {
   padding: 0.5rem 1rem 0.9rem;
   border-radius: var(--r-sheet);
   background: var(--tc-fill);
-  box-shadow: inset 0 0 0 1px rgba(238, 238, 236, 0.07);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--text) 7%, transparent);
 }
 /* Dimmer knobs and tracks than the settings sheet's: three white pills
    were the brightest things on a night map. */
@@ -6084,23 +5993,8 @@ html.map-hold, html.map-hold * {
   margin-bottom: 0.4rem;
 }
 .size-palette-title { color: var(--text-dim); font-size: 0.9375rem; font-weight: 600; }
-.size-palette-close {
-  width: 2.25rem;
-  height: 2.25rem;
-  margin-right: -0.5rem;
-  padding: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border: none;
-  border-radius: 50%;
-  background: var(--surface2);
-  color: var(--text);
-  font-size: 0.9rem;
-  font-weight: 600;
-  cursor: pointer;
-}
-.size-palette-close:active { background: var(--press); }
+/* The circle is .doc-close's */
+.size-palette-close { position: relative; margin-right: -0.5rem; font-size: 0.9rem; }
 
 /* Shared look for every settings text field (import/export areas, editor
    inputs); per-field classes keep only their layout. */
@@ -6168,12 +6062,7 @@ html.map-hold, html.map-hold * {
   margin-left: 0.5rem;
   font-family: var(--font-mono);
 }
-.ed-size-toggle {
-  margin-left: auto;
-  padding: 3px;
-  background: var(--surface3);
-  border-radius: var(--r-ctl);
-}
+.ed-size-toggle { margin-left: auto; background: var(--surface3); }
 .ed-size-btn {
   min-height: 1.75rem;
   padding: 0 0.6rem;
@@ -6190,7 +6079,7 @@ html.map-hold, html.map-hold * {
 /* Segmented geometry (settings pickers, the editor's 3×3/3×4 toggle): the
    track carries the 3px inset; segments are concentric thumbs inside it
    (--r-ctl − 3px). Look per control above. */
-.seg { display: flex; }
+.seg { display: flex; padding: 3px; border-radius: var(--r-ctl); }
 .seg > * { border-radius: calc(var(--r-ctl) - 3px); }
 
 .ed-grid {
@@ -6254,13 +6143,11 @@ html.map-hold, html.map-hold * {
 /* Typed text must stay 16px (iOS focus auto-zoom), but the long placeholder
    hint reads better at the picker's own text scale */
 .ed-picker-text::placeholder { font-family: var(--font-ui); font-size: 0.875rem; color: var(--text-faint); }
-.ed-picker .ed-picker-set {
+.ed-picker-set {
   flex: 0 0 auto;
   min-height: 0;
   padding: 0 1.1rem;
-  background: var(--surface3);
-  border-radius: var(--r-ctl);
-  font-size: 0.9375rem;
+  font-weight: 500;
 }
 .ed-picker-keys {
   display: grid;

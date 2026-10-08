@@ -76,7 +76,7 @@ export function mountCardOverlay(
 ): { body: HTMLElement; close: () => void } {
   const { backdrop, close } = mountBackdrop('sheet-backdrop' + (cls.backdrop ? ` ${cls.backdrop}` : ''))
   const card = document.createElement('div')
-  card.className = 'doc-card sheet-card' + (cls.card ? ` ${cls.card}` : '')
+  card.className = 'doc-card' + (cls.card ? ` ${cls.card}` : '')
   card.setAttribute('role', 'dialog')
   card.setAttribute('aria-modal', 'true')
   card.setAttribute('aria-label', title)

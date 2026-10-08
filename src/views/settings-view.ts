@@ -19,6 +19,7 @@ import { dcssToHtml } from '../game/dcss-colors'
 import { DPAD_LAYOUT } from '../game/input/touch'
 import { defaultPref, getPref, setPref, type Prefs } from '../prefs'
 import { DPAD_STOPS, MSGLOG_FONT_STOPS, MSGLOG_LINE_STOPS, nearestStop } from '../ui-scale'
+import { strokeIcon } from '../util/svg-icon'
 import { openGesturesDoc } from './docs'
 
 // Close handle of the last-mounted settings card, for surfaces that replace
@@ -57,18 +58,18 @@ function button(label: string, className: string, onTap: () => void): HTMLButton
 
 // One home-page section in grouped-list anatomy: a header, one cell holding
 // the controls, and the explanation as a footer under the cell. `bare`
-// drops the cell's fill (a lone segmented control sits on the sheet
-// itself); `list` drops its padding for row lists.
+// holds the controls in a plain box instead (a lone segmented control sits
+// on the sheet itself); `list` drops the cell's padding
+// for row lists.
 function section(
   body: HTMLElement, title: string,
   opts: { footer?: string; bare?: boolean; list?: boolean } = {},
 ): HTMLElement {
   const sec = el('section', 'settings-sec')
   sec.appendChild(el('h2', 'settings-h', title))
-  const cell = el('div', 'settings-cell'
-    + (opts.bare ? ' is-bare' : '') + (opts.list ? ' is-list' : ''))
+  const cell = el('div', opts.bare ? '' : 'settings-cell' + (opts.list ? ' is-list' : ''))
   sec.appendChild(cell)
-  if (opts.footer) sec.appendChild(el('p', 'settings-hint settings-footer', opts.footer))
+  if (opts.footer) sec.appendChild(el('p', 'settings-footer', opts.footer))
   body.appendChild(sec)
   return cell
 }
@@ -132,8 +133,9 @@ function renderHome(body: HTMLElement): void {
 // (settings covers the whole screen, so without one the resize would be
 // adjusted blind). The full 3×3 shows what one button alone can't — the
 // pad's overall footprint. It tracks --pz-dpad via CSS; no re-render needed
-// as the slider moves. In portrait the whole strip scales with the d-pad (its height cap
-// derives from --tc-dpad); in landscape only the floating d-pad does.
+// as the slider moves. In portrait the whole strip scales with the d-pad
+// (its height cap derives from --tc-dpad); in landscape only the floating
+// d-pad does.
 function renderDpadSection(body: HTMLElement): void {
   const cell = section(body, 'D-pad')
   const preview = el('div', 'set-dpad-preview')
@@ -267,22 +269,16 @@ function segPref<K extends 'mapRenderMode' | 'monsterListMode' | 'loginSprites'>
     const b = button(label, 'settings-btn' + (value === active ? ' active' : ''), () => {
       if (getPref(prefKey) === value) return
       setPref(prefKey, value)
-      markChecked(seg, b)
+      for (const sib of seg.children) {
+        sib.classList.toggle('active', sib === b)
+        sib.setAttribute('aria-checked', String(sib === b))
+      }
     })
     b.setAttribute('role', 'radio')
     b.setAttribute('aria-checked', String(value === active))
     seg.appendChild(b)
   }
   return seg
-}
-
-// Re-mark `chosen` as the selected radio among its group's children (class +
-// aria-checked). segPref's children are all radio buttons.
-function markChecked(group: HTMLElement, chosen: Element): void {
-  for (const sib of group.children) {
-    sib.classList.toggle('active', sib === chosen)
-    sib.setAttribute('aria-checked', String(sib === chosen))
-  }
 }
 
 // Numeric prefs whose legal values are a stop table (ui-scale.ts).
@@ -340,10 +336,7 @@ function sliderPref(
 
 // End symbols: small at the start, large at the end (A / A).
 // Symbols, not specimens — the live previews show the true size.
-const svgIcon = (w: number, h: number, body: string): string =>
-  `<svg width="${w}" height="${h}" viewBox="0 0 ${w} ${h}" fill="none" stroke="currentColor"`
-  + ` stroke-linecap="round">${body}</svg>`
-const linesIcon = (n: number, w: number, h: number): string => svgIcon(w, h,
+const linesIcon = (n: number, w: number, h: number): string => strokeIcon(w, h,
   Array.from({ length: n }, (_, i) => {
     const y = 1 + i * ((h - 2) / (n - 1))
     return `<path d="M1 ${y.toFixed(1)}H${w - 1}" stroke-width="1.8"/>`
@@ -355,7 +348,7 @@ const padIcon = (s: number): string => {
     cells.push(`<rect x="${(1.6 + k * c).toFixed(1)}" y="${(1.6 + r * c).toFixed(1)}"`
       + ` width="${(c - 1.2).toFixed(1)}" height="${(c - 1.2).toFixed(1)}" rx="1" stroke-width="1.2"/>`)
   }
-  return svgIcon(s, s, cells.join(''))
+  return strokeIcon(s, s, cells.join(''))
 }
 const letterIcon = (px: number): string =>
   `<span class="set-slider-letter" style="font-size:${px}px">A</span>`
@@ -374,7 +367,7 @@ const msglogFontSlider = () =>
 // --- floating size palette ----------------------------------------------------
 
 // Close handle of the open palette; null when none. openSettings invokes it
-// so the two surfaces never coexist (a covered palette would show stale dots).
+// so the two surfaces never coexist (a covered palette would show stale values).
 let closePalette: (() => void) | null = null
 
 // The "Adjust sizes" palette: the same sliders, floating bare over the live
@@ -826,7 +819,7 @@ function renderEditor(body: HTMLElement, set: ControlSet, isNew: boolean): void 
       else setInfo(current)
     })
     textRow.appendChild(textInput)
-    textRow.appendChild(button('Set', 'settings-btn ed-picker-set', setText))
+    textRow.appendChild(button('Set', 'set-action ed-picker-set', setText))
     picker.appendChild(textRow)
 
     const keys = el('div', 'ed-picker-keys')

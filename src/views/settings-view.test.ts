@@ -447,15 +447,16 @@ describe('settings overlay', () => {
   })
 })
 
+// A slider is a range input over its stop table's indices, by aria-label.
+const slider = (label: string, root: ParentNode = document) =>
+  root.querySelector<HTMLInputElement>(`input[type="range"][aria-label="${label}"]`)!
+// What a drag does: the browser moves the value and fires `input`.
+const slideTo = (input: HTMLInputElement, stops: readonly number[], value: number) => {
+  input.value = String(stops.indexOf(value))
+  input.dispatchEvent(new Event('input', { bubbles: true }))
+}
+
 describe('size sliders', () => {
-  // A slider is a range input over its stop table's indices, by aria-label.
-  const slider = (label: string, root: ParentNode = document) =>
-    root.querySelector<HTMLInputElement>(`input[type="range"][aria-label="${label}"]`)!
-  // What a drag does: the browser moves the value and fires `input`.
-  const slideTo = (input: HTMLInputElement, stops: readonly number[], value: number) => {
-    input.value = String(stops.indexOf(value))
-    input.dispatchEvent(new Event('input', { bubbles: true }))
-  }
   const ticksOf = (input: HTMLInputElement) =>
     [...input.closest('.set-slider-row')!.querySelectorAll('.set-slider-tick')]
 
@@ -569,9 +570,7 @@ describe('floating size palette', () => {
     expect(document.querySelector('.settings-card')).toBeNull()
     const palette = document.querySelector<HTMLElement>('.size-palette')!
     expect(palette.querySelectorAll('input[type="range"]')).toHaveLength(3)
-    const dpad = palette.querySelector<HTMLInputElement>('input[aria-label="D-pad size"]')!
-    dpad.value = String(DPAD_STOPS.indexOf(3.7))
-    dpad.dispatchEvent(new Event('input', { bubbles: true }))
+    slideTo(slider('D-pad size', palette), DPAD_STOPS, 3.7)
     expect(getPref('dpadSize')).toBe(3.7)
   })
 
