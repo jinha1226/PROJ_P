@@ -1165,8 +1165,8 @@ html.pz-home-indicator { --safe-bottom: var(--home-indicator-cap); }
   display: flex;
   flex-direction: column;
   gap: 0.75rem;
-  /* The 16pt gutter the header bar and the login column use (shared with
-     the records list), so cards line up under the nav bar's controls. */
+  /* The 16pt gutter the header bar and the login column use, so cards line
+     up under the nav bar's controls. */
   padding: 0 max(1rem, var(--safe-right))
            max(1rem, var(--safe-bottom)) max(1rem, var(--safe-left));
 }
@@ -1593,8 +1593,16 @@ button.lobby-account-chip:active { background: var(--press); }
    reference WebTiles lobby is one mono table, Idle and Specs columns
    included: the name (.lobby-game-user), the character line, the idle
    time, the spectator count. Our own framing (section titles, buttons)
-   use --font-ui. The character line is kept whole; the version a dim suffix. */
-.lobby-game-info { font-family: var(--font-mono); font-size: 0.8125rem; color: var(--text-dim); }
+   use --font-ui. The character line is kept whole on one line; the version, a
+   dim suffix, is what an ellipsis eats when the spectator count crowds it. */
+.lobby-game-info {
+  font-family: var(--font-mono);
+  font-size: 0.8125rem;
+  color: var(--text-dim);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
 .lobby-game-info .lobby-game-version { margin-left: 0.6ch; color: var(--text-faint); }
 .lobby-game-idle { flex: 0 0 auto; white-space: nowrap; font-family: var(--font-mono); font-size: 0.8125rem; color: var(--text-dim); }
 .lobby-game-idle:empty { display: none; }
