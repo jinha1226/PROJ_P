@@ -94,11 +94,14 @@
   /* Radii by shape class, not by component: a key or inner well, a small
      control, any full-width bar (cards and buttons alike), a sheet or
      dialog. Nested shapes derive (segmented thumb = ctl − its 3px inset).
-     Capsules only for small pills; circles for icon buttons. */
-  --r-key:   8px;
-  --r-ctl:   12px;
-  --r-bar:   16px;
-  --r-sheet: 24px;
+     Capsules only for small pills; circles for icon buttons. A rounder
+     scale (8/12/16/24) read bubbly beside the square map: a 16px bar on a
+     44px row is near-stadium. This ladder is a step down (mock round r19,
+     2026-10-07); don't climb back. */
+  --r-key:   6px;
+  --r-ctl:   8px;
+  --r-bar:   10px;
+  --r-sheet: 14px;
 
   /* Chrome is the UI font (--font-ui); mono is for the game's words —
      game content, and game data shown inside chrome (combo/XL/place,
@@ -355,7 +358,7 @@ html.pz-home-indicator { --safe-bottom: var(--home-indicator-cap); }
 .login-moved-link:active { opacity: 0.5; }
 .login-moved-sub {
   margin: 0;
-  font-size: 0.78rem;
+  font-size: 0.8125rem;
   color: var(--text-dim);
 }
 .login-moved-x {
@@ -756,11 +759,21 @@ html.pz-home-indicator { --safe-bottom: var(--home-indicator-cap); }
   width: 100%;
 }
 .login-account-list .login-account-card { border-radius: 0; }
-.login-account-list .login-account-card + .login-account-card::before {
+/* The grouped-list row separator, every list's: inset at both ends — the
+   row's text column, and the card's 20px content margin where trailing
+   chevrons sit (see --separator). A list whose text
+   column sits elsewhere sets --sep-inset on its ::before. */
+.login-account-list .login-account-card + .login-account-card::before,
+.login-form-row + .login-form-row::before,
+.lobby-game-row + .lobby-game-row::before,
+.offline-device > :not([hidden]) ~ .offline-device-row::before,
+.set-row + .set-row::before,
+.set-row-actions + .set-row::before,
+.set-action-rows > *::before {
   content: '';
   position: absolute;
   top: 0;
-  left: 1.25rem;
+  left: var(--sep-inset, 1.25rem);
   right: 1.25rem;
   height: 0.5px;
   background: var(--separator);
@@ -774,9 +787,9 @@ html.pz-home-indicator { --safe-bottom: var(--home-indicator-cap); }
   /* Accent here is the primary-action mark at card strength (see
      --accent-line): for a returning player these cards ARE the way in —
      Connect is folded away — and a full fill per card would shout. */
-  background: rgba(245, 158, 11, 0.15);
+  background: color-mix(in srgb, var(--accent) 15%, transparent);
   color: var(--accent);
-  border-radius: 6px;
+  border-radius: var(--r-key);
   padding: 0.25rem 0.5rem;
   font-size: 0.8125rem;
   font-weight: 600;
@@ -947,15 +960,6 @@ html.pz-home-indicator { --safe-bottom: var(--home-indicator-cap); }
   align-items: center;
   min-height: 2.75rem;
   padding: 0 1.25rem;
-}
-.login-form-row + .login-form-row::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 1.25rem;
-  right: 1.25rem;
-  height: 0.5px;
-  background: var(--separator);
 }
 .login-form-name { flex: 1; font-size: 1.0625rem; color: var(--text); }
 .login-form-row--picker { padding-right: 0; }
@@ -1170,21 +1174,28 @@ html.pz-home-indicator { --safe-bottom: var(--home-indicator-cap); }
   position: relative;  /* anchors the unread-dot-corner badge */
   display: inline-flex;
   align-items: center;
-  gap: 0.3rem;
-  min-height: 2.25rem;
+  gap: 0.25rem;
+  min-height: 1.875rem;
   background: var(--surface2);
   border: none;
   border-radius: 999px;
   color: var(--text);
-  font-size: 0.9375rem;
-  padding: 0 0.9rem;
+  font-size: 0.8125rem;
+  padding: 0 0.75rem;
   cursor: pointer;
 }
+/* A 44pt target around the 30pt pill (the 36pt+ header row has room). The
+   36pt / 15px pill out-weighed the nav bar it sits in (mock round r20,
+   2026-10-07). */
+button.lobby-account-chip::after { content: ''; position: absolute; inset: -7px 0; }
 
 /* The filled pill above is for a chip that opens something (the account
    menu, the guest server menu). The guest form is usually static (offline
    lobby, spectator bar, a guest lobby with nowhere to switch to) and then
-   drops the fill: the same pill on a static label read as a button. */
+   drops the fill: the same pill on a static label read as a button (HIG:
+   a bezel signals a control); static context belongs in plain
+   secondary text. Same size and slot, dimmed, so both lobbies' headers
+   still read as one component. */
 .lobby-account-chip.is-guest {
   cursor: default;
   color: var(--text-dim);
@@ -1193,6 +1204,7 @@ div.lobby-account-chip.is-guest {
   background: none;
   padding: 0 0.25rem;
 }
+div.lobby-account-chip.is-guest .lobby-chip-tag { color: var(--text-dim); }
 button.lobby-account-chip.is-guest { cursor: pointer; }
 button.lobby-account-chip:active { background: var(--press); }
 
@@ -1288,7 +1300,6 @@ button.lobby-account-chip:active { background: var(--press); }
   border: none;
   border-radius: var(--r-ctl);
   color: var(--text);
-  font-family: var(--font-mono);  /* game ids */
   font-size: 0.8125rem;
   padding: 0 0.75rem;
   cursor: pointer;
@@ -1456,15 +1467,6 @@ button.lobby-account-chip:active { background: var(--press); }
 .offline-slot-row { padding-left: 0.75rem; }
 .lobby-game-row:first-child { border-top-left-radius: var(--r-bar); border-top-right-radius: var(--r-bar); }
 .lobby-game-row:last-child { border-bottom-left-radius: var(--r-bar); border-bottom-right-radius: var(--r-bar); }
-.lobby-game-row + .lobby-game-row::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 1.25rem;
-  right: 1.25rem;
-  height: 0.5px;
-  background: var(--separator);
-}
 
 /* Trailing chevron on the 20px margin, where the separators end */
 .lobby-game-row::after {
@@ -1518,7 +1520,7 @@ button.lobby-account-chip:active { background: var(--press); }
 
 /* A game the server reports a save for (lobby.ts makeGameBtn): a headline
    button carries the server's description as a second line, a version-list
-   button only the accent border. */
+   button only an accent ring. */
 .lobby-btn-primary.has-save { text-align: left; }
 .lobby-btn-save {
   display: block;
@@ -1541,7 +1543,7 @@ button.lobby-account-chip:active { background: var(--press); }
 .lobby-game-idle:empty { display: none; }
 
 /* The spectator count trails the row: what you scan for when choosing a
-   game to watch. Brightness, not accent — a stranger's game is content. */
+   game to watch. Never accent — a stranger's game is content. */
 .lobby-game-spectators { flex: none; font-family: var(--font-mono); font-size: 0.8125rem; color: var(--text-dim); }
 
 /* ── Offline lobby (views/offline-lobby.ts) ──────────────────
@@ -1580,8 +1582,8 @@ button.lobby-account-chip:active { background: var(--press); }
 /* Menu-entry icons (offline-lobby.ts paintMenuIcons — why this column and
    this size live there): a 32px sprite in the glyph column of the menu
    card's rows, and in the primary "New game" bar, which takes the same left
-   geometry (.offline-device: 1px card border, then .offline-device-row's
-   0.75rem padding, glyph column, 0.6rem gap) so its label starts on the menu
+   geometry (.offline-device-row's 1.25rem padding, glyph column, 0.6rem
+   gap) so its label starts on the menu
    labels' edge. --glyph-col is the one width both read (the rows through
    .offline-device-glyph): room for a 32px sprite, and one label edge for
    every row on the page that has a glyph column. */
@@ -1738,13 +1740,7 @@ button.lobby-account-chip:active { background: var(--press); }
    first row; the closed name form parked between New game and Scores and
    morgues), so an adjacent-sibling test dropped real separators. */
 .offline-device > :not([hidden]) ~ .offline-device-row::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: calc(1.25rem + var(--glyph-col) + 0.6rem);
-  right: 1.25rem;
-  height: 0.5px;
-  background: var(--separator);
+  --sep-inset: calc(1.25rem + var(--glyph-col) + 0.6rem);
 }
 .offline-device-glyph {
   width: var(--glyph-col); /* .offline-menu-icon block */
@@ -1818,7 +1814,7 @@ button.lobby-account-chip:active { background: var(--press); }
   gap: 0.5rem;
 }
 .rc-editor-title { color: var(--text); font-size: 1.0625rem; font-weight: 600; }
-.rc-editor-path { color: var(--text-dim); font-size: 0.8rem; }
+.rc-editor-path { color: var(--text-dim); font-size: 0.8125rem; }
 .rc-editor-text {
   flex: 1;
   min-height: 0;
@@ -1837,7 +1833,7 @@ button.lobby-account-chip:active { background: var(--press); }
 }
 .rc-editor-text:focus { outline: none; }
 .rc-editor-text::placeholder { color: var(--text-dim); opacity: 0.6; }
-.rc-editor-error { color: var(--danger); font-size: 0.8rem; }
+.rc-editor-error { color: var(--danger); font-size: 0.8125rem; }
 .rc-editor-footer { display: flex; gap: 0.6rem; }
 .rc-editor-esc,
 .rc-editor-save {
@@ -1966,17 +1962,22 @@ button.lobby-account-chip:active { background: var(--press); }
   box-shadow: var(--modal-shadow);
   overflow: hidden;
 }
-/* Every mountCardOverlay surface (docs, Settings) is one bottom sheet: full
-   height under the status bar, top corners rounded. No grabber — there's no
-   drag-to-dismiss (it would fight the body's own scroll); ✕, Escape and a
-   scrim tap close it. */
+/* Every mountCardOverlay surface (docs, Settings) is one floating sheet:
+   full height under the status bar, inset 8px at the sides and
+   bottom, every corner rounded. Never the edge-attached form (square bottom
+   running off the screen): that form reads as a sheet only when the
+   presenting view recedes behind it, which a page can't do — without it,
+   the sheet read as content overflowing the screen (on device, mock round
+   r21, 2026-10-07). No grabber — there's no drag-to-dismiss (it would
+   fight the body's own scroll); ✕, Escape and a scrim tap close it. The
+   bodies keep their own home-indicator pad. */
 .sheet-backdrop {
   align-items: flex-end;
-  padding: max(0.875rem, calc(var(--safe-top) + 0.5rem)) var(--safe-right) 0 var(--safe-left);
+  padding: max(0.875rem, calc(var(--safe-top) + 0.5rem))
+           max(0.5rem, var(--safe-right)) 0.5rem max(0.5rem, var(--safe-left));
 }
 .sheet-card {
   height: 100%;
-  border-radius: var(--r-sheet) var(--r-sheet) 0 0;
 }
 /* Centred title, a circular ✕ at the trailing edge,
    its edge on the body's 1rem gutter. The body scrolls under the header on
@@ -2019,18 +2020,18 @@ button.lobby-account-chip:active { background: var(--press); }
 .doc-close:active { background: var(--press); }
 .doc-body {
   overflow-y: auto;
-  padding: 0.75rem 1rem 1.5rem;
+  padding: 0.75rem 1rem calc(1.5rem + var(--safe-bottom));
   color: var(--text);
   /* Proportional font for prose readability; inline code/keys stay monospace
      via the explicit --font-mono on .doc-body code below. */
   font-family: var(--font-ui);
-  font-size: 0.9rem;
+  font-size: 0.9375rem;
   line-height: 1.6;
 }
 .doc-body h1, .doc-body h2, .doc-body h3 { line-height: 1.3; }
 .doc-body h1 { font-size: 1.2rem; margin: 1.2rem 0 0.6rem; color: var(--text); }
-.doc-body h2 { font-size: 1.05rem; margin: 1.5rem 0 0.5rem; color: var(--text); }
-.doc-body h3 { font-size: 0.95rem; margin: 1rem 0 0.4rem; color: var(--text); }
+.doc-body h2 { font-size: 1.0625rem; margin: 1.5rem 0 0.5rem; color: var(--text); }
+.doc-body h3 { font-size: 0.9375rem; margin: 1rem 0 0.4rem; color: var(--text); }
 .doc-body > :first-child { margin-top: 0; }
 .doc-body p { margin: 0 0 0.8rem; }
 .doc-body ul { margin: 0 0 0.9rem; padding-left: 1.2rem; }
@@ -2150,7 +2151,7 @@ button.lobby-account-chip:active { background: var(--press); }
   border: none;
   background: color-mix(in srgb, var(--surface2) 92%, transparent);
   color: var(--text-dim);
-  font-size: 0.8rem;
+  font-size: 0.8125rem;
   line-height: 1.35;
   text-align: center;
   cursor: pointer;
@@ -2532,32 +2533,33 @@ html.map-hold, html.map-hold * {
   line-height: var(--msglog-line);
 }
 
-/* A field over the map: the strip's level (--tc-fill), amber only as the
-   caret. */
+/* A field over the map, on the same fill as the Ctrl-F / line-box field
+   (.input-dialog-field); amber only as the caret. Never the strip's level
+   (--tc-fill): at ~1.1:1 on black the field vanished, and its placeholder
+   read as DCSS darkgrey map glyphs (mock round r22, 2026-10-07). */
 .game-text-input {
-  background: var(--tc-fill);
+  background: var(--surface2);
   border: none;
   border-radius: var(--r-key);
   color: var(--text);
   -webkit-text-fill-color: var(--text);
   caret-color: var(--accent);
   font-family: var(--font-mono);
-  font-size: 16px;
+  /* The log's size. Sub-16px is safe from iOS focus auto-zoom only via the
+     viewport meta (see .rc-editor-text). */
+  font-size: var(--msglog-font);
   padding: 0.15rem 0.5rem;
   outline: none;
-  width: 12ch;
+  width: calc(12ch + 1rem);  /* 12ch of text inside the padding */
 }
 
 /* text-field.ts's "tap to type", dim: the fields' text-fill-color would
    paint it as typed text. */
 .game-text-input::placeholder, .input-dialog-field::placeholder {
-  color: var(--text-dim);
-  -webkit-text-fill-color: var(--text-dim);
-  opacity: 0.6;
+  color: var(--text-faint);
+  -webkit-text-fill-color: var(--text-faint);
+  opacity: 1;
 }
-/* At the log's size: the field's 16px only exists to stop iOS zooming on
-   focus. */
-.game-text-input::placeholder { font-size: var(--msglog-font); }
 
 #numpad-input {
   position: fixed;
@@ -2678,18 +2680,20 @@ html.map-hold, html.map-hold * {
   -webkit-text-fill-color: var(--text);
   caret-color: var(--accent);
   font-family: var(--font-mono);
-  /* 16px keeps iOS Safari from auto-zooming on focus */
-  font-size: 16px;
+  /* The prompt's size (.input-dialog-prompt). Sub-16px is safe from iOS
+     focus auto-zoom only via the viewport meta (see .rc-editor-text). */
+  font-size: 0.95rem;
   padding: 0.4rem 0.6rem;
   outline: none;
 }
 
 /* Menu filter input (Ctrl-F search). Inline-sized so it flows next to the
-   prompt label in the title bar. */
+   prompt label in the title bar, at the title's size. */
 .menu-filter-input {
   flex: 1 1 auto;
   min-width: 0;
   padding: 0.15rem 0.4rem;
+  font-size: inherit;
 }
 
 .menu-filter-prompt {
@@ -2785,7 +2789,6 @@ html.map-hold, html.map-hold * {
 
 .seed-btn-primary {
   background: var(--accent);
-  border-color: var(--accent);
   color: var(--bg);
   font-weight: bold;
   min-width: 9rem;
@@ -3355,14 +3358,7 @@ html.map-hold, html.map-hold * {
 /* word-spacing tightens the literal spaces between the XL/progress/@/$ readouts
    to the unified 5.3px inter-readout gap (matches AC↔EV, Noise↔Time, etc.). */
 .hg-xl-place { flex: 0 0 auto; white-space: nowrap; word-spacing: -0.15em; }
-.hg-quiver {
-  font-size: 0.72rem;
-  line-height: 1.2;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
+.hg-quiver,
 .hg-wq {
   font-size: 0.72rem;
   line-height: 1.2;
@@ -3459,19 +3455,6 @@ html.map-hold, html.map-hold * {
   line-height: 1;
   flex: 0 0 auto;
   white-space: nowrap;
-}
-
-#game-lobby-btn {
-  align-self: flex-end;
-  background: var(--surface);
-  border: none;
-  border-radius: var(--r-key);
-  color: var(--text-dim);
-  font-family: var(--font-mono);
-  font-size: 0.7rem;
-  padding: 0.2rem 0.5rem;
-  cursor: pointer;
-  margin-top: 0.15rem;
 }
 
 /* Game UI overlay (char creation, menus, descriptions) */
@@ -3822,11 +3805,10 @@ html.map-hold, html.map-hold * {
   flex-direction: row-reverse;
   gap: 0.75rem;
 }
-/* Quiet outlined buttons, matching the lobby exit dialog's tone: a prompt
-   like "Transfer? / No" is a real either/or, so neither choice should shout
-   as a filled accent CTA. Normal weight, body text on a transparent fill with
-   a hairline border for tap affordance; --press on :active is the same
-   press feedback as .lobby-exit-close. */
+/* Quiet buttons, matching the lobby exit dialog's tone: a prompt like
+   "Transfer? / No" is a real either/or, so neither choice should shout as
+   a filled accent CTA. Normal weight on the neutral control fill; --press
+   on :active is the same press feedback as .lobby-exit-close. */
 .dialog-body .button,
 .dialog-body input[type="button"] {
   float: none !important;
@@ -3981,9 +3963,6 @@ html.map-hold, html.map-hold * {
    ("za" → "Za"; capitalize uppercases just the first letter). */
 #game-view.shift-on .spell-letter { text-transform: capitalize; }
 
-/* Terminal-mode: engaged when server sends scroll positions */
-.overlay-body--term .overlay-line { white-space: nowrap; }
-
 .overlay-footer {
   color: var(--text);
   font-size: var(--fs-overlay-chrome);
@@ -4001,10 +3980,12 @@ html.map-hold, html.map-hold * {
   border-top: none;
 }
 /* In the layout actions bar the choices are a row of keys, drawn as the
-   strip's keys (the controls right under them), not a lighter chip. Here
-   only: the same .action-btn sits in the log's prompt rows and the
-   X-describe strip, which stay transparent over the map (below). */
-.overlay-actions .action-btn {
+   strip's keys (the controls right under them), not a lighter chip. Scoped
+   to .layout-actions, not .overlay-actions: the random-combo confirm
+   (newgame-view.ts) shares that bar class, and the same .action-btn sits in
+   the log's prompt rows and the X-describe strip — all stay transparent
+   (below). */
+.layout-actions .action-btn {
   min-height: 2rem;
   padding: 0 0.7rem;
   background: var(--tc-fill);
@@ -4013,15 +3994,15 @@ html.map-hold, html.map-hold * {
   color: var(--tc-label);
   font-size: 0.8rem;
 }
-.overlay-actions .action-btn:active { background: var(--tc-press); color: var(--accent); }
+.layout-actions .action-btn:active { background: var(--tc-press); color: var(--accent); }
 
-/* Engine-offered choices as buttons (prompt rows, X-describe strip, layout
-   actions bar, random-combo confirm). Neutral edge, like the chat pill —
-   the other thing drawn over the map. Never an amber border: amber alpha is
-   the emphasis ladder (--border 12% → --border-card 22% → --accent-line
-   35%), and at a strength that reads over tiles it lands on --accent-line,
-   putting near-accent outlines on every prompt option. Transparent on
-   purpose: the log's text already shows the map through. */
+/* Engine-offered choices as buttons (prompt rows, X-describe strip,
+   random-combo confirm). Neutral edge, like the chat pill — the other
+   thing drawn over the map. Never an amber border: an amber outline strong
+   enough to read over tiles lands on --accent-line, putting near-accent
+   outlines on every prompt option, and accent is for state (see
+   --accent-line). Transparent on purpose: the log's text already shows the
+   map through. */
 .action-btn {
   background: transparent;
   border: 1px solid color-mix(in srgb, var(--text-dim) 45%, transparent);
@@ -4507,18 +4488,14 @@ html.map-hold, html.map-hold * {
 .menu-ctrl-btn[data-shift="true"].active {
   background: var(--accent);
   color: var(--bg);
-  border-color: var(--accent);
 }
 .menu-ctrl-btn[data-shift="true"].locked {
   background: var(--warn);
   color: var(--bg);
-  border-color: var(--warn);
   box-shadow: inset 0 0 0 1px var(--bg);
 }
 
 /* ── Unified touch controls ─────────────────────────────────── */
-/* Token block shared with the settings pad preview (.set-dpad-pad), so the
-   specimen buttons can't drift from the strip's real resting look. */
 /* The game-key palette: the strip, and everything that draws the strip's
    keys elsewhere (virtual keyboard, the settings d-pad specimen, the
    control-set editor's grids and key picker, the describe actions bar)
@@ -4529,10 +4506,9 @@ html.map-hold, html.map-hold * {
 .set-dpad-pad,
 .ed-grid,
 .ed-picker-keys,
-.overlay-actions,
+.layout-actions,
 #menu-controls,
-.size-palette,
-.game-text-input {
+.size-palette {
   /* D-pad cell size (consumed by .tc-dpad / .tc-dpad-btn) — also sets the
      whole strip's height via the max-height calc below, so the settings
      slider scales the macro panel along with the d-pad. User-adjustable:
@@ -4546,15 +4522,14 @@ html.map-hold, html.map-hold * {
   --tc-btn-min-h: 2rem;
   /* Resting palette below the whole chrome ladder: at night the map is
      sparse dim glyphs on near-black, so --text/--surface buttons outshine
-     the play area. In-game chrome over the map (palette, in-log field,
-     chat chip) sits at this level too. Presses brighten to --surface3
+     the play area. The size palette over the map sits at this level too
+     (not a lone text field: .game-text-input). Presses brighten to --surface3
      (+ accent label), so tap feedback stays crisp against the dim resting
      state. Keys separate by fill alone — no outline. */
   --tc-fill: #161715;
   --tc-press: var(--surface3);
   --tc-label: var(--text-dim);
   --tc-label-dim: var(--text-faint);  /* the wait btn */
-  --tc-border: transparent;
 }
 
 #touch-controls {
@@ -4585,7 +4560,7 @@ html.map-hold, html.map-hold * {
 
 /* Spectator bar: occupies the same `touch` slot the d-pad would, so swapping
    from playing to spectating doesn't change overall vertical layout.
-   Layout mirrors the lobby header ("← Lobby" ghost button on the left,
+   Layout mirrors the lobby header ("‹ Lobby" ghost button on the left,
    "Spectating · @user" label on the right). */
 #spectator-bar {
   --bar-pad: 0.3rem;
@@ -4645,7 +4620,7 @@ html.map-hold, html.map-hold * {
 
 .tc-dpad-btn {
   background: var(--tc-fill);
-  border: 1px solid var(--tc-border);
+  border: 1px solid transparent;
   border-radius: var(--r-key);
   color: var(--tc-label);
   font-size: 1.4rem;
@@ -4687,7 +4662,7 @@ html.map-hold, html.map-hold * {
 .tc-esc,
 .tc-enter {
   background: var(--tc-fill);
-  border: 1px solid var(--tc-border);
+  border: 1px solid transparent;
   border-radius: var(--r-key);
   color: var(--tc-label);
   font-size: 0.8rem;
@@ -4708,7 +4683,7 @@ html.map-hold, html.map-hold * {
 .tc-enter:active,
 .tc-enter.pressed { background: var(--tc-press); color: var(--accent); }
 
-/* Tab strip: a segmented control — ONE bordered track holding borderless
+/* Tab strip: a segmented control — ONE filled track holding fill-less
    segments, the selected one a filled lozenge. The tabs used to be styled
    as the same bordered-button family as the Esc/Enter actions flanking
    them, so the active tab read as "a pressed button" and nothing marked
@@ -4726,7 +4701,7 @@ html.map-hold, html.map-hold * {
   flex-direction: row;
   flex: 1;
   background: var(--tc-fill);
-  border: 1px solid var(--tc-border);
+  border: 1px solid transparent;
   border-radius: var(--r-key);
   /* 1px inset for the lozenge: iOS insets its segment 2pt in a 32pt track
      (~12% per edge); 2px here on a 22px track was ~27% and read as a
@@ -4805,7 +4780,7 @@ html.map-hold, html.map-hold * {
   height: calc(var(--tc-dpad) * 3 + 4px);
   box-sizing: border-box;
   padding: 2px;
-  border: 1px solid var(--tc-border);
+  border: 1px solid transparent;
   border-radius: var(--r-key);
 }
 .minimap-xslot { line-height: 0; }  /* no descender gap under the inline canvas */
@@ -4840,7 +4815,7 @@ html.map-hold, html.map-hold * {
 .tc-btn {
   flex: 1;
   background: var(--tc-fill);
-  border: 1px solid var(--tc-border);
+  border: 1px solid transparent;
   border-radius: var(--r-key);
   color: var(--tc-label);
   font-family: var(--font-mono);
@@ -4892,7 +4867,7 @@ html.map-hold, html.map-hold * {
   align-content: start;
   padding: 4px;
   background: var(--tc-fill);
-  border: 1px solid var(--tc-border);
+  border: 1px solid transparent;
   border-radius: var(--r-key);
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
@@ -4922,7 +4897,7 @@ html.map-hold, html.map-hold * {
 .tc-kbd {
   flex: 1;
   background: var(--tc-fill);
-  border: 1px solid var(--tc-border);
+  border: 1px solid transparent;
   border-radius: var(--r-key);
   color: var(--tc-label);
   font-size: 0.65rem;
@@ -4966,8 +4941,8 @@ html.map-hold, html.map-hold * {
   bottom: 0;
   z-index: var(--z-game-panel);
   background: var(--bg);
-  /* Standard region-seam hairline (see the chat-sheet comment) — the old
-     2px accent seam out-shouted every other edge on screen. */
+  /* The region-seam hairline (--border) — the old 2px accent seam
+     out-shouted every other edge on screen. */
   border-top: 1px solid var(--border);
   /* Full-bleed to the screen edge; the capped insets ride inside as padding
      so the bottom key row clears the home-indicator gesture zone and, in
@@ -5221,9 +5196,6 @@ html.map-hold, html.map-hold * {
      cell also reaches the screen bottom here (portrait parks the menu keys
      there), so keep the last rows clear of the home-indicator zone. */
   #ui-overlay {
-    grid-area: map;
-    position: relative;
-    z-index: var(--z-map-overlay);
     padding-left: max(0.5rem, var(--safe-left));
     padding-bottom: max(0.75rem, var(--safe-bottom));
   }
@@ -5348,10 +5320,7 @@ html.map-hold, html.map-hold * {
     padding-bottom: max(0.25rem, var(--safe-bottom));
   }
 
-  #map-wrap { grid-area: map; }
-
   #game-hud {
-    grid-area: hud;
     border-top: none;
     overflow-y: auto;
     /* The place chip's hit-area bleed (padding/negative-margin pair) pokes
@@ -5379,11 +5348,6 @@ html.map-hold, html.map-hold * {
   .hg-bar-pair .hg-hp,
   .hg-bar-pair .hg-mp { flex: none; }
 
-  /* Split touch controls so d-pad and panel become separate grid cells */
-  #touch-controls {
-    display: contents;
-  }
-
   /* D-pad floats over the map's bottom-left corner (the same float trick
      as the message log above), with translucent buttons so the map reads
      through. */
@@ -5405,9 +5369,8 @@ html.map-hold, html.map-hold * {
     background: color-mix(in srgb, var(--surface2) 20%, transparent);
     color: color-mix(in srgb, var(--text) 40%, transparent);
     /* The 20%-opaque fill leaves the border as the button's visible edge
-       over the map, so the app-wide border is needed here — the dimmer
-       --tc-border is tuned for the solid portrait strip and all but
-       disappears on a floating translucent button. */
+       over the map: the strip keys' 1px border is transparent (they
+       separate by fill), so a floating translucent button colours it. */
     border-color: var(--border);
   }
   /* The center "·" (.wait) has its own dimmer color at higher specificity than
@@ -5476,7 +5439,7 @@ html.map-hold, html.map-hold * {
      no spells) and that must keep winning. */
   #game-messages { display: flex  !important; }
   #game-hud      { display: flex  !important; }
-  #touch-controls { display: contents !important; }
+  #touch-controls { display: contents !important; }  /* d-pad and panel become separate grid cells */
   /* ...except the macro panel while the menu bar is up: the bar takes the
      same `panel` area (game-view's setMenuBar), and a panel left in flow
      there sizes the minmax(max-content) row to its own height, so the bar
@@ -5790,15 +5753,7 @@ html.map-hold, html.map-hold * {
 .set-row, .set-action-row, .settings-nav { position: relative; }
 .set-row + .set-row::before,
 .set-row-actions + .set-row::before,
-.set-action-rows > *::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: var(--row-text-x, 1.25rem);
-  right: 1.25rem;
-  height: 0.5px;
-  background: var(--separator);
-}
+.set-action-rows > *::before { --sep-inset: var(--row-text-x, 1.25rem); }
 /* Control-set list: tap a row to activate; ⋯ reveals per-set actions. The
    leading ✓ column puts every row's text at --row-text-x. */
 .set-list, .set-action-rows { --row-text-x: 3.05rem; }
@@ -6062,7 +6017,7 @@ html.map-hold, html.map-hold * {
 }
 .set-dpad-specimen {
   background: var(--tc-fill);
-  border: 1px solid var(--tc-border);
+  border: 1px solid transparent;
   border-radius: var(--r-key);
   color: var(--tc-label);
   font-size: 1.4rem;
@@ -6330,6 +6285,8 @@ html.map-hold, html.map-hold * {
 /* current = what the slot holds now (the active-state gray); armed = first
    tap of the two-tap send (an amber ring + label) */
 .ed-key.current { background: var(--surface3); color: var(--text); }
+/* --tc-press IS --surface3, so the current key presses a step lighter */
+.ed-key.current:active { background: var(--press); color: var(--accent); }
 .ed-key.armed { box-shadow: inset 0 0 0 2px var(--accent); color: var(--accent); }
 /* Footer: quiet text actions — one row of filled buttons per page (the
    editor's Cancel/Save) is enough */
@@ -6399,9 +6356,10 @@ html.map-hold, html.map-hold * {
 
 /* Transient preview of an incoming message while the sheet is closed.
    Sits just above the floating message log (and spell rail, for casters).
-   Speech-bubble shape on purpose; the dashed border is what lifts it off
-   the map (the old solid var(--border) hairline vanished against dark
-   glyphs). Wraps to two lines, then ellipsizes — the clamp lives on the
+   Speech-bubble shape on purpose. Near-transparent over the map, so the
+   border alone marks it — keep it, not a fill (user ruling 2026-10-07);
+   it's text-dim, since a var(--border) hairline vanished against dark
+   glyphs. Wraps to two lines, then ellipsizes — the clamp lives on the
    inner .chat-pill-text because WebKit lets clamped overflow ghost through
    the padding when the clamp sits on the padded box itself. */
 #chat-pill {
@@ -6575,6 +6533,9 @@ html.map-hold, html.map-hold * {
   border-radius: var(--r-bar);
   padding: 0.6rem 0.75rem;
   text-align: left;
+  /* Every line is game data. Set here, not inherited: the doll-tap card
+     mounts in .doc-backdrop, one of the --font-ui roots. */
+  font-family: var(--font-mono);
 }
 .char-card-tappable { cursor: pointer; }
 :root:not(.press-cancelled) .char-card-tappable:active { background: var(--press); transition: background-color 0s var(--press-delay); }
@@ -6596,7 +6557,7 @@ html.map-hold, html.map-hold * {
   white-space: nowrap;
 }
 .char-card-head-title { font-weight: 400; color: var(--text-dim); }
-.char-card-sub { color: var(--text-dim); font-size: 0.78rem; }
+.char-card-sub { color: var(--text-dim); font-size: 0.8125rem; }
 /* Fact-separator middot (char-card.ts joinedLine/sepSpan): margins set the
    gap — a text ' · ' join costs three full mono cells, too wide at phone
    width (thin/hair spaces fall back to the full space advance in this
@@ -6611,7 +6572,7 @@ html.map-hold, html.map-hold * {
 .char-card-fact { white-space: nowrap; }
 .char-card-result {
   color: var(--text);
-  font-size: 0.8rem;
+  font-size: 0.8125rem;
   /* Online verbose blurbs are multi-line morgue text (death line + "..."
      continuations, hiscores.cc); keep their breaks, show them whole — a
      line clamp was tried and cut normal blurbs at phone width. */
@@ -6620,7 +6581,7 @@ html.map-hold, html.map-hold * {
 .char-card-kind-won { color: var(--ok); }
 .char-card-kind-dead { color: var(--danger); }
 .char-card-kind-quit, .char-card-kind-left, .char-card-kind-saved, .char-card-kind-other { color: var(--text-dim); }
-.char-card-god { color: var(--text-dim); font-size: 0.78rem; font-style: italic; }
+.char-card-god { color: var(--text-dim); font-size: 0.8125rem; font-style: italic; }
 /* Values in the HUD's lightgrey (.fg7, #hud-stats' default). */
 .char-card-stats { color: var(--color-7); font-size: 0.75rem; font-family: var(--font-mono); }
 /* Per-stat label tints, muted to sit inside the amber theme. */
@@ -6703,7 +6664,7 @@ html.map-hold, html.map-hold * {
    segmented control in the header chips' family (.lobby-account-chip) — the
    2px track padding comes off the segments' so both are one height. */
 /* margin-left:auto pins the control to the right edge — .crypt-header has no
-   justify-content, so without it it'd sit flush against ← Back. */
+   justify-content, so without it it'd sit flush against ‹ Back. */
 .records-sort {
   display: flex;
   margin-left: auto;
@@ -6742,9 +6703,9 @@ html.map-hold, html.map-hold * {
   padding-right: max(0.5rem, var(--safe-right));
 }
 .records-morgue-title {
-  margin-left: auto; /* right edge, opposite ← Back (header has no justify) */
+  margin-left: auto; /* right edge, opposite ‹ Back (header has no justify) */
   color: var(--text-dim);
-  font-size: 0.8rem;
+  font-size: 0.8125rem;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;

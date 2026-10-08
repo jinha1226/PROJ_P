@@ -483,7 +483,7 @@ export class LayoutView {
 
   private actionsBar(actionsText: string): HTMLElement {
     const bar = document.createElement('div')
-    bar.className = 'overlay-footer overlay-actions'
+    bar.className = 'overlay-footer overlay-actions layout-actions'
     const tokens = actionsText.replace(/\.\s*$/, '').split(/,\s*|\s+or\s+/)
     for (const token of tokens) {
       // ", or " gets split into ", " + "or X" because the comma alternative

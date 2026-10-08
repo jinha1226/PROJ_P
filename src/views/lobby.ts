@@ -515,9 +515,8 @@ export function buildLobbyView(
       ? `<span class="lobby-game-spectators">${g.spectator_count} spectator${g.spectator_count === 1 ? '' : 's'}</span>`
       : ''
     const id = String(g.id)
-    const isIdle = idleSinceMs.has(id)
     const row = document.createElement('div')
-    row.className = 'lobby-game-row' + (isIdle ? ' is-idle' : '')
+    row.className = 'lobby-game-row'
     row.setAttribute('role', 'button')
     row.tabIndex = 0
     row.innerHTML = `

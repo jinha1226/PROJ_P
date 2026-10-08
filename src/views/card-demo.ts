@@ -204,7 +204,7 @@ function mountDollStrip(host: HTMLElement, recipe: DollRecipe | null): void {
 }
 
 export function toggleCardDemo(): void {
-  // ← Back / Escape close the shell without telling us — isConnected is the truth.
+  // ‹ Back / Escape close the shell without telling us — isConnected is the truth.
   if (openView?.view.isConnected) { openView.close(); openView = null; return }
   openView = mountCryptShell('records-view card-demo',
     '<span class="records-morgue-title">Card gallery (dev)</span>', `<style>${DEMO_CSS}</style><div class="records-list"></div>`)

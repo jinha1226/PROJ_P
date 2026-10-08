@@ -132,7 +132,7 @@ function renderHome(body: HTMLElement): void {
 // (settings covers the whole screen, so without one the resize would be
 // adjusted blind). The full 3×3 shows what one button alone can't — the
 // pad's overall footprint. It tracks --pz-dpad via CSS; no re-render needed
-// on tap. In portrait the whole strip scales with the d-pad (its height cap
+// as the slider moves. In portrait the whole strip scales with the d-pad (its height cap
 // derives from --tc-dpad); in landscape only the floating d-pad does.
 function renderDpadSection(body: HTMLElement): void {
   const cell = section(body, 'D-pad')
@@ -277,8 +277,7 @@ function segPref<K extends 'mapRenderMode' | 'monsterListMode' | 'loginSprites'>
 }
 
 // Re-mark `chosen` as the selected radio among its group's children (class +
-// aria-checked). Shared by segPref and sliderPref, whose children are all
-// radio buttons.
+// aria-checked). segPref's children are all radio buttons.
 function markChecked(group: HTMLElement, chosen: Element): void {
   for (const sib of group.children) {
     sib.classList.toggle('active', sib === chosen)
