@@ -527,7 +527,8 @@ export function buildLoginView(
       ${againNotice ? `<p id="login-sheet-msg" class="login-sheet-msg">${escHtml(againNotice)}</p>` : ''}
       <form id="login-form" autocomplete="on" novalidate>${formInnerHtml}</form>
       <p class="login-sheet-foot">No account?
-        <a class="login-sheet-register" target="_blank" rel="noopener"></a></p>
+        <a class="login-sheet-register" target="_blank" rel="noopener"></a>.<br>
+        Pick a server near you for lower latency.</p>
     `
     const select = body.querySelector<HTMLSelectElement>('#server-select')!
     const userInput = body.querySelector<HTMLInputElement>('#login-user')!
@@ -536,10 +537,21 @@ export function buildLoginView(
     const btn = body.querySelector<HTMLButtonElement>('#login-btn')!
     const register = body.querySelector<HTMLAnchorElement>('.login-sheet-register')!
 
+    // Region as group headers, not in the option text: "host · region"
+    // overran the closed row for 7 of 9 servers at 402px and clipped the
+    // region (measured 2026-10-08).
+    const groups = new Map<string, HTMLOptGroupElement>()
     for (const s of KNOWN_SERVERS) {
+      let g = groups.get(s.region)
+      if (!g) {
+        g = document.createElement('optgroup')
+        g.label = s.region
+        groups.set(s.region, g)
+        select.appendChild(g)
+      }
       const o = document.createElement('option')
       o.value = s.wsUrl; o.textContent = s.label
-      select.appendChild(o)
+      g.appendChild(o)
     }
     // The signed-out identity, else the most-recently-used session's server.
     const initial = refill?.wsUrl ?? listSessions()[0]?.wsUrl
