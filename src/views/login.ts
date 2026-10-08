@@ -533,7 +533,10 @@ export function buildLoginView(
         conn.send({ msg: 'set_login_cookie' })
         onLogin({ conn, username: msg.username })
       } else if (msg.msg === 'login_fail') {
-        showError(msg.message || 'Login failed.')
+        // No reason = a plain password mismatch or unknown user
+        // (ws_handler.py login); a reason ("Account is disabled.") is the
+        // server's own sentence.
+        showError(msg.reason || 'Incorrect username or password.')
         conn.close()
         btn.disabled = false
         btn.textContent = 'Connect'

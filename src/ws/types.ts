@@ -129,10 +129,12 @@ export interface GameExit {
 
 export type ServerMsg =
   | { msg: 'login_success'; username: string }
-  | { msg: 'login_fail'; message: string }
+  // `reason` only when the server has one (ws_handler.py login: absent on a
+  // plain password mismatch and on every token-login failure).
+  | { msg: 'login_fail'; reason?: string }
   | { msg: 'auth_error'; reason: string }
   | { msg: 'login_cookie'; cookie: string; expires: number }
-  | { msg: 'register_fail'; message: string }
+  | { msg: 'register_fail'; reason: string }
   | { msg: 'ping' }
   | { msg: 'close'; reason?: string }
   | { msg: 'set_layer'; layer: 'lobby' | 'game' | 'crt' }

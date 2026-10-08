@@ -230,7 +230,7 @@ describe('resumeOnConn — played game', () => {
     withSession()
     const { conn, feed } = fakeConn()
     const p = resumeOnConn(conn, { kind: 'play', gameId: 'dcss-0.34' }, { username: USER, guest: false }, fakeUi())
-    feed({ msg: 'login_fail', message: 'nope' })
+    feed({ msg: 'login_fail' })
     await expect(p).rejects.toBeInstanceOf(ResumeFatal)
     expect(loadSession(WS_URL, USER)).toBeNull()
   })

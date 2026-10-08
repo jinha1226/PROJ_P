@@ -36,7 +36,7 @@ describe('listenOnce (password login hand-over)', () => {
     const outcomes: string[] = []
     listenOnce(conn, (m) => outcomes.push(m.msg))
     conn.onMessage({ msg: 'lobby_complete' })
-    conn.onMessage({ msg: 'login_fail', message: 'nope' })
+    conn.onMessage({ msg: 'login_fail' })
     expect(outcomes).toEqual(['login_fail'])
     expect(conn.onMessage).toBe(prev)
     expect(before).toEqual(['lobby_complete'])
