@@ -29,7 +29,7 @@ import { escHtml } from '../game/dcss-colors'
 import { paintAvatars, type DollRecipe } from './avatar-tiles'
 import { resolveRuneSource, sourceSprite } from './rune-sprites'
 import { dropTileLoader, TEX } from '../game/tiles/tile-loader'
-import { maybeShowExitDialog } from './lobby'
+import { maybeShowExitDialog, setLobbyNotice, type NoticeKind } from './lobby'
 import { openRcEditor } from './rc-editor'
 import { openGameRecords } from './records-view'
 import { liveDollRecipe, materializeDollSidecars, readGameRecords } from '../offline/game-records'
@@ -206,10 +206,8 @@ export function buildOfflineLobbyView(
     gatedRun(() => launch(name))
   }
 
-  const showNotice = (text: string): void => {
-    noticeEl.textContent = text
-    noticeEl.hidden = text === ''
-  }
+  const showNotice = (text: string, kind?: NoticeKind): void =>
+    setLobbyNotice(noticeEl, text, kind)
 
   // --- New character -------------------------------------------------------
 
@@ -770,7 +768,7 @@ export function buildOfflineLobbyView(
     // back as a failure.
     if (readiness?.state === 'offline-not-cached'
       || (readiness?.state === 'ready' && readiness.deploy === 'unreachable')) {
-      showNotice('No connection — connect once to download the offline data.')
+      showNotice('No connection — connect once to download the offline data.', 'error')
       return false
     }
     // The deploy serves only its current build, so finishing a partial set
@@ -796,7 +794,7 @@ export function buildOfflineLobbyView(
       const name = readiness ? packName(readiness) : 'Game data'
       await downloadOfflineData((label) => setReadiness('dim', name, label))
     } catch (e) {
-      showNotice(`Download failed: ${errMsg(e)}`)
+      showNotice(`Download failed: ${errMsg(e)}`, 'error')
     }
     downloading = false
     downloadBtn.disabled = false
@@ -838,7 +836,7 @@ export function buildOfflineLobbyView(
           showNotice('Backup exported.')
         }
       } catch (e) {
-        showNotice(`Export failed: ${errMsg(e)}`)
+        showNotice(`Export failed: ${errMsg(e)}`, 'error')
       }
     })()
   })
@@ -848,7 +846,7 @@ export function buildOfflineLobbyView(
   // lobby is mounted. The editor writes only on Save (rc-editor.ts).
 
   view.querySelector('#offline-rc')!.addEventListener('click', () => {
-    void openRcEditor(showNotice).catch((e: unknown) => showNotice(`Could not open the options file: ${errMsg(e)}`))
+    void openRcEditor(showNotice).catch((e: unknown) => showNotice(`Could not open the options file: ${errMsg(e)}`, 'error'))
   })
 
   view.querySelector('#offline-import')!.addEventListener('click', () => {
@@ -867,7 +865,7 @@ export function buildOfflineLobbyView(
           const when = meta.exportedAt ? ` from ${meta.exportedAt.slice(0, 10)}` : ''
           showNotice(`Restored backup${when}.`)
         } catch (e) {
-          showNotice(`Import failed: ${errMsg(e)}`)
+          showNotice(`Import failed: ${errMsg(e)}`, 'error')
         }
         // The pack can carry both save files and the logfile; refresh every
         // surface either lands on.

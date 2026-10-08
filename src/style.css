@@ -1473,10 +1473,37 @@ button.lobby-account-chip:active { background: var(--press); }
   z-index: 1;
   background: var(--surface);
   border-radius: var(--r-bar);
-  box-shadow: inset 3px 0 0 var(--warn);
   color: var(--text);
   font-size: 0.9375rem;
   padding: 0.75rem 1.25rem;
+}
+/* The kind's leading mark (setLobbyNotice in lobby.ts). Never an edge
+   stripe: an inset shadow on a rounded cell is clipped by the radius into a
+   crescent. Line box = mark height, so flex-start puts the mark on the first
+   line of a wrapped error and still centres it on a
+   single one. */
+.lobby-notice[data-kind] {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  line-height: 1.25rem;
+}
+.lobby-notice[data-kind]::before {
+  content: '';
+  flex: none;
+  width: 1.25rem;
+  height: 1.25rem;
+  border-radius: 50%;
+}
+/* Ring at .reconnect-spinner */
+.lobby-notice[data-kind="progress"] { color: var(--text-dim); }
+.lobby-notice[data-kind="error"]::before {
+  content: '!';
+  background: var(--warn);
+  color: var(--bg);
+  font-size: 0.8125rem;
+  font-weight: 700;
+  text-align: center;
 }
 
 /* One grouped list: rows share a cell, separators inset at both ends */
@@ -5670,19 +5697,23 @@ html.map-hold, html.map-hold * {
   align-items: stretch;
   gap: 0.4rem;
 }
-/* A thin neutral ring with an amber arc — the one moving thing on screen. */
 .reconnect-spinner {
   flex: none;
   width: 1.25rem;
   height: 1.25rem;
   border-radius: 50%;
+}
+/* A thin neutral ring with an amber arc — the one moving thing on screen. */
+.reconnect-spinner,
+.lobby-notice[data-kind="progress"]::before {
   border: 2px solid var(--surface4);
   border-top-color: var(--accent);
   animation: reconnect-spin 0.8s linear infinite;
 }
 @keyframes reconnect-spin { to { transform: rotate(360deg); } }
 @media (prefers-reduced-motion: reduce) {
-  .reconnect-spinner { animation-duration: 2.4s; }
+  .reconnect-spinner,
+  .lobby-notice[data-kind="progress"]::before { animation-duration: 2.4s; }
 }
 .reconnect-status {
   color: var(--text);

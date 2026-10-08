@@ -17,6 +17,18 @@ import { isBelowSupportCutoff, parseDcssVersion } from '../util/dcss-version'
 import { attachScrollCue } from '../util/scroll-cue'
 import { registerViewDispose } from './view-dispose'
 
+/** A `#lobby-notice` line, online and offline lobby alike. The kind picks its
+ *  leading mark (style.css `.lobby-notice[data-kind]`): a spinner while
+ *  something is in flight, a warn badge when it failed, none for plain info.
+ *  Empty text hides the notice. */
+export type NoticeKind = 'info' | 'progress' | 'error'
+export function setLobbyNotice(el: HTMLElement, text: string, kind: NoticeKind = 'info'): void {
+  el.textContent = text
+  el.hidden = text === ''
+  if (kind === 'info') delete el.dataset['kind']
+  else el.dataset['kind'] = kind
+}
+
 export function buildLobbyView(
   conn: GameConnection,
   username: string,
@@ -193,15 +205,14 @@ export function buildLobbyView(
         // pick made there leave the same trace.
         setLastSpectateServer(wsUrl)
         chip.disabled = true
-        noticeEl.textContent = `Connecting to ${labelFor(wsUrl)}…`
-        noticeEl.hidden = false
+        setLobbyNotice(noticeEl, `Connecting to ${labelFor(wsUrl)}…`, 'progress')
         // By the time it resolves this view is gone — swapped for the new
         // server's lobby, or for whatever the user navigated to meanwhile. So
         // only the failure path has anything left to clean up, and it leaves
         // the current lobby live.
         void onSwitchServer!(wsUrl).catch(() => {
           chip.disabled = false
-          noticeEl.textContent = `Could not connect to ${labelFor(wsUrl)}.`
+          setLobbyNotice(noticeEl, `Could not connect to ${labelFor(wsUrl)}.`, 'error')
         })
       })
     }
@@ -256,8 +267,7 @@ export function buildLobbyView(
     game_ended: onGameEnded,
     auth_error: (msg) => {
       abortGameStart()
-      noticeEl.textContent = msg.reason
-      noticeEl.hidden = false
+      setLobbyNotice(noticeEl, msg.reason, 'error')
     },
     // A previous session of ours still holds the game's lockfile (typical
     // after a phone app-swap: the server hasn't noticed the dead socket
@@ -265,15 +275,11 @@ export function buildLobbyView(
     // save, then proceeds to game_started on its own — without this notice
     // the lobby just sits silently unresponsive for 10–20s.
     stale_processes: () => {
-      noticeEl.textContent =
-        'Closing your previous session — the game will start in a moment…'
-      noticeEl.hidden = false
+      setLobbyNotice(noticeEl,
+        'Closing your previous session — the game will start in a moment…', 'progress')
     },
     'force_terminate?': () => showForceTerminatePrompt(),
-    hide_dialog: () => {
-      noticeEl.textContent = ''
-      noticeEl.hidden = true
-    },
+    hide_dialog: () => setLobbyNotice(noticeEl, ''),
   })
 
   conn.onMessage = handleMsg
@@ -359,10 +365,6 @@ export function buildLobbyView(
   // The stale process didn't exit when asked; the server wants a yes/no.
   // Yes force-kills it (skipping its save), no abandons the play attempt.
   function showForceTerminatePrompt(): void {
-    noticeEl.textContent = ''
-    noticeEl.hidden = false
-    const label = document.createElement('div')
-    label.textContent = FORCE_TERMINATE_WARNING
     const actions = document.createElement('div')
     actions.className = 'lobby-notice-actions'
     const yes = document.createElement('button')
@@ -373,13 +375,14 @@ export function buildLobbyView(
     no.textContent = 'Leave it'
     const answer = (a: boolean) => () => {
       conn.send({ msg: 'force_terminate', answer: a })
-      noticeEl.textContent = a ? 'Force-closing previous session…' : ''
-      noticeEl.hidden = !a
+      if (a) setLobbyNotice(noticeEl, 'Force-closing previous session…', 'progress')
+      else setLobbyNotice(noticeEl, '')
     }
     yes.addEventListener('click', answer(true))
     no.addEventListener('click', answer(false))
     actions.append(yes, no)
-    noticeEl.append(label, actions)
+    setLobbyNotice(noticeEl, FORCE_TERMINATE_WARNING)
+    noticeEl.append(actions)
   }
 
   function renderGameButtons(html: string): void {

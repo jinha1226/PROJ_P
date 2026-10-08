@@ -322,5 +322,6 @@ describe('offline lobby: download lifecycle', () => {
     expect($('#offline-new-row').classList.contains('is-disabled')).toBe(false)
     expect($<HTMLButtonElement>('#offline-name-cancel').disabled).toBe(false)
     expect($('#lobby-notice').textContent).toContain('Download failed')
+    expect($('#lobby-notice').dataset['kind']).toBe('error')
   })
 })

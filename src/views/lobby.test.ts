@@ -385,6 +385,32 @@ describe('lobby account menu', () => {
   })
 })
 
+describe('lobby notice kinds', () => {
+  it('marks a stale-process wait as progress, and the force-close question as neither', () => {
+    const { dispatch, view } = setupLobby()
+    const notice = view.querySelector<HTMLElement>('#lobby-notice')!
+    dispatch({ msg: 'stale_processes', timeout: 15, game: 'test-game' })
+    expect(notice.dataset['kind']).toBe('progress')
+
+    dispatch({ msg: 'force_terminate?' })
+    expect(notice.dataset['kind']).toBeUndefined() // no stale spinner beside the buttons
+    expect(notice.hidden).toBe(false)
+    expect(notice.querySelectorAll('.lobby-notice-actions button')).toHaveLength(2)
+
+    dispatch({ msg: 'hide_dialog' })
+    expect(notice.hidden).toBe(true)
+    expect(notice.dataset['kind']).toBeUndefined()
+  })
+
+  it('marks an auth_error as an error', () => {
+    const { dispatch, view } = setupLobby()
+    const notice = view.querySelector<HTMLElement>('#lobby-notice')!
+    dispatch({ msg: 'auth_error', reason: 'Spectating is restricted.' })
+    expect(notice.dataset['kind']).toBe('error')
+    expect(notice.textContent).toBe('Spectating is restricted.')
+  })
+})
+
 // The guest header's chip is a server switcher (the only way to change servers
 // without going back to the login home). It hands the pick to the app, which
 // opens the new socket before dropping the current one — so a rejected switch
@@ -428,8 +454,10 @@ describe('guest server switcher', () => {
 
     view.querySelector<HTMLButtonElement>(`.lobby-server-item[data-ws="${CBR_WS}"]`)!.click()
     expect(chip.disabled).toBe(true) // no second attempt while one is in flight
+    expect(notice.dataset['kind']).toBe('progress')
     await vi.waitFor(() => expect(chip.disabled).toBe(false))
     expect(notice.hidden).toBe(false)
+    expect(notice.dataset['kind']).toBe('error')
     expect(notice.textContent).toContain('cbro.berotato.org')
     // Still this lobby, still on the server we were watching.
     expect(view.querySelector('#lobby-server-chip .lobby-chip-tag')!.textContent).toBe('CDI')
