@@ -8,7 +8,7 @@ import type { ClientMsg } from '../ws/types'
 import type { ShiftToggle } from '../game/input/shift-state'
 import { bindPressedClass } from '../game/input/touch'
 import { escHtml } from '../game/dcss-colors'
-import { MF_MULTISELECT } from '../game/menu-model'
+import { MF_ALLOW_FILTER, MF_MULTISELECT } from '../game/menu-model'
 
 // Menus whose tag earns a permanent bottom control bar (shown on open,
 // kept under layered ui-pushes, rebuilt across input-mode changes). Every
@@ -109,10 +109,21 @@ export class MenuBar {
       // HOVERED spell (SpellMenu::process_command → examine_index), and a
       // row tap is the only hover mover here — which already selected the
       // row (describe in the `I` menu, cast in the `z` one).
+      // The M menu shares the tag (SpellLibraryMenu, spl-book.cc) and is
+      // the one carrying MF_ALLOW_FILTER — the flag is how we tell it
+      // apart. Its footer offers [Ctrl-F] search, which this bar is the
+      // only touch path to (it replaces the strip whose keyboard has Ctrl),
+      // and [?] help: its get_command maps ? to show_spell_library_help,
+      // a help screen rather than a describe. The search prompt is
+      // menu-view's filter; ⎋ while a search is applied clears it rather
+      // than closing.
       btns = [
         { label: '⎋', keycode: 27 },
         { label: '!', key: '!' },
       ]
+      if (flags !== undefined && (flags & MF_ALLOW_FILTER)) {
+        btns.push({ label: '⌃F', keycode: 6 }, { label: '?', key: '?' })
+      }
     } else if (tag === 'skills') {
       // Key roles (skill-menu.cc init_switches / init_help): ! = train
       // mode switch, ⇧ = shift-tap rows, * = show all skills, - = clear

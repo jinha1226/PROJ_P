@@ -48,6 +48,7 @@ export interface MenuMsg {
 // Menu flag bits (subset; values from the reference client enums.js).
 export const MF_MULTISELECT = 0x0004
 export const MF_WRAP = 0x0080
+export const MF_ALLOW_FILTER = 0x0100
 export const MF_ARROWS_SELECT = 0x40000
 // Paged inventory (0.34+): left/right flip between item categories. The bit
 // is 0x200000 in every version that has the feature; older servers never set

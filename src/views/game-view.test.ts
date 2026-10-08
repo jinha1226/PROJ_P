@@ -1664,6 +1664,20 @@ describe('menu handler', () => {
     expect(labels(h)).toEqual(['⎋', '!'])
     bar(h).querySelectorAll<HTMLElement>('.menu-ctrl-btn')[1].click()
     expect(sent(h).at(-1)).toEqual({ msg: 'input', text: '!' })
+    h.dispatch({ msg: 'close_menu' })
+
+    // M (SpellLibraryMenu) shares the tag and adds MF_ALLOW_FILTER (0x100):
+    // its Ctrl-F search and ? help get buttons, and the filter prompt opens
+    // on reply.
+    h.dispatch({ msg: 'menu', tag: 'spell', flags: 0xc0342, title: { text: 'Memorise' },
+      items: [{ level: 2, text: 'a - Magic Dart', hotkeys: [97] }] })
+    expect(labels(h)).toEqual(['⎋', '!', '⌃F', '?'])
+    bar(h).querySelectorAll<HTMLElement>('.menu-ctrl-btn')[3].click()
+    expect(sent(h).at(-1)).toEqual({ msg: 'input', text: '?' })
+    bar(h).querySelectorAll<HTMLElement>('.menu-ctrl-btn')[2].click()
+    expect(sent(h).at(-1)).toEqual({ msg: 'key', keycode: 6 })
+    h.dispatch({ msg: 'title_prompt', prompt: 'Search for what? (regex) ' })
+    expect(overlay(h).querySelector('.menu-filter-input')).not.toBeNull()
   })
 
   it('lays a spell menu out in columns and follows the ! toggle', () => {
