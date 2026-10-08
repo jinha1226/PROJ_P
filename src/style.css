@@ -2719,6 +2719,20 @@ html.map-hold, html.map-hold * {
   font-size: inherit;
 }
 
+/* primeSystemKeyboard's stand-in (text-field.ts): focusable, so not
+   display:none or visibility:hidden, which iOS won't focus. */
+.keyboard-stand-in {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  border: 0;
+  opacity: 0;
+  pointer-events: none;
+}
+
 .menu-filter-prompt {
   font-family: var(--font-mono);
   flex-shrink: 0;

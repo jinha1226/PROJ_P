@@ -9,6 +9,7 @@ import type { ShiftToggle } from '../game/input/shift-state'
 import { bindPressedClass } from '../game/input/touch'
 import { escHtml } from '../game/dcss-colors'
 import { MF_ALLOW_FILTER, MF_MULTISELECT } from '../game/menu-model'
+import { primeSystemKeyboard } from './text-field'
 
 // Menus whose tag earns a permanent bottom control bar (shown on open,
 // kept under layered ui-pushes, rebuilt across input-mode changes). Every
@@ -49,7 +50,10 @@ export class MenuBar {
   // The button row for a menu tag (or the bare ⎋ with none).
   build(tag?: string, flags?: number): void {
     this.clear()
-    type BtnDef = { label: string; key?: string; keycode?: number; dynamic?: true; shift?: true }
+    // opensField: the key always opens a free-text field (primeSystemKeyboard).
+    type BtnDef = {
+      label: string; key?: string; keycode?: number; dynamic?: true; shift?: true; opensField?: true
+    }
     // Server keeps the menu open for a (y/N) confirmation (e.g. shop purchase)
     // and signals it via input_mode=YESNO. Swap the row to Y/N so the user
     // has a way to answer without a keyboard.
@@ -122,7 +126,7 @@ export class MenuBar {
         { label: '!', key: '!' },
       ]
       if (flags !== undefined && (flags & MF_ALLOW_FILTER)) {
-        btns.push({ label: '⌃F', keycode: 6 }, { label: '?', key: '?' })
+        btns.push({ label: '⌃F', keycode: 6, opensField: true }, { label: '?', key: '?' })
       }
     } else if (tag === 'skills') {
       // Key roles (skill-menu.cc init_switches / init_help): ! = train
@@ -155,7 +159,7 @@ export class MenuBar {
             if (def.key) this.deps.send({ msg: 'input', text: def.key })
             else if (def.keycode) this.deps.send({ msg: 'key', keycode: def.keycode })
           }
-      const btn = this.button(def.label, fire)
+      const btn = this.button(def.label, fire, def.opensField)
       if (def.dynamic) btn.dataset.dynamic = 'accept'
       if (def.shift) {
         btn.dataset.shift = 'true'
@@ -168,8 +172,9 @@ export class MenuBar {
   // One bar button: fires on touchstart (preventDefault suppresses the
   // synthesized click, so phones respond instantly without double-firing)
   // with click as the mouse path — the only one that re-focuses the view.
-  // Every bar button goes through here so the tap feel can't drift.
-  private button(label: string, fire: () => void): HTMLButtonElement {
+  // Every bar button goes through here so the tap feel can't drift. Only
+  // the touch path primes: a mouse's click focuses the field directly.
+  private button(label: string, fire: () => void, opensField = false): HTMLButtonElement {
     const btn = document.createElement('button')
     btn.className = 'menu-ctrl-btn'
     btn.innerHTML = glyphHtml(label)
@@ -179,6 +184,7 @@ export class MenuBar {
     })
     btn.addEventListener('touchstart', (e) => {
       e.preventDefault()
+      if (opensField) primeSystemKeyboard()
       fire()
     }, { passive: false })
     bindPressedClass(btn)

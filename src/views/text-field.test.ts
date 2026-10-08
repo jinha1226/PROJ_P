@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 
-import { describe, expect, it, vi } from 'vitest'
-import { systemKeyboardField } from './text-field'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { primeSystemKeyboard, systemKeyboardField } from './text-field'
 
 function typed(input: HTMLInputElement, value: string, caret = value.length, composing = false): void {
   input.value = value
@@ -10,6 +10,9 @@ function typed(input: HTMLInputElement, value: string, caret = value.length, com
 }
 
 describe('systemKeyboardField', () => {
+  // A field left focused by an earlier test would hold off every prime.
+  beforeEach(() => { (document.activeElement as HTMLElement | null)?.blur() })
+
   it('turns smart punctuation back into ASCII, keeping the caret after the same text', () => {
     const input = systemKeyboardField('f')
     document.body.appendChild(input)
@@ -47,6 +50,62 @@ describe('systemKeyboardField', () => {
     coarse.mockReturnValue({ matches: false } as MediaQueryList)
     expect(systemKeyboardField('f').placeholder).toBe('')
     coarse.mockRestore()
+  })
+
+  it('a field focused from the primed stand-in drops "tap to type"', () => {
+    const coarse = vi.spyOn(window, 'matchMedia').mockReturnValue({ matches: true } as MediaQueryList)
+    primeSystemKeyboard()
+    const input = systemKeyboardField('f')
+    document.body.appendChild(input)
+    expect(input.placeholder).toBe('tap to type')
+    input.focus()
+    expect(input.placeholder).toBe('')
+    input.remove()
+    coarse.mockRestore()
+  })
+
+  it('text typed into the stand-in before the field arrives moves into the field', () => {
+    primeSystemKeyboard()
+    const standIn = document.activeElement as HTMLInputElement
+    standIn.value = 'ring'
+    const input = systemKeyboardField('f')
+    input.value = 'a '
+    const echoed: string[] = []
+    input.addEventListener('input', () => echoed.push(input.value))
+    document.body.appendChild(input)
+    input.focus()
+    expect(input.value).toBe('a ring')
+    expect(echoed).toEqual(['a ring'])
+    expect(standIn.value).toBe('')
+    input.remove()
+  })
+
+  it('never takes the focus from a field that already has it', () => {
+    const chat = document.createElement('input')
+    document.body.appendChild(chat)
+    chat.focus()
+    primeSystemKeyboard()
+    expect(document.activeElement).toBe(chat)
+    chat.remove()
+  })
+
+  it('does nothing on Android', () => {
+    const ua = vi.spyOn(navigator, 'userAgent', 'get').mockReturnValue('Mozilla/5.0 (Linux; Android 15)')
+    primeSystemKeyboard()
+    expect((document.activeElement as HTMLElement | null)?.className).not.toBe('keyboard-stand-in')
+    ua.mockRestore()
+  })
+
+  it('the stand-in gives the keyboard back when no field arrives', () => {
+    vi.useFakeTimers()
+    primeSystemKeyboard()
+    const standIn = document.activeElement as HTMLElement
+    expect(standIn.className).toBe('keyboard-stand-in')
+    vi.advanceTimersByTime(1999)
+    expect(document.activeElement).toBe(standIn)
+    vi.advanceTimersByTime(1)
+    expect(document.activeElement).not.toBe(standIn)
+    vi.useRealTimers()
   })
 
   it('an IME-confirming Enter reaches no later handler', () => {

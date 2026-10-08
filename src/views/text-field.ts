@@ -18,7 +18,26 @@ const SMART_PUNCTUATION: Record<string, string> = {
 const SMART_RE = /[‘’“”—–…]/g
 const asciiPunctuation =(s: string): string => s.replace(SMART_RE, c => SMART_PUNCTUATION[c])
 
-export function systemKeyboardField(className: string): HTMLInputElement {
+// A control known to open a field can spare the player that tap: inside its
+// own touch handler it focuses this stand-in, which raises the keyboard, and
+// the field's focus() a round trip later moves the focus on. That move rests
+// on iOS keeping a showing keyboard up across a scripted focus change between
+// text inputs — long-standing WebKit behaviour, not a documented contract.
+// If it ever stops holding, the field falls back to waiting for a tap. Prime
+// only for taps that reliably open a field: a miss shows the keyboard for
+// STAND_IN_MS over nothing.
+//
+// Not on Android: Chromium shows the IME for a focus made by the time the
+// tap ends, and both callers preventDefault() the touchstart, so the prime
+// is most likely a silent focus move there (reasoned from Chromium's IME
+// rules, never seen on a device).
+const STAND_IN_MS = 2000
+let standIn: HTMLInputElement | null = null
+let standInTimer = 0
+
+// One keyboard configuration for the stand-in and the fields, so the
+// handoff doesn't swap the return key or the suggestion bar mid-show.
+function textEntry(className: string): HTMLInputElement {
   const input = document.createElement('input')
   input.type = 'text'
   input.className = className
@@ -27,6 +46,29 @@ export function systemKeyboardField(className: string): HTMLInputElement {
   input.setAttribute('autocorrect', 'off')
   input.spellcheck = false
   input.enterKeyHint = 'done'
+  return input
+}
+
+export function primeSystemKeyboard(): void {
+  if (/android/i.test(navigator.userAgent)) return
+  // A field (the open filter, the chat input) already holds the keyboard.
+  const active = document.activeElement
+  if (active !== standIn && (active instanceof HTMLInputElement || active instanceof HTMLTextAreaElement)) return
+  if (!standIn) {
+    standIn = textEntry('keyboard-stand-in')
+    standIn.tabIndex = -1
+    standIn.setAttribute('aria-label', 'Keyboard')
+    standIn.addEventListener('blur', () => clearTimeout(standInTimer))
+    document.body.appendChild(standIn)
+  }
+  standIn.value = ''
+  standIn.focus({ preventScroll: true })
+  clearTimeout(standInTimer)
+  standInTimer = window.setTimeout(() => standIn?.blur(), STAND_IN_MS)
+}
+
+export function systemKeyboardField(className: string): HTMLInputElement {
+  const input = textEntry(className)
   // The wait for that tap shouldn't read as a stuck box. Touch screens only
   // (a mouse or hardware keyboard types into the focus straight away), and
   // cleared by the tap itself, never on focus: iOS does take the unprompted
@@ -60,6 +102,18 @@ export function systemKeyboardField(className: string): HTMLInputElement {
   // Safari's composition keydown).
   input.addEventListener('keydown', (e) => {
     if (e.isComposing || e.keyCode === 229) e.stopImmediatePropagation()
+  })
+  // Focus handed on from a primed stand-in arrives with the keyboard up, and
+  // brings what was typed into the stand-in during the round trip.
+  input.addEventListener('focus', (e) => {
+    if (!standIn || e.relatedTarget !== standIn) return
+    input.placeholder = ''
+    const carried = standIn.value
+    standIn.value = ''
+    if (!carried) return
+    input.value = input.value + carried
+    if (input.maxLength > 0) input.value = input.value.slice(0, input.maxLength)
+    input.dispatchEvent(new Event('input', { bubbles: true }))
   })
   return input
 }

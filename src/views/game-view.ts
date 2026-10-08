@@ -61,6 +61,7 @@ import { stripDcss } from './overlay-body'
 import { SpellHarvester, type SpellEntry } from '../game/spell-harvest'
 import { SpellRail } from './spell-rail'
 import { NumpadInput } from './numpad-input'
+import { primeSystemKeyboard } from './text-field'
 import { ChatView } from './chat-view'
 import {
   showInputDialog, showSeedSelection,
@@ -731,6 +732,14 @@ export function buildGameView(opts: GameViewOptions): HTMLElement {
   // The touch strip's and the Android back gesture's way in: an injected Esc
   // means exactly what a tapped one does.
   function dispatchTouchInput(msg: ClientMsg): void {
+    // At the command prompt Ctrl-F always opens the stash search's in-log
+    // field (main.cc CMD_SEARCH_STASHES → search_stashes, stash.cc); in X
+    // mode it is CMD_MAP_FORGET and opens none, and the router swallows it
+    // under client panels and a harvest — idleAtCommandPrompt covers all
+    // three. Ours open means ours types the field (focusForOurKbd). Touch
+    // calls this inside the tap, as primeSystemKeyboard needs.
+    if (!spectating && msg.msg === 'key' && msg.keycode === 6
+      && idleAtCommandPrompt() && !touchControls.isKbdOpen()) primeSystemKeyboard()
     routeInput(touchInput(msg), routerTargets)
   }
 
