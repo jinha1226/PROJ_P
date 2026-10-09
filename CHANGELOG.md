@@ -9,7 +9,7 @@ formatting and HTML chrome differ. Drift is a bug.
 
 ## 2026-10-08
 
-- *Your surroundings suddenly seem different.*
+- *Your surroundings seem slightly different.*
 - Added `^F` and `?` to the `M` menu.
 - Improved the control set editor.
 - Other improvements.
