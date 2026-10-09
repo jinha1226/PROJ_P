@@ -4778,11 +4778,12 @@ html.map-hold, html.map-hold * {
   flex-direction: row;
   flex: 1;
   background: var(--tc-fill);
-  border: 1px solid transparent;
   border-radius: var(--r-key);
   /* 1px inset for the lozenge: iOS insets its segment 2pt in a 32pt track
      (~12% per edge); 2px here on a 22px track was ~27% and read as a
-     lozenge that failed to fill. 0 would make it a flush button again. */
+     lozenge that failed to fill. 0 would make it a flush button again.
+     No border here, not even the transparent one .tc-esc/.tc-enter carry:
+     it adds to the padding, making the inset 2px. */
   padding: 1px;
   height: 1.4rem;  /* = .tc-esc/.tc-enter (border-box); segments stretch inside */
 }
