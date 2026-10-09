@@ -12,7 +12,6 @@ formatting and HTML chrome differ. Drift is a bug.
 - *Your surroundings suddenly seem different.*
 - Added `^F` and `?` to the `M` menu.
 - Improved the control set editor.
-- Servers are now grouped by location to help new players choose one.
 - Other improvements.
 
 ## 2026-10-04
