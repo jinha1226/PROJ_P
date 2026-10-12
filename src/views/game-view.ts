@@ -61,7 +61,7 @@ import { stripDcss } from './overlay-body'
 import { SpellHarvester, type SpellEntry } from '../game/spell-harvest'
 import { SpellRail } from './spell-rail'
 import { NumpadInput } from './numpad-input'
-import { primeSystemKeyboard } from './text-field'
+import { kbdTrace, primeSystemKeyboard } from './text-field'
 import { ChatView } from './chat-view'
 import {
   showInputDialog, showSeedSelection,
@@ -732,15 +732,36 @@ export function buildGameView(opts: GameViewOptions): HTMLElement {
   // The touch strip's and the Android back gesture's way in: an injected Esc
   // means exactly what a tapped one does.
   function dispatchTouchInput(msg: ClientMsg): void {
-    // At the command prompt Ctrl-F always opens the stash search's in-log
-    // field (main.cc CMD_SEARCH_STASHES → search_stashes, stash.cc); in X
-    // mode it is CMD_MAP_FORGET and opens none, and the router swallows it
-    // under client panels and a harvest — idleAtCommandPrompt covers all
-    // three. Ours open means ours types the field (focusForOurKbd). Touch
-    // calls this inside the tap, as primeSystemKeyboard needs.
-    if (!spectating && msg.msg === 'key' && msg.keycode === 6
-      && idleAtCommandPrompt() && !touchControls.isKbdOpen()) primeSystemKeyboard()
-    routeInput(touchInput(msg), routerTargets)
+    routeInput(touchInput(msg), touchTargets)
+  }
+
+  // A touch Ctrl-F the router hands to the engine at the command prompt
+  // opens the stash search's in-log field (main.cc CMD_SEARCH_STASHES →
+  // search_stashes, stash.cc) a round trip later, so the tap primes the
+  // system keyboard (text-field.ts) on the router's verdict. Touch routes
+  // inside the tap, as primeSystemKeyboard needs. Never gate this on
+  // idleAtCommandPrompt: the minimap lens lets keys through (routeInput
+  // claims only Esc for it), so the field opens under it, keyboard or not.
+  const touchTargets: RouterTargets = {
+    ...routerTargets,
+    send: (msg) => {
+      if (!spectating && msg.msg === 'key' && msg.keycode === 6) {
+        const blocker = searchFieldBlocker()
+        if (blocker) kbdTrace('prime skipped', blocker)
+        else primeSystemKeyboard()
+      }
+      routerTargets.send(msg)
+    },
+  }
+  // Why a routed Ctrl-F would open no field, or null when it will. The
+  // harvest's late-base phase passes keys but its probe menu may still be
+  // open server-side (spell-harvest.ts), where Ctrl-F opens nothing: a prime
+  // there holds the keyboard over nothing for STAND_IN_MS.
+  function searchFieldBlocker(): string | null {
+    if (touchControls.isKbdOpen()) return 'our keyboard types the field'
+    if (!uiQuiet()) return 'not at the command prompt'
+    if (!harvester.channelIdle()) return 'a harvest reply is still due: the key may land in its menu'
+    return null
   }
 
   const touchControls: TouchControls = buildTouchControls(dispatchTouchInput, spectating ? {} : {

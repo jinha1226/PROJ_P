@@ -3424,3 +3424,72 @@ describe('messages routed to the views that own them', () => {
     expect(body.scrollTop).toBe(500)
   })
 })
+
+// The stand-in prime on a strip Ctrl-F: game-view's touchTargets.
+describe('strip Ctrl-F primes the system keyboard', () => {
+  const standInFocused = () => (document.activeElement as HTMLElement | null)?.className === 'keyboard-stand-in'
+  const tapCtrlF = (h: Harness) => {
+    h.view.querySelector<HTMLElement>('.tc-tab[data-tab="macro"]')!.click()
+    const btn = [...h.view.querySelectorAll<HTMLButtonElement>('#touch-controls .tc-btn')]
+      .find(b => b.textContent === '^F')!
+    btn.click()
+  }
+  const sentCtrlF = (h: Harness) => sent(h).some(m => m.msg === 'key' && m.keycode === 6)
+  const startHarvest = () => (window as unknown as { __dcssHarvestSpells: () => void }).__dcssHarvestSpells()
+  afterEach(() => { vi.useRealTimers() })
+
+  it('at the command prompt', () => {
+    const h = setupAtCommand()
+    tapCtrlF(h)
+    expect(sentCtrlF(h)).toBe(true)
+    expect(standInFocused()).toBe(true)
+  })
+
+  it('with the minimap lens open (keys pass through the lens)', () => {
+    const h = setupAtCommand()
+    h.dispatch({ msg: 'player', hp: 10, hp_max: 10, place: 'Dungeon', depth: 3 })
+    h.view.querySelector<HTMLElement>('.hud-place-chip')!.click()
+    expect(h.view.querySelector('.minimap-lens')).not.toBeNull()
+    tapCtrlF(h)
+    expect(sentCtrlF(h)).toBe(true)
+    expect(standInFocused()).toBe(true)
+  })
+
+  it("not in a harvest's late-base window: the key passes, but may land in the still-open probe menu", () => {
+    vi.useFakeTimers()
+    const h = setupAtCommand()
+    startHarvest()
+    vi.advanceTimersByTime(1500)
+    tapCtrlF(h)
+    expect(sentCtrlF(h)).toBe(true)
+    expect(standInFocused()).toBe(false)
+  })
+
+  it('not while a harvest owns the channel (the router swallows the key)', () => {
+    const h = setupAtCommand()
+    startHarvest()
+    tapCtrlF(h)
+    expect(sentCtrlF(h)).toBe(false)
+    expect(standInFocused()).toBe(false)
+  })
+
+  it('not under the monster panel (the router swallows the key)', () => {
+    const h = setupAtCommand()
+    h.dispatch({ msg: 'map', cells: [{ x: 5, y: 5, g: 'o', col: 7, mon: { id: 1, name: 'orc', att: 1, type: 1 } }] })
+    h.view.querySelector<HTMLElement>('#monster-list')!.click()
+    expect(overlay(h).querySelector('.mp-list')).not.toBeNull()
+    tapCtrlF(h)
+    expect(sentCtrlF(h)).toBe(false)
+    expect(standInFocused()).toBe(false)
+  })
+
+  it('not while the search field is already open (the strip drops the key)', () => {
+    const h = setupAtCommand()
+    h.dispatch({ msg: 'input_mode', mode: 0 })
+    h.dispatch({ msg: 'init_input', type: 'messages', prefill: '', maxlen: 80 })
+    expect(msgLog(h).querySelector('.game-text-input')).not.toBeNull()
+    tapCtrlF(h)
+    expect(sentCtrlF(h)).toBe(false)
+    expect(standInFocused()).toBe(false)
+  })
+})

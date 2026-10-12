@@ -11,6 +11,8 @@
 // iOS Smart Punctuation (Settings › General › Keyboard) rewrites quotes and
 // "--" as the player types, and autocorrect="off" doesn't stop it. Game
 // text (inscriptions, searches, notes) means the ASCII the player typed.
+import { devRingPush } from '../util/dev-ring'
+
 const SMART_PUNCTUATION: Record<string, string> = {
   '‘': "'", '’': "'", '“': '"', '”': '"',
   '—': '--', '–': '-', '…': '...',
@@ -25,7 +27,10 @@ const asciiPunctuation =(s: string): string => s.replace(SMART_RE, c => SMART_PU
 // text inputs — long-standing WebKit behaviour, not a documented contract.
 // If it ever stops holding, the field falls back to waiting for a tap. Prime
 // only for taps that reliably open a field: a miss shows the keyboard for
-// STAND_IN_MS over nothing.
+// STAND_IN_MS over nothing (and a hardware keyboard types into the stand-in
+// meanwhile), while a budget shorter than the round trip is a field with no
+// keyboard. Unmeasured either way: a "stand-in gave up" entry in
+// __dcssKbdLog followed by a cold field focus is the case for raising it.
 //
 // Not on Android: Chromium shows the IME for a focus made by the time the
 // tap ends, and both callers preventDefault() the touchstart, so the prime
@@ -34,6 +39,17 @@ const asciiPunctuation =(s: string): string => s.replace(SMART_RE, c => SMART_PU
 const STAND_IN_MS = 2000
 let standIn: HTMLInputElement | null = null
 let standInTimer = 0
+
+// DEV: window.__dcssKbdLog, the last KBD_LOG_MAX prime decisions and field
+// focus arrivals {ts, event, detail} — on a phone, read it over Safari's
+// remote inspector. Which side dropped a keyboard (our gate, the stand-in's
+// give-up, or iOS across the handoff) can't be told from the screen.
+const KBD_LOG_MAX = 50
+export function kbdTrace(event: string, detail?: string): void {
+  if (!import.meta.env.DEV) return
+  devRingPush('__dcssKbdLog', KBD_LOG_MAX,
+    detail === undefined ? { ts: Date.now(), event } : { ts: Date.now(), event, detail })
+}
 
 // One keyboard configuration for the stand-in and the fields, so the
 // handoff doesn't swap the return key or the suggestion bar mid-show.
@@ -53,18 +69,23 @@ export function primeSystemKeyboard(): void {
   if (/android/i.test(navigator.userAgent)) return
   // A field (the open filter, the chat input) already holds the keyboard.
   const active = document.activeElement
-  if (active !== standIn && (active instanceof HTMLInputElement || active instanceof HTMLTextAreaElement)) return
+  if (active !== standIn && (active instanceof HTMLInputElement || active instanceof HTMLTextAreaElement)) {
+    kbdTrace('prime skipped', 'a field holds the focus')
+    return
+  }
   if (!standIn) {
     standIn = textEntry('keyboard-stand-in')
     standIn.tabIndex = -1
     standIn.setAttribute('aria-label', 'Keyboard')
     standIn.addEventListener('blur', () => clearTimeout(standInTimer))
-    document.body.appendChild(standIn)
   }
+  // A detached input takes no focus (a body wipe takes the stand-in with it).
+  if (!standIn.isConnected) document.body.appendChild(standIn)
   standIn.value = ''
   standIn.focus({ preventScroll: true })
+  kbdTrace('primed', document.activeElement === standIn ? 'stand-in focused' : 'stand-in NOT focused')
   clearTimeout(standInTimer)
-  standInTimer = window.setTimeout(() => standIn?.blur(), STAND_IN_MS)
+  standInTimer = window.setTimeout(() => { kbdTrace('stand-in gave up'); standIn?.blur() }, STAND_IN_MS)
 }
 
 export function systemKeyboardField(className: string): HTMLInputElement {
@@ -106,7 +127,11 @@ export function systemKeyboardField(className: string): HTMLInputElement {
   // Focus handed on from a primed stand-in arrives with the keyboard up, and
   // brings what was typed into the stand-in during the round trip.
   input.addEventListener('focus', (e) => {
-    if (!standIn || e.relatedTarget !== standIn) return
+    if (!standIn || e.relatedTarget !== standIn) {
+      if (import.meta.env.DEV) kbdTrace('field focused cold', `${className}; from ${(e.relatedTarget as Element | null)?.className || 'nothing'}`)
+      return
+    }
+    kbdTrace('field focused from stand-in', className)
     input.placeholder = ''
     const carried = standIn.value
     standIn.value = ''
