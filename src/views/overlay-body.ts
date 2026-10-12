@@ -233,6 +233,26 @@ function matchLabel(line: string): RegExpMatchArray | null {
     ?? line.match(/^([^\s<][^<]{0,17}?:)()(?=[^\s<])/)
 }
 
+// The deepest column text hangs at, in ch: the widest real DBRAND label
+// ("Manifold Assault:" — art-data.txt) fills it. Beyond it a label row
+// hangs compactly and an indented line wraps flush, so one cap serves
+// both — a block's later paragraphs are indented by the label row's hang
+// column and must hang the same way.
+const MAX_HANG_COL = 18
+
+// The column a marked label row's wrapped text hangs at: the description
+// column itself up to MAX_HANG_COL, else a compact 2ch. The mundane-ego
+// run-in form `'Of X': ` always takes the compact hang — its column is its
+// full natural width, too deep on a phone. The quote prefix is what marks
+// the run-in form, not the padding-space count: a column-aligned artprop
+// label whose name exactly fills the column has only ONE trailing space
+// (e.g. `Corpsefed: `, padded to 11) and must still hang at its column,
+// level with its 2+-space siblings (`rMiasma:`, `^Drain:`).
+function hangColumn(shape: string): number {
+  const pm = matchLabel(shape)
+  return pm && pm[0].length <= MAX_HANG_COL && !shape.startsWith("'") ? pm[0].length : 2
+}
+
 // An item examined from Ctrl-F search results has the search's first match
 // recoloured in its description (stash.cc StashSearchMenu::examine_index →
 // annotate_string("lightcyan"), trunk and 0.34.1 alike), sent through
@@ -273,15 +293,31 @@ export function unwrapHangingIndents(body: string, searchHighlight = false): str
     const m = shielded ? null : matchLabel(shape)
     if (m) {
       const col = m[1].length + m[2].length
-      const contRe = new RegExp(`^ {${col}}(?=\\S)`)
+      // _format_prop_desc pads EVERY newline of the description, so the
+      // block is every following line that carries the column: text after
+      // it, or nothing at all — a blank line between paragraphs arrives as
+      // exactly `col` spaces (trunk egos.txt "mesmerism" is the first armour
+      // ego with two paragraphs; 0.34.1 has none). A pad-only line that no
+      // continuation follows is not part of the block.
+      const pad = ' '.repeat(col)
+      const contRe = new RegExp(`^ {${col}}(?=\\S|$)`)
       let j = i + 1
       while (j < lines.length && contRe.test(lines[j])) j++
+      while (j > i + 1 && lines[j - 1] === pad) j--
       if (j > i + 1) {
-        // Keep line 1 verbatim (label + original padding) — renderBodyLines
-        // re-derives the description column from it to set the hang width,
-        // so wrapped text aligns under the description column.
-        const joined = [line, ...lines.slice(i + 1, j).map(l => l.slice(col))].join(' ')
-        out.push(HANG_MARK + joined)
+        // Strip the padding and the description is back as the formatter
+        // received it: paragraphs separated by a blank line. Keep line 1
+        // verbatim (label + original padding) — renderBodyLines re-derives
+        // the description column from it to set the hang width, so wrapped
+        // text aligns under the description column. Later paragraphs have
+        // no label: they go out unmarked behind a blank line, indented by
+        // the block's hang column, and renderBodyLines' indented-prose rule
+        // hangs them at that depth — so every line of them sits in the
+        // description column, as the server lays them out.
+        const paras = [line, ...lines.slice(i + 1, j).map(l => l.slice(col))]
+          .join('\n').split(/\n{2,}/).map(p => p.replace(/\n/g, ' '))
+        out.push(HANG_MARK + paras[0])
+        for (const para of paras.slice(1)) out.push('', ' '.repeat(hangColumn(shape)) + para)
         for (let k = i + 1; k < j; k++) trackTags(lines[k])
         i = j - 1
         continue
@@ -295,11 +331,11 @@ export function unwrapHangingIndents(body: string, searchHighlight = false): str
       // description column like the joined blocks; rows that fit render
       // pixel-identical to the nowrap form. Guards: padding ≥2 spaces (a
       // single space is ordinary prose, e.g. "Mesmerism radius: 2"), short
-      // label, description column ≤18 (the widest real formatter column —
+      // label, description column ≤MAX_HANG_COL (the widest real formatter column —
       // excludes right-aligned-to-col-80 layouts like the god-powers
       // "Granted powers:        (Cost)" header), and no multi-space runs in
       // the remainder (multi-column rows keep their alignment).
-      if (m[2].length >= 2 && m[1].length <= 16 && col <= 18 && !/ {3,}/.test(shape.slice(col))) {
+      if (m[2].length >= 2 && m[1].length <= 16 && col <= MAX_HANG_COL && !/ {3,}/.test(shape.slice(col))) {
         out.push(HANG_MARK + line)
         continue
       }
@@ -355,26 +391,12 @@ export function renderBodyLines(rawBody: string, highlight: string, terminal = f
     // necessarily at index 0. The marked line keeps its original
     // `label + padding` prefix; re-derive the description column from it so
     // wrapped text aligns under the column (the body is monospace, so Nch
-    // matches N wire characters exactly). Padded columns are honored up to
-    // 18ch (the widest real DBRAND label, "Manifold Assault:") — beyond
-    // that, and for single-space run-in labels like `'Of mesmerism': `,
-    // fall back to a compact 2ch hang.
+    // matches N wire characters exactly; hangColumn has the rules).
     const hang = line.includes(HANG_MARK)
     let hangStyle = ''
     if (hang) {
       line = line.replace(HANG_MARK, '')
-      const shape = searchHighlight ? liftSearchHighlight(line) : line
-      const pm = matchLabel(shape)
-      const col = pm ? pm[0].length : 0
-      // Hang wrapped text at the description column so the block stays aligned.
-      // Exception: the mundane-ego run-in form `'Of X': ` hangs at a compact
-      // 2ch default (its column is its full natural width, too deep on a
-      // phone). Don't gate on the padding-space count — a column-aligned
-      // artprop label whose name exactly fills the column has only ONE trailing
-      // space (e.g. `Corpsefed: `, padded to 11), and must still hang at its
-      // column to line up with its 2+-space siblings (`rMiasma:`, `^Drain:`).
-      // The quote prefix is what marks the run-in form, not the space count.
-      if (pm && col <= 18 && !shape.startsWith("'")) hangStyle = ` style="--hang-col:${col}ch"`
+      hangStyle = ` style="--hang-col:${hangColumn(searchHighlight ? liftSearchHighlight(line) : line)}ch"`
     }
     if (!terminal && !hang) {
       const stat = tryStatRow(line)
@@ -402,7 +424,7 @@ export function renderBodyLines(rawBody: string, highlight: string, terminal = f
     // continuations stay aligned under the sub-item instead of falling
     // flush-left. The leading spaces render on line 1 as-is; the negative
     // text-indent/padding pair only moves the wrapped lines. Deeply indented
-    // lines (>18) are left alone. Skip past any leading colour-markup tags:
+    // lines (>MAX_HANG_COL) are left alone. Skip past any leading colour-markup tags:
     // opens-only bodies (formatted_string::to_colour_string, e.g. msg.status)
     // get reopened tags prepended at each line start by
     // balanceColorTagsAcrossLines, so the indent no longer sits at column 0 —
@@ -416,7 +438,7 @@ export function renderBodyLines(rawBody: string, highlight: string, terminal = f
       const m = /^((?:<[^>]+>)*)( {2,})(.*)$/.exec(line)
       const hasText = !!m && m[3].replace(/<[^>]+>/g, '').trim() !== ''
       const ind = m && hasText && !/<\/?darkgrey>/.test(m[1]) ? m[2].length : 0
-      if (ind > 0 && ind <= 18) {
+      if (ind > 0 && ind <= MAX_HANG_COL) {
         cls += ' overlay-line--hang'
         hangStyle = ` style="--hang-col:${ind}ch"`
       }

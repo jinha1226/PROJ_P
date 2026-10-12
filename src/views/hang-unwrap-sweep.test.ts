@@ -1,17 +1,21 @@
-// One-off sweep: run unwrapHangingIndents against wire bodies generated from
-// the REAL game strings in the DCSS 0.34.1 reference source, replicating the
-// server's formatting pipeline (unwrap_desc → _format_prop_desc /
-// _format_dbrand: greedy word-wrap at 80−prefix cols, continuation lines
-// padded to the description column). Asserts word-for-word fidelity of every
-// joined block. Skipped automatically when the reference checkout is absent.
+// Sweep: run unwrapHangingIndents against wire bodies generated from the
+// REAL game strings in the DCSS reference sources, replicating the server's
+// formatting pipeline (unwrap_desc → _format_prop_desc / _format_dbrand:
+// greedy word-wrap at 80−prefix cols, continuation lines padded to the
+// description column). Asserts word-for-word fidelity of every joined block.
+// Runs once per reference checkout present — stable AND trunk, because new
+// text shapes land on trunk first (the multi-paragraph mesmerism ego exists
+// only there) — and skips a checkout that is absent.
 
 import { describe, it, expect } from 'vitest'
-import { readFileSync, existsSync, writeFileSync } from 'node:fs'
+import { readFileSync, readdirSync, existsSync, writeFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { unwrapHangingIndents, plainStatSegments, HANG_MARK } from './overlay-body'
 
-const SRC = resolve(__dirname, '../../../crawl-0.34.1/crawl-ref/source')
-const hasRef = existsSync(SRC)
+// Both always listed — an absent one skips its tests (an empty
+// describe.each registers none, and vitest fails a file with no tests).
+const REFS = ['crawl-0.34.1', 'crawl-trunk']
+  .map(name => ({ name, src: resolve(__dirname, `../../../${name}/crawl-ref/source`) }))
 
 // --- server-side replication ---------------------------------------------
 
@@ -79,8 +83,8 @@ function formatDbrand(dbrand: string): string {
 
 // --- data file parsing -----------------------------------------------------
 
-function parseEgosTxt(): { key: string; desc: string }[] {
-  const raw = readFileSync(resolve(SRC, 'dat/descript/egos.txt'), 'utf8')
+function parseEgosTxt(src: string): { key: string; desc: string }[] {
+  const raw = readFileSync(resolve(src, 'dat/descript/egos.txt'), 'utf8')
   const out: { key: string; desc: string }[] = []
   for (const entry of raw.split('%%%%')) {
     const lines = entry.replace(/^\n+/, '').split('\n')
@@ -93,8 +97,8 @@ function parseEgosTxt(): { key: string; desc: string }[] {
 
 // art-data.txt: DBRAND:/DESCRIP: values; leading-space lines continue the
 // previous field joined with ' '; leading '+' lines append with '\n'.
-function parseArtData(): { name: string; field: string; value: string }[] {
-  const raw = readFileSync(resolve(SRC, 'art-data.txt'), 'utf8')
+function parseArtData(src: string): { name: string; field: string; value: string }[] {
+  const raw = readFileSync(resolve(src, 'art-data.txt'), 'utf8')
   const out: { name: string; field: string; value: string }[] = []
   let name = ''
   let prevField = ''
@@ -180,9 +184,9 @@ const words = (s: string) => s.split(/\s+/).filter(Boolean)
 
 interface Case { source: string; label: string; desc: string; wire: string }
 
-function buildCases(): Case[] {
+function buildCases(src: string): Case[] {
   const cases: Case[] = []
-  for (const { key, desc } of parseEgosTxt()) {
+  for (const { key, desc } of parseEgosTxt(src)) {
     const unwrapped = unwrapDesc(desc).trim()
     if (!unwrapped) continue
     // Armour egos go through _format_prop_desc (describe.cc:2338 mundane
@@ -209,7 +213,7 @@ function buildCases(): Case[] {
         wire: formatPropDesc('Mesmerism:'.padEnd(MAX_ARTP_NAME_LEN + 1), unwrapped) })
     }
   }
-  for (const { name, field, value } of parseArtData()) {
+  for (const { name, field, value } of parseArtData(src)) {
     for (const power of value.split('\n')) {
       const ci = power.indexOf(':')
       if (ci === -1) continue
@@ -224,21 +228,20 @@ function buildCases(): Case[] {
   return cases
 }
 
-describe.skipIf(!hasRef)('unwrapHangingIndents vs the full description corpus', () => {
+describe.each(REFS)('unwrapHangingIndents vs $name', ({ name, src }) => {
   // Regression net for the rest of the game's text: every entry in every
   // descript DB file (plus the quotes DB), processed the way the server
   // does (unwrap_desc + 80-col wrap), must produce ZERO marked lines —
   // padded-label rows only ever come from the C++ formatters, so any mark
   // here is a false positive that changed how prose/verse/diagrams render.
-  it('marks nothing in raw DB prose, quotes, and pre-formatted blocks', () => {
-    const { readdirSync } = require('node:fs') as typeof import('node:fs')
-    const files = readdirSync(resolve(SRC, 'dat/descript'))
-      .filter((f: string) => f.endsWith('.txt'))
-      .map((f: string) => `dat/descript/${f}`)
+  it.skipIf(!existsSync(src))('marks nothing in raw DB prose, quotes, and pre-formatted blocks', () => {
+    const files = readdirSync(resolve(src, 'dat/descript'))
+      .filter(f => f.endsWith('.txt'))
+      .map(f => `dat/descript/${f}`)
     let entries = 0
     const marked: string[] = []
     for (const file of files) {
-      const raw = readFileSync(resolve(SRC, file), 'utf8')
+      const raw = readFileSync(resolve(src, file), 'utf8')
       for (const entry of raw.split('%%%%')) {
         const lines = entry.replace(/^\n+/, '').split('\n')
         const key = lines[0]?.trim()
@@ -262,20 +265,19 @@ describe.skipIf(!hasRef)('unwrapHangingIndents vs the full description corpus', 
         }
       }
     }
-    writeFileSync('/tmp/hang-corpus-stats.txt',
+    writeFileSync(`/tmp/hang-corpus-stats-${name}.txt`,
       `files: ${files.length}\nentries: ${entries}\nmarked: ${marked.length}\n` + marked.join('\n'))
     expect(entries).toBeGreaterThan(1000)
     expect(marked).toEqual([])
   })
-})
 
-describe.skipIf(!hasRef)('unwrapHangingIndents vs real DCSS strings', () => {
-  it('handles every block word-for-word: multi-line joined, padded single-line collapsed, prose untouched', () => {
-    const cases = buildCases()
+  it.skipIf(!existsSync(src))('handles every block word-for-word: multi-line joined, padded single-line collapsed, prose untouched', () => {
+    const cases = buildCases(src)
     expect(cases.length).toBeGreaterThan(100)
     let joined = 0
     let collapsed = 0
     let untouched = 0
+    let multiParagraph = 0
     const anomalies: string[] = []
     for (const c of cases) {
       const result = unwrapHangingIndents(c.wire)
@@ -304,18 +306,25 @@ describe.skipIf(!hasRef)('unwrapHangingIndents vs real DCSS strings', () => {
       if (JSON.stringify(got) !== JSON.stringify(want)) {
         anomalies.push(`${c.source}: word mismatch\n got: ${got.join(' ')}\nwant: ${want.join(' ')}`)
       }
-      // no residual staircase: nothing left over that still carries the
-      // server's continuation padding (would catch partial joins)
-      if (resultLines.slice(1).some(l => /^ {4,}/.test(l))) {
-        anomalies.push(`${c.source}: residual indented line:\n${result}`)
+      // Nothing may follow the marked line except the description's later
+      // paragraphs, each behind a blank line (their indent is presentation,
+      // pinned by the game-view tests). This also rules out a residual
+      // staircase — lines still carrying the server's continuation padding
+      // after a partial join.
+      const paras = c.desc.split('\n').filter(Boolean)
+      const wantTail = paras.slice(1).flatMap(p => ['', p])
+      if (JSON.stringify(resultLines.slice(1).map(l => l.trimStart())) !== JSON.stringify(wantTail)) {
+        anomalies.push(`${c.source}: lines after the marked one differ from the later paragraphs:\n${result}`)
       }
+      if (paras.length > 1) multiParagraph++
     }
     const bySource = (p: string) => cases.filter(c => c.source.startsWith(p)).length
-    writeFileSync('/tmp/hang-sweep-stats.txt', [
+    writeFileSync(`/tmp/hang-sweep-stats-${name}.txt`, [
       `cases: ${cases.length} (armour-ego: ${bySource('ego:')}, ego-pad: ${bySource('ego-pad:')}, brand: ${bySource('brand:')}, dbrand/descrip: ${bySource('DBRAND') + bySource('DESCRIP')}, artp: ${bySource('artp:')})`,
       `multi-line joined: ${joined}`,
       `single-line collapsed: ${collapsed}`,
       `untouched prose: ${untouched}`,
+      `multi-paragraph blocks: ${multiParagraph}`,
       `anomalies: ${anomalies.length}`,
       ...anomalies,
     ].join('\n'))

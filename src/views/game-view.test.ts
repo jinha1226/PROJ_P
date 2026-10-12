@@ -1159,7 +1159,7 @@ describe('ui-push / ui-pop overlay stack', () => {
     h.dispatch({ msg: 'ui-push', type: 'describe-item', title: 'c - an orb of mesmerism', body })
     // Marked rows keep their original `label + padding` prefix; wrapped text
     // hangs at the description column (style --hang-col) for padded labels,
-    // or at the 2ch default for run-in labels like `'Of mesmerism': `.
+    // or at a compact 2ch for run-in labels like `'Of mesmerism': `.
     const hangEls = [...overlay(h).querySelectorAll<HTMLElement>('.overlay-line--hang')]
     expect(hangEls.map(el => el.textContent)).toEqual([
       "'Of mesmerism': When you are struck in melee, it briefly dazes all nearby "
@@ -1171,7 +1171,7 @@ describe('ui-push / ui-pop overlay stack', () => {
       // wrapping within the column when they don't
       'Will+:     It increases your willpower.',
     ])
-    expect(hangEls.map(el => el.style.getPropertyValue('--hang-col'))).toEqual(['', '11ch', '11ch'])
+    expect(hangEls.map(el => el.style.getPropertyValue('--hang-col'))).toEqual(['2ch', '11ch', '11ch'])
     // Single-space-after-colon lines are ordinary prose — untouched — and no
     // line carries the HANG_MARK sentinel into the DOM.
     const lines = [...overlay(h).querySelectorAll('.overlay-line')]
@@ -1179,6 +1179,55 @@ describe('ui-push / ui-pop overlay stack', () => {
     expect(radiusLine?.classList.contains('overlay-line--hang')).toBe(false)
     expect(radiusLine?.textContent).toBe('Mesmerism radius: 2 (max 4)')
     expect(lines.some(el => el.textContent?.includes('\u0001'))).toBe(false)
+  })
+
+  it('keeps a multi-paragraph ego block in its description column (trunk mesmerism)', () => {
+    const h = setup()
+    // describe.cc _format_prop_desc pads every newline of the description,
+    // so a paragraph break inside it arrives as a pad-only line (exactly the
+    // column's spaces) and the next paragraph's lines carry the column
+    // indent. Both label forms: the mundane run-in `'Of X': ` (16-col) and
+    // the artefact 11-col padded one.
+    const body = [
+      'A sphere of crystal, carried in place of a shield.',
+      '',
+      "'Of mesmerism': When you are struck in melee, it briefly dazes all nearby",
+      '                enemies, then must recharge by standing still for a while.',
+      '                ',
+      '                It goes briefly dormant whenever you enter a different',
+      '                floor.',
+      '',
+      'Mesmerism: When you are struck in melee, it briefly dazes all nearby',
+      '           enemies, then must recharge by standing still for a while.',
+      '           ',
+      '           It goes briefly dormant whenever you enter a different floor.',
+      '',
+      'Mesmerism radius: 2 (max 4)',
+    ].join('\n')
+    h.dispatch({ msg: 'ui-push', type: 'describe-item', title: 'g - an orb of mesmerism', body })
+    const shape = [...overlay(h).querySelectorAll<HTMLElement>('.overlay-line')]
+      .map(el => `${el.className}|${el.style.getPropertyValue('--hang-col')}|${el.textContent}`)
+    // The later paragraph is its own hung line behind a blank one, led by
+    // the block's hang column in literal spaces so all of it sits in the
+    // description column: 2ch under a run-in label, 11ch under a padded one.
+    expect(shape).toEqual([
+      'overlay-line||A sphere of crystal, carried in place of a shield.',
+      'overlay-line|| ',
+      "overlay-line overlay-line--hang|2ch|'Of mesmerism': When you are struck in melee, it briefly dazes all nearby "
+        + 'enemies, then must recharge by standing still for a while.',
+      'overlay-line|| ',
+      'overlay-line overlay-line--hang|2ch|  It goes briefly dormant whenever you enter a different floor.',
+      'overlay-line|| ',
+      'overlay-line overlay-line--hang|11ch|Mesmerism: When you are struck in melee, it briefly dazes all nearby '
+        + 'enemies, then must recharge by standing still for a while.',
+      'overlay-line|| ',
+      'overlay-line overlay-line--hang|11ch|           It goes briefly dormant whenever you enter a different floor.',
+      'overlay-line|| ',
+      'overlay-line||Mesmerism radius: 2 (max 4)',
+    ])
+    // A pad-only line with no continuation after it is not a paragraph
+    // break — the block ends and the line passes through as it came.
+    expect(unwrapHangingIndents("'Of X': a b\n        c\n        \nplain")).toBe("\u0001'Of X': a b c\n        \nplain")
   })
 
   it('unwraps a zero-padded brand block whose label exactly fills the 11 column', () => {
