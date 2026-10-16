@@ -1019,13 +1019,15 @@ describe('prompt layered over the frame it covers', () => {
     h.dispatch({ msg: 'txt', id: 'crt', lines: { '0': 'old row' } })
     overlay(h).querySelector<HTMLElement>('#crt-display')!.scrollLeft = 40
     h.dispatch(PROMPT)
-    const letterRows = document.querySelectorAll('.skill-letter-row').length
-    h.dispatch({ msg: 'txt', id: 'crt', clear: true, lines: { '0': 'new row' } })
+    // The new row carries a hotkey, so a txt that leaked into the prompt's
+    // bar would mint a keyboard there.
+    h.dispatch({ msg: 'txt', id: 'crt', clear: true, lines: { '0': '  a + New row' } })
     expect(covered(h)?.textContent).toContain('old row')
     expect(covered(h)?.querySelector<HTMLElement>('#crt-display')?.scrollLeft).toBe(40)
-    expect(document.querySelectorAll('.skill-letter-row').length).toBe(letterRows)
+    expect(document.querySelectorAll('.skill-kbd')).toHaveLength(0)
     h.dispatch({ msg: 'close_menu' })
-    expect(overlay(h).querySelector('#crt-display')?.textContent).toContain('new row')
+    expect(overlay(h).querySelector('#crt-display')?.textContent).toContain('New row')
+    expect(document.querySelectorAll('.skill-kbd')).toHaveLength(1)
   })
 
   // A rejected key closes the popup and pushes a fresh one carrying the

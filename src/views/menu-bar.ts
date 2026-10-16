@@ -130,13 +130,13 @@ export class MenuBar {
       }
     } else if (tag === 'skills') {
       // Key roles (skill-menu.cc init_switches / init_help): ! = train
-      // mode switch, ⇧ = shift-tap rows, * = show all skills, - = clear
-      // targets (a visible no-op until some skill has a target set), _ =
-      // level/progress display, = = set target, / = auto/manual, ? = help.
+      // mode switch, * = show all skills, - = clear targets (a visible
+      // no-op until some skill has a target set), _ = level/progress
+      // display, = = set target, / = auto/manual, ? = help. ⇧ lives in
+      // the letter keyboard (setSkillLetters).
       btns = [
         { label: '⎋', keycode: 27 },
         { label: '!',   key: '!' },
-        { label: '⇧', shift: true },
         { label: '*',   key: '*' },
         { label: '-',   key: '-' },
         { label: '_',   key: '_' },
@@ -206,27 +206,55 @@ export class MenuBar {
     else btn.innerHTML = glyphHtml('⏎')
   }
 
-  // The skills CRT's letter row above the fixed buttons, one per hotkey the
-  // screen shows.
+  // The skills CRT's keyboard above the fixed buttons: the virtual
+  // keyboard's QWERTY shape, a key lit for each hotkey the screen shows and
+  // dimmed for the rest. Hotkeys run a–z, then 0–9 (menu.h menu_letter2),
+  // so the number row appears only once the list reaches a digit (27+
+  // selectable skills: `*` all skills, `?` help). ⇧ sits left of z as on
+  // the virtual keyboard; with no hotkey at all (distributed training, or
+  // before the rows land) there's no keyboard and no ⇧ — nothing to shift.
   setSkillLetters(letters: string[]): void {
-    let row = this.element.querySelector<HTMLElement>('.skill-letter-row')
-    if (!row) {
-      row = document.createElement('div')
-      row.className = 'skill-letter-row'
-      this.element.insertBefore(row, this.element.firstChild)
+    this.element.querySelector('.skill-kbd')?.remove()
+    if (!letters.length) return
+    const lit = new Set(letters)
+    const rows = [[...'qwertyuiop'], [...'asdfghjkl'], ['⇧', ...'zxcvbnm', '']]
+    if (letters.some(c => c >= '0' && c <= '9')) rows.unshift([...'1234567890'])
+    const kbd = document.createElement('div')
+    kbd.className = 'skill-kbd'
+    for (const keys of rows) {
+      const row = document.createElement('div')
+      row.className = 'skill-kbd-row'
+      for (const k of keys) row.appendChild(this.skillKey(k, lit))
+      kbd.appendChild(row)
     }
-    row.innerHTML = ''
+    this.element.insertBefore(kbd, this.element.firstChild)
+  }
+
+  private skillKey(k: string, lit: Set<string>): HTMLElement {
     const shift = this.deps.shift
-    for (const letter of letters) {
-      const shown = shift.isOn && /[a-z]/.test(letter) ? letter.toUpperCase() : letter
-      const btn = this.button(shown, () => {
-        const out = shift.isOn && /[a-z]/.test(letter) ? letter.toUpperCase() : letter
-        this.deps.send({ msg: 'input', text: out })
-        shift.consume()
-      })
-      btn.classList.add('skill-letter-btn')
-      row.appendChild(btn)
+    if (k === '⇧') {
+      const btn = this.button(k, () => shift.tap())
+      btn.dataset.shift = 'true'
+      btn.classList.add('skill-kbd-wide')
+      this.applyShiftBtnState(btn)
+      return btn
     }
+    const cased = () => (shift.isOn ? k.toUpperCase() : k)
+    if (!lit.has(k)) {
+      // A span, not a disabled button: no tap, no press state. The empty
+      // key is the spacer that balances ⇧.
+      const off = document.createElement('span')
+      off.className = k ? 'skill-key skill-key-off' : 'skill-kbd-wide'
+      off.textContent = cased()
+      off.setAttribute('aria-hidden', 'true')
+      return off
+    }
+    const btn = this.button(cased(), () => {
+      this.deps.send({ msg: 'input', text: cased() })
+      shift.consume()
+    })
+    btn.classList.add('skill-key')
+    return btn
   }
 
   // The shift toggle changed: its ⇧ button's state and the letter labels.
@@ -236,16 +264,14 @@ export class MenuBar {
     this.syncShiftLabels()
   }
 
-  // Skill-letter buttons echo the shift state so what the user sees matches
-  // what tapping will send. In shops the ⇧ control's own active/locked
-  // styling is the shift indicator.
+  // The skill keyboard's faces echo the shift state so what the user sees
+  // matches what tapping will send. In shops the ⇧ control's own
+  // active/locked styling is the shift indicator.
   private syncShiftLabels(): void {
     const shiftOn = this.deps.shift.isOn
-    this.element.querySelectorAll<HTMLElement>('.skill-letter-btn').forEach(el => {
+    this.element.querySelectorAll<HTMLElement>('.skill-key').forEach(el => {
       const t = el.textContent ?? ''
-      if (t.length === 1 && /[a-zA-Z]/.test(t)) {
-        el.textContent = shiftOn ? t.toUpperCase() : t.toLowerCase()
-      }
+      el.textContent = shiftOn ? t.toUpperCase() : t.toLowerCase()
     })
   }
 

@@ -4529,24 +4529,54 @@ html.map-hold, html.map-hold * {
 .menu-ctrl-btn.pressed { background: var(--tc-press); color: var(--accent); }
 .menu-ctrl-glyph { font-size: 1.25rem; line-height: 1; }
 
-.skill-letter-row {
+/* The skills CRT's keyboard (MenuBar.setSkillLetters): the virtual
+   keyboard's rows, ten keys across, at the bar's compact key height. */
+.skill-kbd {
+  --sk-gap: 0.3rem;
+  --sk-key-w: calc((100% - 9 * var(--sk-gap)) / 10);
   display: flex;
-  flex-wrap: wrap;
-  gap: 0.3rem;
-  width: 100%;
+  flex-direction: column;
+  gap: var(--sk-gap);
   flex-basis: 100%;
-  order: -1;
   padding-bottom: 0.2rem;
 }
-/* No selectable skills (distributed training) → no letter buttons. */
-.skill-letter-row:empty { display: none; }
-.skill-letter-btn {
-  flex: 0 0 auto;
-  min-width: 2.2rem;
-  max-width: unset;
-  font-size: 0.95rem;
+.skill-kbd-row {
+  display: flex;
+  justify-content: center;
+  gap: var(--sk-gap);
+}
+.skill-kbd .skill-key,
+.skill-kbd .skill-kbd-wide {
+  position: relative;
+  flex: 0 0 var(--sk-key-w);
+  min-width: 0;
+  max-width: none;
   min-height: 2.2rem;
-  padding: 0.2rem 0.3rem;
+  padding: 0;
+}
+/* ⇧ and its balancing spacer: the virtual keyboard's 1.5-key mods. */
+.skill-kbd .skill-kbd-wide { flex-basis: calc(var(--sk-key-w) * 1.5 + var(--sk-gap) / 2); }
+/* Live keys hit-test across half of each gap, overlapping by 0.5px (the
+   seam rule at .kbd-key::after), so a narrow key — ~21px in the landscape
+   sidebar — leaves no dead strip. */
+.skill-kbd .menu-ctrl-btn::after {
+  content: '';
+  position: absolute;
+  inset: calc(var(--sk-gap) / -2 - 0.5px);
+}
+/* Dimmed by lightness, not hue; a span, so no press state. */
+.skill-key-off {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--tc-fill);
+  border-radius: var(--r-key);
+  color: var(--text);
+  font-family: var(--font-mono);
+  font-size: 0.95rem;
+  opacity: 0.28;
+  user-select: none;
+  -webkit-user-select: none;
 }
 
 .menu-ctrl-btn[data-dynamic="accept"] {

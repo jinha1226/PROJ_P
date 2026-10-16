@@ -65,7 +65,7 @@ export class CrtView {
 
   private mount(tag: string | undefined): void {
     this.d.closeAutoKbd()
-    // Only skills brings its own bar (letter row + ⎋). Never hide the strip
+    // Only skills brings its own bar (letter keyboard + ⎋). Never hide the strip
     // for any other CRT: its d-pad, ⏎/⎋ and abc▴ keyboard are that screen's
     // only input. Pre-0.24 character creation is one (species list, tag "",
     // CAO 0.23 captured 2026-09-29), as are trunk's startup menu and arena.

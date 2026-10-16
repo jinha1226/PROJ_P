@@ -1866,7 +1866,7 @@ export function buildGameView(opts: GameViewOptions): HTMLElement {
     // after `!`) should keep the menu's bottom row. Same for the skills CRT
     // (`m` → `?` → letter opens a describe popup): keep the skills row (its ⎋
     // dismisses) instead of swapping in the d-pad. Fixed row only — the
-    // letter row is derived from the CRT lines and isn't rebuilt here.
+    // letter keyboard is derived from the CRT lines and isn't rebuilt here.
     if (menus.active && menuTagHasBar(menus.active.tag)) {
       menuBar.build(menus.active.tag, menus.active.flags)
       showMenuBarForStrip()
