@@ -71,9 +71,19 @@ describe('openAvatarCard', () => {
     delete a.outcome // no dump → the card itself is inert
     openAvatarCard(a)
     const bd = backdrop()!
-    bd.querySelector<HTMLElement>('.char-card')!.click()
+    const card = bd.querySelector<HTMLElement>('.char-card')!
+    // A tap = a press, then a click, on the same element.
+    const tap = (el: HTMLElement): void => {
+      el.dispatchEvent(new Event('pointerdown', { bubbles: true }))
+      el.click()
+    }
+    tap(card)
     expect(backdrop()).not.toBeNull()
+    // A press inside the card released on the scrim (a drag) clicks the backdrop.
+    card.dispatchEvent(new Event('pointerdown', { bubbles: true }))
     bd.click()
+    expect(backdrop()).not.toBeNull()
+    tap(bd)
     expect(backdrop()).toBeNull()
   })
 

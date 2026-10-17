@@ -73,6 +73,7 @@ function installInstrumentation(): void {
   instrumentMethod(TileMapView.prototype, 'fullRender', 'tiles.fullRender')
   instrumentMethod(TileMapView.prototype, 'panRender', 'tiles.panRender')
   instrumentMethod(TileMapView.prototype, 'fitToContainer', 'tiles.fit')
+  instrumentMethod(TileMapView.prototype, 'animate', 'tiles.animate')
   instrumentMethod(StatsView.prototype, 'update', 'hud.stats')
   instrumentMethod(StatusView.prototype, 'update', 'hud.status')
   instrumentMethod(MonsterListView.prototype, 'update', 'hud.monsters')
@@ -83,14 +84,14 @@ function installInstrumentation(): void {
 // promise the FIRST preloadAtlases call returns so the driver can block on
 // it (??= — later calls for the same loader early-return an already-settled
 // no-op promise, which must not displace the real one).
-let preloadPromise: Promise<void> | null = null
+let preloadPromise: Promise<unknown> | null = null
 function capturePreload(): void {
   // Same patcher instrumentMethod uses, for the same reason: a rename of
   // preloadAtlases must warn, not silently leave the run measuring the
   // ASCII-fallback canvas path.
   patchMethod(TileMapView.prototype, 'preloadAtlases', (orig) =>
     function (this: unknown, ...args: unknown[]): unknown {
-      const p = orig.apply(this, args) as Promise<void>
+      const p = orig.apply(this, args) as Promise<unknown>
       preloadPromise ??= p
       return p
     })
@@ -202,10 +203,14 @@ export async function buildReplayView(params: URLSearchParams): Promise<HTMLElem
 
   const conn = new ReplayConnection(rec.wsUrl, rec.httpBase)
   let exited = false
-  const view = buildGameView(conn, () => {
-    // game_ended / go_lobby in the recording tears the view down; just stop.
-    exited = true
-  }, undefined, undefined, 'replay')
+  const view = buildGameView({
+    conn,
+    onLobby: () => {
+      // game_ended / go_lobby in the recording tears the view down; just stop.
+      exited = true
+    },
+    username: 'replay',
+  })
 
   // The game view owns onMessage now — wrap it for per-message-type cost.
   // (ui-stack items re-enter the handler internally and are attributed to
@@ -260,7 +265,7 @@ export async function buildReplayView(params: URLSearchParams): Promise<HTMLElem
         if (mode === 'tiles' && !warmupFrames && preloadPromise) {
           warmupFrames = i + 1
           await preloadPromise
-          await nextPaint() // its internal rAF fit+fullRender
+          await nextPaint() // game-view preloadTiles' rAF fit+fullRender
         }
       },
     })

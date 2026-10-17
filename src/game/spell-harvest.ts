@@ -16,14 +16,14 @@
 // power/damage/noise, re-add the second phase in the same change (it lives
 // in git history: `mergeSpellExtra` + the 'extra' harvestPhase).
 //
-// SpellHarvester is the probe's state machine, extracted from game-view so
-// its timer/latch/phase logic is unit-testable in isolation. game-view
-// feeds it message-handler events (onMenu / onMsgLine /
-// consumePendingClose / reset*) and supplies the environment through
-// SpellHarvestHooks; everything DOM-shaped (the rail, the z tab, input
-// suppression at the event-handler layer) stays in game-view.
+// SpellHarvester is the probe's state machine. game-view feeds it
+// message-handler events (onMenu / onMsgLine / consumePendingClose /
+// reset*) and supplies the environment through SpellHarvestHooks;
+// everything DOM-shaped lives elsewhere (the rail and z tab in
+// views/spell-rail, input suppression in the input router).
 import type { ClientMsg } from '../ws/types'
 import { stripDcss } from './dcss-colors'
+import type { MenuItem } from './menu-model'
 
 export interface SpellEntry {
   title: string
@@ -42,15 +42,8 @@ export interface SpellEntry {
   level?: number
 }
 
-// The shape of a `menu` item row the harvester consumes — structurally
-// compatible with game-view's MenuItem, declared here so this module never
-// has to import from the view layer.
-export interface SpellMenuItem {
-  text?: string
-  colour?: number
-  hotkeys?: number[]
-  tiles?: Array<{ t: number; tex: number }>
-}
+// The fields of a `menu` item row the harvester consumes.
+export type SpellMenuItem = Pick<MenuItem, 'text' | 'colour' | 'hotkeys' | 'tiles'>
 
 // Input-suppression budget for the harvest's single `I` round-trip, and how
 // much longer a slow reply is still accepted after suppression ends.
@@ -60,14 +53,12 @@ export const HARVEST_LATE_MS = 8500
 export interface SpellHarvestHooks {
   // Outbound WS send (the probe's `I` and the menu-closing Escape).
   send(msg: ClientMsg): void
-  // The view's half of the "safe to inject a command-level keystroke" check:
-  // nothing transient is up — no menu/overlay/CRT/dialog, no examine cursor
-  // (X-mode), no `--more--` pager, no in-log y/n prompt. The harvester ANDs
-  // this with its own phase (see channelIdle) to gate every injection.
+  // The view's half of the "safe to inject a command-level keystroke" check
+  // (game-view uiQuiet has the conditions and why). The harvester ANDs this
+  // with its own phase (see channelIdle) to gate every injection.
   uiQuiet(): boolean
   // The spell list changed (menu capture, no-spells terminator, timeout
-  // expiry, dev fake-spells). game-view refreshes every spell surface: the
-  // rail, the z-tab grid, and the __dcssSpellCache dev hook.
+  // expiry, dev fake-spells).
   onSpellsChanged(): void
 }
 
@@ -85,16 +76,25 @@ export class SpellHarvester {
   // stack — is swallowed instead of popping/clearing real overlay state.
   private pendingClose = false
   // Auto-harvest fires once per game (so the rail is populated without the
-  // player opening the tray); re-armed by resetForNewGame on go_lobby.
+  // player opening the tray). One harvester per game view, so per game.
   private autoHarvested = false
   // Set when the letter→spell map changes (memorise / forget / `=`
   // reassign) so the rail isn't left mapping a stale letter — which would
   // cast the WRONG spell on tap. Resolved by reharvestIfDirty() at the next
   // clean command-mode moment. Event-driven, not timer-polled.
   private dirty = false
+  // The give-up's one retry (armTimeout). `retryPending` waits for
+  // retryOnCommandEntry; `retried` spends the retry until any reply
+  // (capture or no-spells terminator) re-arms it. A retry cut
+  // short by an abort (foreign menu, close_all_menus) stays
+  // spent: re-arming there could loop. Never retry unbounded — each probe
+  // costs the player 1.5s of suppressed input, so a failure that repeats
+  // (e.g. an RC keymap rebinding `I`) would cost that every turn.
+  private retryPending = false
+  private retried = false
   // Every capture assigns a NEW array, never mutates in place: the rail
   // uses reference identity on this array to tell "content changed,
-  // rebuild" from "visibility toggled" (see renderSpellRail in game-view).
+  // rebuild" from "visibility toggled" (see SpellRail.builtFrom in views/spell-rail).
   private cache: SpellEntry[] = []
 
   constructor(private hooks: SpellHarvestHooks, private spectating: boolean) {}
@@ -141,7 +141,7 @@ export class SpellHarvester {
   // path routes through here so the timer/phase/latch lifecycle lives in
   // one place: the successful menu capture (which re-latches pendingClose
   // right after), the foreign-menu abort, the no-spells terminator, and the
-  // full-state teardowns (layer:"game", close_all_menus, go_lobby). The
+  // full-state teardowns (close_all_menus, the game view's dispose). The
   // teardown calls are what keep a bulk menu close or game transition
   // mid-harvest from leaving input suppressed (phase stuck) or pendingClose
   // latched — the latter would otherwise swallow the NEXT genuine
@@ -150,14 +150,6 @@ export class SpellHarvester {
     clearTimeout(this.timer)
     this.phase = 'idle'
     this.pendingClose = false
-  }
-
-  // go_lobby teardown: also re-arm the once-per-game auto-harvest and drop
-  // any pending re-harvest, so neither carries into the next game.
-  resetForNewGame(): void {
-    this.reset()
-    this.autoHarvested = false
-    this.dirty = false
   }
 
   // Fire a silent `I` to (re)populate the cache. Only from a clean game
@@ -191,6 +183,19 @@ export class SpellHarvester {
     if (this.harvest()) this.dirty = false
   }
 
+  // Resolve the give-up's pending retry (armTimeout). The caller invokes
+  // this only on an input_mode 0→1 transition, never on a 1→1 repeat: a
+  // spectator join makes the engine re-send the current mode to the player
+  // too (tileweb.cc _send_everything → update_input_mode(mode, true)), so
+  // a repeated 1 can reach us while the engine has yet to read our first
+  // `I` — a retry then queues a second `I` into the probe's menu. A 0→1
+  // transition means the engine left COMMAND to read a key and came back.
+  retryOnCommandEntry(): void {
+    if (!this.retryPending) return
+    if (this.spectating) { this.retryPending = false; return }
+    if (this.harvest()) this.retryPending = false
+  }
+
   // A `menu` message arrived; titlePlain is the DCSS-markup-stripped title.
   // Returns true when the menu was the probe's own spell list and has been
   // captured + Escaped — the caller must swallow it (never render).
@@ -206,6 +211,7 @@ export class SpellHarvester {
             || (this.phase === 'late-base'
                 && /^Your spells \(describe\)/.test(titlePlain)))) {
       this.reset()  // timer + phase; the latch is re-set just below
+      this.retried = false
       this.cache = (items ?? [])
         .filter(it => !!it.hotkeys?.length && !!it.tiles?.length)
         .map(parseSpellItem)
@@ -264,6 +270,7 @@ export class SpellHarvester {
     if (this.phase !== 'idle' && /^You don't know any spells\b/.test(stripDcss(text).trim())) {
       this.cache = []
       this.reset()
+      this.retried = false
       this.hooks.onSpellsChanged()
       return true
     }
@@ -295,9 +302,16 @@ export class SpellHarvester {
   // menu so a slow reply is still captured silently — a reset-to-idle here
   // would let that late menu render as an unrequested full-screen spell
   // list AND leave the rail empty for the rest of the game (autoHarvested
-  // stays true; nothing retries). Only after the extended `late-base`
-  // window also passes do we conclude the frame was truly dropped and clear
-  // the cache.
+  // stays true). Only after the extended `late-base` window also passes do
+  // we conclude the frame was truly dropped and clear the cache — it is
+  // either empty (the auto-harvest) or suspect (a letter-change re-harvest;
+  // a stale letter casts the wrong spell).
+  // The give-up then flags one retry, never an immediate `I`: the engine
+  // sends input_mode 0 as it reads our `I` (main.cc _get_next_keycode's
+  // mouse_control), so a reply merely slower than this window arrives
+  // behind that 0 and retryOnCommandEntry can't fire into its menu. Never
+  // drop the retry: autoHarvested is spent and `dirty` already cleared, so
+  // nothing else would re-probe this game.
   private armTimeout(): void {
     clearTimeout(this.timer)
     this.timer = window.setTimeout(() => {
@@ -307,6 +321,7 @@ export class SpellHarvester {
         if (this.phase !== 'late-base') return
         this.reset()
         this.cache = []
+        if (!this.retried) { this.retried = true; this.retryPending = true }
         this.hooks.onSpellsChanged()
       }, HARVEST_LATE_MS)
     }, HARVEST_SUPPRESS_MS)

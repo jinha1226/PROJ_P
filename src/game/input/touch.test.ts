@@ -9,21 +9,32 @@ import { buildTouchControls, HOLD_MS, REPEAT_DELAY_MS, REPEAT_INTERVAL_MS } from
 import {
   cloneSet, newSetId, saveControlSet, setActiveControlSet, builtinSets,
 } from './control-sets'
+import { X_MODE_COLS, X_MODE_KEYS } from './x-mode-keys'
 import type { ClientMsg } from '../../ws/types'
 
 beforeEach(() => {
   localStorage.clear()
 })
 
+// Controls built here, destroyed after each test: their window/document
+// listeners outlive the DOM otherwise (destroy is the only release).
+const built: Array<ReturnType<typeof buildTouchControls>> = []
+function build(...args: Parameters<typeof buildTouchControls>) {
+  const tc = buildTouchControls(...args)
+  built.push(tc)
+  return tc
+}
+
 afterEach(() => {
+  for (const tc of built.splice(0)) tc.destroy()
   document.body.innerHTML = ''
   vi.restoreAllMocks()
 })
 
 function setup() {
   const sent: ClientMsg[] = []
-  const tc = buildTouchControls(msg => sent.push(msg))
-  document.body.appendChild(tc.element)  // connected: the live-apply listener stays subscribed
+  const tc = build(msg => sent.push(msg))
+  document.body.appendChild(tc.element)
   return { tc, sent }
 }
 
@@ -115,6 +126,86 @@ describe('control-set-driven rendering', () => {
     // Fires the change event with the panel gone: listener must self-remove
     // without touching the dead DOM (and without throwing).
     expect(() => setActiveControlSet(id)).not.toThrow()
+  })
+})
+
+describe('X level-map key set', () => {
+  const texts = (sent: ClientMsg[]) => sent.map(m => m.msg === 'input' ? m.text : `key:${(m as { keycode?: number }).keycode}`)
+
+  it('swaps the panel to the X keys and back to the tab the player left', () => {
+    const { tc } = setup()
+    tc.element.querySelector<HTMLElement>('.tc-tab[data-tab="info"]')!.click()
+    const before = tabButtons(tc.element).map(b => b.textContent)
+
+    tc.enterXMode()
+    expect(tabButtons(tc.element).map(b => b.textContent))
+      .toEqual(['e', 'E', 'R', '^', '!', 'G', '[', ']', '_', '\\', '<', '>'])
+    expect(tc.element.querySelectorAll('.tc-content .tc-row')).toHaveLength(3)
+
+    tc.exitXMode()
+    expect(tabButtons(tc.element).map(b => b.textContent)).toEqual(before)
+  })
+
+  it('sends each key as its level-map command', () => {
+    const { tc, sent } = setup()
+    tc.enterXMode()
+    for (const b of tabButtons(tc.element)) b.click()
+    expect(texts(sent)).toEqual(['e', 'E', 'R', '^', '!', 'G', '[', ']', '_', '\\', '<', '>'])
+  })
+
+  it('keys shared with the Standard > tab sit on that tab\'s slots, bar !', () => {
+    const tab = builtinSets()[0].tabs.find(t => t.name === '>')!
+    expect(tab.cols).toBe(X_MODE_COLS)
+    const shared = X_MODE_KEYS.flatMap((k, i) => {
+      const j = tab.slots.findIndex(s => s.text === k.slot.text)
+      return j < 0 ? [] : [{ key: k.label, at: i, onTab: j }]
+    })
+    expect(shared.map(s => s.key)).toEqual(['e', '!', 'G', '<', '>'])
+    for (const s of shared.filter(s => s.key !== '!')) expect(s.at).toBe(s.onTab)
+  })
+
+  it('keeps the header Esc / Enter', () => {
+    const { tc, sent } = setup()
+    tc.enterXMode()
+    tc.element.querySelector<HTMLElement>('.tc-header .tc-esc')!.click()
+    tc.element.querySelector<HTMLElement>('.tc-header .tc-enter')!.click()
+    expect(texts(sent)).toEqual(['key:27', 'key:13'])
+  })
+
+  it('the footer abc▴ opens the keyboard overlay', () => {
+    const { tc } = setup()
+    tc.enterXMode()
+    tc.element.querySelector<HTMLElement>('.tc-footer .tc-kbd')!.click()
+    expect(tc.isKbdOpen()).toBe(true)
+  })
+
+  it('the header level label follows setXModePlace, live and across entries', () => {
+    const { tc } = setup()
+    tc.enterXMode()
+    tc.setXModePlace('Depths:4')
+    const place = () => tc.element.querySelector<HTMLElement>('.tc-header .tc-xplace')!
+    expect(place().textContent).toBe('Depths:4')
+    tc.exitXMode()
+    tc.setXModePlace('Necropolis')  // while out of X: kept for the next entry
+    tc.enterXMode()
+    expect(place().textContent).toBe('Necropolis')
+  })
+
+  it('the d-pad centre sends "." in X too (travel-to-cursor there), not only in normal play', () => {
+    const { tc, sent } = setup()
+    const centre = tc.element.querySelector<HTMLElement>('.tc-dpad-btn.wait')!
+    tc.enterXMode()
+    centre.click()
+    tc.exitXMode()
+    centre.click()
+    expect(texts(sent)).toEqual(['.', '.'])
+  })
+
+  it('a control-set change while in X keeps the X keys up', () => {
+    const { tc } = setup()
+    tc.enterXMode()
+    setActiveControlSet(saveThreeColSet())
+    expect(tabButtons(tc.element)).toHaveLength(12)
   })
 })
 
@@ -410,7 +501,7 @@ describe('consumeShift — spell-rail force-cast hook', () => {
 
   it('notifies onShiftChange on engage and on consume', () => {
     const states: boolean[] = []
-    const tc = buildTouchControls(() => {}, { onShiftChange: on => states.push(on) })
+    const tc = build(() => {}, { onShiftChange: on => states.push(on) })
     document.body.appendChild(tc.element)
     shiftBtn(tc.element).click()
     expect(states).toEqual([true])
@@ -418,5 +509,92 @@ describe('consumeShift — spell-rail force-cast hook', () => {
     expect(states).toEqual([true, false])
     tc.consumeShift()  // already off — no state change, no callback
     expect(states).toEqual([true, false])
+  })
+})
+
+describe('strip with a text field showing', () => {
+  const dpadUp = (root: HTMLElement) =>
+    [...root.querySelectorAll<HTMLElement>('.tc-dpad-btn')].find(b => b.textContent === '↑')!
+  function field(className: string): { input: HTMLInputElement; keys: string[] } {
+    const input = document.createElement('input')
+    input.className = className
+    const keys: string[] = []
+    input.addEventListener('keydown', e => keys.push(e.key))
+    document.body.appendChild(input)
+    return { input, keys }
+  }
+
+  it('⎋ and ⏎ go to the field, not the wire', () => {
+    const { tc, sent } = setup()
+    const { keys } = field('game-text-input')
+    tc.element.querySelector<HTMLElement>('.tc-enter')!.click()
+    tc.element.querySelector<HTMLElement>('.tc-esc')!.click()
+    expect(keys).toEqual(['Enter', 'Escape'])
+    expect(sent).toEqual([])
+  })
+
+  it('game keys stay off the wire under a local line field, not a server-synced one', () => {
+    const { tc, sent } = setup()
+    dpadUp(tc.element).click()
+    expect(sent).toHaveLength(1)
+    const local = field('input-dialog-field menu-filter-input')
+    dpadUp(tc.element).click()
+    tabButtons(tc.element)[0].click()
+    expect(sent).toHaveLength(1)
+    local.input.remove()
+    field('input-dialog-field')
+    dpadUp(tc.element).click()
+    expect(sent).toHaveLength(2)
+  })
+
+  it('Ctrl on our keyboard and the strip sends a captured key’s code and nothing for r/v/z', () => {
+    const { tc, sent } = setup()
+    const kbdKey = (label: string) =>
+      [...tc.element.querySelectorAll<HTMLElement>('#kbd-overlay .kbd-key')].find(b => b.textContent === label)!
+    tc.openKbd()
+    kbdKey('⌃').click(); kbdKey('r').click()
+    kbdKey('⌃').click(); kbdKey('f').click()
+    tc.closeKbd()
+    const slot = (label: string) => tabButtons(tc.element).find(b => b.textContent === label)!
+    const ctrl = tc.element.querySelector<HTMLElement>('.tc-ctrl')!
+    ctrl.click(); slot('v').click()
+    ctrl.click(); slot('f').click()
+    expect(sent).toEqual([{ msg: 'key', keycode: 6 }, { msg: 'key', keycode: 6 }])
+  })
+
+  it('our keyboard types with inputmode none, and closing it hands the field back', () => {
+    const { tc } = setup()
+    const { input } = field('game-text-input')
+    tc.openKbd()
+    ;[...tc.element.querySelectorAll<HTMLElement>('.kbd-key.letter')].find(b => b.textContent === 'q')!.click()
+    expect(input.value).toBe('q')
+    expect(input.inputMode).toBe('none')
+    tc.closeKbd()
+    expect(input.inputMode).toBe('')
+  })
+
+  it('closeAutoKbd takes down only a kbd an auto open raised', () => {
+    const { tc } = setup()
+    const kbdEl = tc.element.querySelector<HTMLElement>('#kbd-overlay')!
+    const showing = () => kbdEl.style.display !== 'none'
+    const abcDown = () =>
+      [...kbdEl.querySelectorAll<HTMLElement>('.kbd-key')].find(b => b.textContent === 'abc▾')!
+    const abcUp = () => tc.element.querySelector<HTMLElement>('.tc-footer .tc-kbd')!
+
+    tc.openKbd({ auto: true })
+    tc.closeAutoKbd()
+    expect(showing()).toBe(false)
+
+    // Closed on its own abc▾, then reopened by hand: the user's now.
+    tc.openKbd({ auto: true })
+    abcDown().click()
+    abcUp().click()
+    tc.closeAutoKbd()
+    expect(showing()).toBe(true)
+
+    // An auto open over a kbd the user already had up doesn't claim it.
+    tc.openKbd({ auto: true })
+    tc.closeAutoKbd()
+    expect(showing()).toBe(true)
   })
 })

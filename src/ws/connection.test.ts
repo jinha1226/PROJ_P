@@ -2,36 +2,12 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { WsConnection } from './connection'
+import { FakeWS } from '../test/fake-ws'
 
 // The handshake contract the resume loop depends on: every connect() settles
 // (timeout, error, close-before-open, or open), onClose fires only for an
 // ESTABLISHED connection dying, and a superseded socket's late events can't
 // touch the instance that replaced it.
-
-class FakeWS {
-  static CONNECTING = 0
-  static OPEN = 1
-  static CLOSING = 2
-  static CLOSED = 3
-  static instances: FakeWS[] = []
-  readyState = FakeWS.CONNECTING
-  onopen: (() => void) | null = null
-  onclose: (() => void) | null = null
-  onerror: ((e: unknown) => void) | null = null
-  onmessage: ((e: { data: string }) => void) | null = null
-  sent: string[] = []
-  closeCalls = 0
-  constructor(readonly url: string, readonly protocol: string) {
-    FakeWS.instances.push(this)
-  }
-  send(data: string): void { this.sent.push(data) }
-  // Like the engines: close() on a CONNECTING socket later fires `close`,
-  // never `error`. Tests fire it explicitly to control ordering.
-  close(): void { this.closeCalls++; this.readyState = FakeWS.CLOSED }
-  open(): void { this.readyState = FakeWS.OPEN; this.onopen?.() }
-  fireClose(): void { this.readyState = FakeWS.CLOSED; this.onclose?.() }
-  fireError(): void { this.onerror?.(new Event('error')) }
-}
 
 const WS_URL = 'wss://test.example/socket'
 

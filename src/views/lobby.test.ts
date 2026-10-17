@@ -1,15 +1,17 @@
 // @vitest-environment happy-dom
 
-import { describe, it, expect, vi } from 'vitest'
+import { afterEach, describe, it, expect, vi } from 'vitest'
 import { fakeStorage } from '../test/fake-storage'
 
 vi.stubGlobal('localStorage', fakeStorage())
 
-import { buildLobbyView, selectPrimaryGameIds } from './lobby'
+import { buildLobbyView as buildLobbyViewRaw, selectPrimaryGameIds } from './lobby'
+import { disposeView } from './view-dispose'
 import type { WsConnection } from '../ws/connection'
 import type { ServerMsg } from '../ws/types'
 import { getTileLoader } from '../game/tiles/tile-loader'
 import { getLastSpectateServer } from '../prefs'
+import { activeGameStart, clearGameStart, rememberGameStart } from '../reconnect'
 
 // Regression coverage for the tile loader hand-off across the lobby→game
 // boundary. `game_client` (which carries the gamedata version) can arrive while
@@ -28,6 +30,15 @@ import { getLastSpectateServer } from '../prefs'
 // so calling it in the test returns the very instance the lobby created.
 const WS_URL = 'wss://test.example/socket'
 const HTTP_BASE = 'https://test.example'
+
+// No setView here to run each lobby's disposer (its idle ticker).
+const built: HTMLElement[] = []
+function buildLobbyView(...args: Parameters<typeof buildLobbyViewRaw>): HTMLElement {
+  const view = buildLobbyViewRaw(...args)
+  built.push(view)
+  return view
+}
+afterEach(() => { for (const v of built.splice(0)) disposeView(v) })
 
 function fakeConn(wsUrl: string, httpBase: string): WsConnection {
   return {
@@ -107,6 +118,60 @@ describe('lobby tile-loader hand-off', () => {
   })
 })
 
+// A failed start never mounts the game view: the server sends game_ended then
+// go_lobby with no game_started (trunk ws_handler.py _on_crawl_end), so the
+// lobby must show the exit dialog itself.
+describe('lobby game_ended before any game started', () => {
+  it('shows the reason and message of a failed play, and drops the start', () => {
+    const { dispatch, view, conn } = setupLobby()
+    rememberGameStart({ kind: 'play', gameId: 'dcss-test' },
+      { wsUrl: conn.wsUrl, username: 'tester', guest: false })
+
+    dispatch({ msg: 'game_ended', reason: 'error', message: 'Error while starting the Crawl process!' })
+    dispatch({ msg: 'go_lobby' })
+
+    expect(view.querySelector('.lobby-exit-reason')?.textContent)
+      .toBe('Unfortunately your game terminated due to an error.')
+    expect(view.querySelector('.lobby-exit-summary')?.textContent)
+      .toContain('Error while starting the Crawl process!')
+    expect(activeGameStart()).toBeNull()
+  })
+
+  it('names the spectated player when a watch attempt ends', () => {
+    const { dispatch, view, conn } = setupLobby()
+    rememberGameStart({ kind: 'watch', username: 'demo_player' },
+      { wsUrl: conn.wsUrl, username: 'tester', guest: false })
+
+    dispatch({ msg: 'game_ended', reason: 'saved' })
+
+    expect(view.querySelector('.lobby-exit-reason')?.textContent)
+      .toBe('demo_player stopped playing (saved).')
+  })
+
+  it('ignores the late game_ended of a game already left (no start in flight)', () => {
+    // A client go_lobby lands us here before the stopped process's
+    // game_ended arrives; the lobby's mount cleared the start.
+    const { dispatch, view } = setupLobby()
+    clearGameStart()
+    dispatch({ msg: 'game_ended', reason: 'unknown' })
+    expect(view.querySelector('.lobby-exit-backdrop')).toBeNull()
+  })
+})
+
+// The server never echoes the game_id back, so the lobby's play is the only
+// point where auto-resume can learn what to replay.
+describe('lobby play records the resume context', () => {
+  it('a headline tap remembers the game id, then sends play', () => {
+    const { dispatch, view, conn } = setupLobby()
+    dispatch({ msg: 'set_game_links', content: '<a href="#play-0.34">v0.34</a>' } as unknown as ServerMsg)
+
+    view.querySelector<HTMLElement>('#lobby-games > button.lobby-btn-primary')!.click()
+
+    expect(activeGameStart()).toEqual({ kind: 'play', gameId: '0.34' })
+    expect(conn.send).toHaveBeenCalledWith({ msg: 'play', game_id: '0.34' })
+  })
+})
+
 // Chat/spectator state sent before the transition trigger. On a spectate join
 // CDI sends game_client → update_spectators → watching_started (captured
 // live 2026-07), so update_spectators lands while the lobby still owns
@@ -114,7 +179,7 @@ describe('lobby tile-loader hand-off', () => {
 // view's handler right after onGameStart mounts it — without this the chat
 // chip starts blind (no spectator count) and join-time chat is lost.
 describe('lobby pre-game chat-state replay', () => {
-  const SPECTATORS: ServerMsg = { msg: 'update_spectators', count: 1, names: 'RoinerR' }
+  const SPECTATORS: ServerMsg = { msg: 'update_spectators', count: 1, names: 'DemoPlayer' }
   const CHAT: ServerMsg = { msg: 'chat', content: 'hi' }
 
   it('replays pre-transition update_spectators and chat, in order, after mount', () => {
@@ -320,6 +385,32 @@ describe('lobby account menu', () => {
   })
 })
 
+describe('lobby notice kinds', () => {
+  it('marks a stale-process wait as progress, and the force-close question as neither', () => {
+    const { dispatch, view } = setupLobby()
+    const notice = view.querySelector<HTMLElement>('#lobby-notice')!
+    dispatch({ msg: 'stale_processes', timeout: 15, game: 'test-game' })
+    expect(notice.dataset['kind']).toBe('progress')
+
+    dispatch({ msg: 'force_terminate?' })
+    expect(notice.dataset['kind']).toBeUndefined() // no stale spinner beside the buttons
+    expect(notice.hidden).toBe(false)
+    expect(notice.querySelectorAll('.lobby-notice-actions button')).toHaveLength(2)
+
+    dispatch({ msg: 'hide_dialog' })
+    expect(notice.hidden).toBe(true)
+    expect(notice.dataset['kind']).toBeUndefined()
+  })
+
+  it('marks an auth_error as an error', () => {
+    const { dispatch, view } = setupLobby()
+    const notice = view.querySelector<HTMLElement>('#lobby-notice')!
+    dispatch({ msg: 'auth_error', reason: 'Spectating is restricted.' })
+    expect(notice.dataset['kind']).toBe('error')
+    expect(notice.textContent).toBe('Spectating is restricted.')
+  })
+})
+
 // The guest header's chip is a server switcher (the only way to change servers
 // without going back to the login home). It hands the pick to the app, which
 // opens the new socket before dropping the current one — so a rejected switch
@@ -363,8 +454,10 @@ describe('guest server switcher', () => {
 
     view.querySelector<HTMLButtonElement>(`.lobby-server-item[data-ws="${CBR_WS}"]`)!.click()
     expect(chip.disabled).toBe(true) // no second attempt while one is in flight
+    expect(notice.dataset['kind']).toBe('progress')
     await vi.waitFor(() => expect(chip.disabled).toBe(false))
     expect(notice.hidden).toBe(false)
+    expect(notice.dataset['kind']).toBe('error')
     expect(notice.textContent).toContain('cbro.berotato.org')
     // Still this lobby, still on the server we were watching.
     expect(view.querySelector('#lobby-server-chip .lobby-chip-tag')!.textContent).toBe('CDI')

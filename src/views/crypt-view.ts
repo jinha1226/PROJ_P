@@ -2,29 +2,35 @@ import { listAllAvatars, type Avatar } from '../avatars'
 import { nameTitle } from '../game/char-label'
 import { paintAvatars } from './avatar-tiles'
 import { avatarToCard, cardHeadline, renderCharCard } from './char-card'
-import { pickCryptLine } from './crypt-flavor'
+import { cryptFate, pickCryptLine } from './crypt-flavor'
+import { decorateCrypt } from './crypt-room'
 import { mountBackdrop, mountOverlay } from './overlay'
 import { attachScrollCue } from '../util/scroll-cue'
 import { count } from '../counter'
 
 // Full-screen "crypt": the complete retained character history (../avatars),
 // painted as a vertical-scrolling 4-wide grid of doll sprites. An opaque full
-// screen, not a modal card — so it's dismissed with a "← Back" ghost button (the
+// screen, not a modal card — so it's dismissed with a "‹ Back" ghost button (the
 // same chrome as the lobby), top-left; Escape also closes it (mountOverlay).
 // Mounted on document.body above the login view, opened by tapping the login doll
 // strip. The grid mirrors the strip's newest-first order (newest top-left), so the
 // strip reads as the crypt's top row.
 //
 // Heading: a thematic line chosen from the history's state (./crypt-flavor),
-// in the smaller flavor style (it's prose, not a wordmark).
+// in the smaller flavor style (it's prose, not a wordmark). The crypt is
+// also dressed as a room (./crypt-room).
 export function openCrypt(): void {
   if (document.querySelector('.crypt-view')) return // already open — ignore re-taps
   count('crypt')
+  let undecorate = (): void => {}
   const { view } = mountCryptShell('', '', `
-      <p class="crypt-flavor"></p>
-      <div class="crypt-grid"></div>
-  `)
+      <div class="crypt-floor">
+        <p class="crypt-flavor"></p>
+        <div class="crypt-grid"></div>
+      </div>
+  `, () => undecorate())
   const avatars = listAllAvatars()
+  undecorate = decorateCrypt(view, cryptFate(avatars))
   // Set via textContent (the flavor lines are author-written plain text).
   view.querySelector<HTMLElement>('.crypt-flavor')!.textContent = pickCryptLine(avatars)
   // Scale 2.5 (80px): bigger than the login strip's 64px teaser, but small enough
@@ -76,7 +82,7 @@ export function openAvatarCard(a: Avatar): void {
 }
 
 // The full-screen shell shared by the crypt, the records browser, and its
-// morgue drill-down: pinned header with the "← Back" ghost button (the same
+// morgue drill-down: pinned header with the "‹ Back" ghost button (the same
 // chrome as the lobby), scrollable body, scroll-edge cue (hairline under the
 // pinned bar while content is scrolled beneath it), Escape dismissal.
 // Callers fill the header's right side and the body — static markup only,
@@ -91,7 +97,7 @@ export function mountCryptShell(
   view.className = extraClass ? `crypt-view ${extraClass}` : 'crypt-view'
   view.innerHTML = `
     <header class="crypt-header">
-      <button type="button" class="crypt-back lobby-btn-ghost" aria-label="Back">← Back</button>
+      <button type="button" class="crypt-back lobby-btn-ghost is-back" aria-label="Back">Back</button>
       ${headerHtml}
     </header>
     <div class="crypt-scroll">${bodyHtml}</div>

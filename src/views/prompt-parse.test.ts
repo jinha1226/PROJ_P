@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { parsePromptText, PROMPT_TRIGGER_RE, type PromptSegment } from './prompt-parse'
+import { isKeyHintsLine, parsePromptText, PROMPT_TRIGGER_RE, type PromptSegment } from './prompt-parse'
 
 function buttons(segments: PromptSegment[]): Array<{ label: string; key: string }> {
   return segments
@@ -89,6 +89,27 @@ describe('parsePromptText — level-up stat prompt', () => {
   })
 })
 
+// PromptMenu::show_in_msgpane (RC prompt_menu = false): build_prompt_menu
+// pads each "(X) item" to a column width with "%-*s".
+describe('parsePromptText — in-pane option columns', () => {
+  it('one button per padded column, each bound to its own key', () => {
+    const r = parsePromptText('<cyan>(D) Dungeon          (T) Temple           (L) Lair            ')
+    expect(buttons(r.segments)).toEqual([
+      { label: '(D) Dungeon', key: 'D' },
+      { label: '(T) Temple', key: 'T' },
+      { label: '(L) Lair', key: 'L' },
+    ])
+  })
+
+  // The real wire shape: textcolour() per column, and to_colour_string
+  // (format.cc) emits an opening tag per change and no closing tags.
+  it('keeps each column’s own colour tag on its button', () => {
+    const r = parsePromptText('<cyan><lightgrey>(D) Dungeon          <lightgrey>(T) Temple           <lightgrey>')
+    expect(buttons(r.segments).map(b => b.key)).toEqual(['D', 'T'])
+    expect(buttons(r.segments)[1].label).toBe('<lightgrey>(T) Temple')
+  })
+})
+
 describe('parsePromptText — Adjust prompt (in-word parens)', () => {
   it('walks back through word boundaries for "sc(r)olls" / "e(v)ocables"', () => {
     const r = parsePromptText(
@@ -116,6 +137,56 @@ describe('parsePromptText — non-prompts and false-positive guards', () => {
   })
 })
 
+describe('parsePromptText — chooser key-hints line', () => {
+  it('buttons every single-char key of the x-examine line, "." and letters included', () => {
+    const r = parsePromptText('<cyan>Press: ? - help, v - describe, . - travel, g - get item<lightgrey>')
+    expect(buttons(r.segments).map(b => b.key)).toEqual(['?', 'v', '.', 'g'])
+    expect(r.segments[0]).toEqual({ kind: 'text', value: 'Press: ' })
+    expect(isKeyHintsLine('<cyan>Press: ? - help, v - describe, . - travel<lightgrey>')).toBe(true)
+  })
+
+  it('keys through <w> markup; multi-char keys and "( or ) - cycle" stay text', () => {
+    // directn.cc print_key_hints in targeting, with action_cycler's
+    // fire_key_hints (quiver.cc) and the "\n"-joined direction hint.
+    const r = parsePromptText(
+      '<cyan>Press: ? - help, <w>=</w> - select action, <w>(</w> or <w>)</w> - cycle\nDir - move target')
+    expect(buttons(r.segments)).toEqual([
+      { label: '? - help', key: '?' },
+      { label: '<w>=</w> - select action', key: '=' },
+    ])
+    const texts = r.segments.filter(s => s.kind === 'text').map(s => s.value)
+    expect(texts).toContain('<w>(</w> or <w>)</w> - cycle')
+    expect(texts).toContain('Dir - move target')
+  })
+
+  it('a targeting line with only multi-char keys past "?" still buttons "?"', () => {
+    const r = parsePromptText('<cyan>Press: ? - help, Shift-Dir - straight line')
+    expect(buttons(r.segments)).toEqual([{ label: '? - help', key: '?' }])
+  })
+
+  // Every other crawl string opening "Press" (trunk + 0.34.1) is a
+  // sentence without the colon; none may take the key-hints shape.
+  it.each([
+    'Press <w>?</w> for a list of commands and other information.',
+    'Press } to see all the runes you have collected.',
+    'Press } and ! to see all the gems you have collected.',
+    "Press 'a' to toggle all layers. Press any other key to exit.",
+    'Press <w>_</w> or <w>p</w> to pray at altars.',
+  ])('not a key-hints line: %s', (text) => {
+    expect(isKeyHintsLine(text)).toBe(false)
+  })
+
+  it('"Press:" with no single-char key token is not a key-hints line', () => {
+    expect(isKeyHintsLine('<cyan>Press: Dir - move target')).toBe(false)
+  })
+
+  it('" - " item lines without the intro stay out of the shape', () => {
+    // Inventory-letter lines ("a - a +0 dagger") read like hint tokens.
+    expect(isKeyHintsLine('a - a +0 dagger (weapon)')).toBe(false)
+    expect(isKeyHintsLine('You have: a - a +0 dagger, b - 3 darts')).toBe(false)
+  })
+})
+
 describe('parsePromptText — known gap behavior', () => {
   // Pinning these so a future widening of the anchor is intentional.
   it('"<w>?</w> for menu" mid-token: no buttons extracted (gap)', () => {
@@ -126,5 +197,15 @@ describe('parsePromptText — known gap behavior', () => {
   it('"(* - delete all, Esc - exit)" mid-token: no buttons extracted (gap)', () => {
     const r = parsePromptText('<cyan>Delete which waypoint? (* - delete all, Esc - exit) ')
     expect(r.hasButton).toBe(false)
+  })
+
+  // prompt_invent_item (invent.cc) appends " (? for menu, Esc to quit)" to
+  // prompts that already end in a space, so the hint follows two spaces and
+  // the column split starts a token at it: the hint becomes a button that
+  // sends ?. Accepted widening; trunk and 0.34 mark it <white>?<cyan>,
+  // which the trigger doesn't match, so it can't reach the parser today.
+  it('a double-spaced "(? for menu" hint becomes a ? button', () => {
+    const r = parsePromptText('<cyan>Wield which item?  (? for menu, Esc to quit)')
+    expect(buttons(r.segments)).toEqual([{ label: '? for menu', key: '?' }])
   })
 })

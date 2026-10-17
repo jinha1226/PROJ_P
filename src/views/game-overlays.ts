@@ -1,17 +1,18 @@
-// Standalone full-screen overlay renderers, split out of game-view.ts:
-// seed-selection plus the msgwin-get-line input dialog, and the shared
+// Standalone overlay renderers: seed-selection (full screen) plus the
+// msgwin-get-line input dialog (a layered popup), and the shared
 // OverlayScreenCtx. The newgame-choice grid and newgame-random-combo
 // confirm live in newgame-view.ts, their wire types in newgame-model.ts
 // (spec: dev-material/newgame-redesign.md). Each screen owns one ui-push type
 // wholesale — none of them share the title/body/actions frame the
-// describe-*/menu overlays get from showUiPush. They build their DOM
-// into ctx.overlay (#ui-overlay) after ctx.enterLayout()/ctx.renderOverlay()
-// swaps the screen from map/HUD/log to overlay layout, and reach everything
-// stateful (WS sends, virtual keyboard, focus) through OverlayScreenCtx so
-// no game-view closure state leaks in here.
+// describe-*/menu overlays get from LayoutView.show. They build their DOM
+// into ctx.overlay (#ui-overlay) after ctx.enterLayout()/ctx.renderOverlay(),
+// or into the root ctx.enterPopup() returns, and reach everything stateful
+// (WS sends, virtual keyboard, focus) through OverlayScreenCtx so no
+// game-view closure state leaks in here.
 import type { ClientMsg } from '../ws/types'
 import type { TileLoader } from '../game/tiles/tile-loader'
 import { dcssToHtml } from '../game/dcss-colors'
+import { systemKeyboardField } from './text-field'
 import type { SpellBook } from './overlay-body'
 import type { NewgameItems } from './newgame-model'
 
@@ -93,6 +94,10 @@ export interface OverlayScreenCtx {
   // map column beside a sidebar of pre-creation HUD (the `newgame` view
   // class; style.css landscape block).
   enterLayout(opts?: { touch?: boolean; screen?: 'newgame' }): void
+  // enterLayout for a small popup (msgwin-get-line): layered over the frame
+  // it covers when that frame is on screen (game-view frameDom). Returns
+  // the element to build into.
+  enterPopup(): HTMLElement
   // enterLayout + the standard overlay title header; buildBody appends the
   // rest into `overlay` below it.
   renderOverlay(title: string, buildBody: () => void, opts?: { screen?: 'newgame' }): void
@@ -109,20 +114,21 @@ export interface OverlayScreenCtx {
   isSpectating(): boolean
 }
 
-// ?/ search prompts ("Describe what?", "Find what?", ...) arrive as ui-push
-// msgwin-get-line — only when a popup layout is already open or no game is
-// running (message.cc:1646); in-play line prompts (Ctrl-F, travel depth)
+// ?/ search prompts ("Describe what?", "Find what?", ...) and inscribing
+// from the open inventory arrive as ui-push msgwin-get-line — only when a
+// popup layout is already open or no game is running (message.cc:1646);
+// in-play line prompts (Ctrl-F, travel depth)
 // use the in-log init_input path, and G's branch picker is a tag:"travel"
 // menu. The server drives the field via
 // ui-state-sync (widget_id "input") and we echo each edit back, so
-// generation_id must match. game-view's ui-state-sync handler finds the
-// field by its .input-dialog-field class.
+// generation_id must match. LayoutView.onStateSync finds the field by its
+// .input-dialog-field class.
 export function showInputDialog(ctx: OverlayScreenCtx, msg: UiPushMsg): void {
   const genId = msg.generation_id
   // Touch controls stay visible (enterLayout default) — the kbd-overlay is a
   // fixed-position child of them, and `display:none` on the parent would hide
-  // the keyboard too. The keyboard covers the d-pad anyway when open.
-  ctx.enterLayout()
+  // the keyboard too; the strip's ⎋/⏎ also reach the field.
+  const root = ctx.enterPopup()
 
   const wrap = document.createElement('div')
   wrap.className = 'input-dialog'
@@ -134,13 +140,7 @@ export function showInputDialog(ctx: OverlayScreenCtx, msg: UiPushMsg): void {
     wrap.appendChild(promptEl)
   }
 
-  const input = document.createElement('input')
-  input.type = 'text'
-  input.className = 'input-dialog-field'
-  input.autocomplete = 'off'
-  input.autocapitalize = 'off'
-  input.spellcheck = false
-  input.inputMode = 'none'
+  const input = systemKeyboardField('input-dialog-field')
 
   input.addEventListener('input', () => {
     if (genId === undefined) return
@@ -165,9 +165,11 @@ export function showInputDialog(ctx: OverlayScreenCtx, msg: UiPushMsg): void {
   })
 
   wrap.appendChild(input)
-  ctx.overlay.appendChild(wrap)
-  ctx.autoOpenKbd()
-  requestAnimationFrame(() => input.focus())
+  root.appendChild(wrap)
+  // A spectator's field only mirrors the player's (ui-state-sync); the
+  // server discards what a spectator would type, and chat keeps its focus.
+  if (ctx.isSpectating()) input.readOnly = true
+  else requestAnimationFrame(() => input.focus())
 }
 // Custom-seed entry on newgame. The server pushes title/body/footer text
 // and a show_pregen_toggle flag, then drives the seed input and pregen

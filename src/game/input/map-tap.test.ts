@@ -2,7 +2,7 @@
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import {
-  attachMapGestures, canDescribe, canHover, LONG_PRESS_MS, SLOP_PX,
+  attachMapGestures, canDescribe, canHover, canOpenLevelMap, DRAG_PX, LONG_PRESS_MS, SLOP_PX,
 } from './map-tap'
 
 beforeEach(() => {
@@ -14,13 +14,12 @@ afterEach(() => {
   vi.useRealTimers()
 })
 
-// happy-dom has no PointerEvent constructor; MouseEvent carries the fields
-// the recognizer reads (isPrimary/pointerId default undefined = primary/0,
-// matching real single-touch streams closely enough for the state machine).
-function fire(el: HTMLElement, type: string, x: number, y: number, extra: Record<string, unknown> = {}): void {
-  const ev = new MouseEvent(type, { clientX: x, clientY: y, bubbles: true, button: 0 })
-  for (const [k, v] of Object.entries(extra)) Object.defineProperty(ev, k, { value: v })
-  el.dispatchEvent(ev)
+// One primary pointer by default, like a single-touch stream (happy-dom's
+// PointerEvent defaults isPrimary to false).
+function fire(el: HTMLElement, type: string, x: number, y: number, extra: PointerEventInit = {}): void {
+  el.dispatchEvent(new PointerEvent(type, {
+    clientX: x, clientY: y, bubbles: true, button: 0, pointerId: 1, isPrimary: true, ...extra,
+  }))
 }
 
 function setup(cellAt?: (x: number, y: number) => { x: number; y: number } | null) {
@@ -33,15 +32,21 @@ function setup(cellAt?: (x: number, y: number) => { x: number; y: number } | nul
   const presses: { x: number; y: number }[] = []
   const taps: { x: number; y: number }[] = []
   const pans: { x: number; y: number }[] = []
-  attachMapGestures(wrap, {
+  let drags = 0
+  // Swappable so a test can model X mode rebuilding the grid mid-gesture.
+  const geometry = {
     // Default fake geometry: 10px cells, dungeon origin at the screen origin.
-    hitTester: () => cellAt ?? ((x, y) => ({ x: Math.floor(x / 10), y: Math.floor(y / 10) })),
+    cellAt: cellAt ?? ((x: number, y: number) => ({ x: Math.floor(x / 10), y: Math.floor(y / 10) })),
+  }
+  const gestures = attachMapGestures(wrap, {
+    hitTester: () => geometry.cellAt,
     onHover: (c) => hovers.push(c),
     onLongPress: (c) => presses.push(c),
     onTap: (c) => taps.push(c),
     onPan: (d) => pans.push(d),
+    onDrag: () => { drags++ },
   })
-  return { wrap, grid, hovers, presses, taps, pans }
+  return { wrap, grid, hovers, presses, taps, pans, geometry, gestures, drags: () => drags }
 }
 
 describe('attachMapGestures', () => {
@@ -176,6 +181,21 @@ describe('attachMapGestures', () => {
     expect(root.classList.contains('map-hold')).toBe(false)
   })
 
+  it('destroy removes every window listener it added and drops a pending hold', () => {
+    const add = vi.spyOn(window, 'addEventListener')
+    const remove = vi.spyOn(window, 'removeEventListener')
+    const { grid, presses, gestures } = setup()
+    const added = add.mock.calls.map(([type, fn]) => [type, fn])
+    expect(added.length).toBeGreaterThan(0)
+    fire(grid, 'pointerdown', 25, 35)
+    gestures.destroy()
+    vi.advanceTimersByTime(LONG_PRESS_MS + 50)
+    expect(presses).toEqual([])
+    expect(remove.mock.calls.map(([type, fn]) => [type, fn])).toEqual(added)
+    add.mockRestore()
+    remove.mockRestore()
+  })
+
   it('lifting before the hold threshold cancels the long-press', () => {
     const { grid, presses } = setup()
     fire(grid, 'pointerdown', 25, 35)
@@ -229,6 +249,58 @@ describe('attachMapGestures', () => {
     expect(hovers).toEqual([])
     expect(presses).toEqual([])
   })
+
+  it('onDrag fires once, past DRAG_PX — not at the slop radius', () => {
+    const { grid, drags } = setup()
+    fire(grid, 'pointerdown', 5, 5)
+    fire(grid, 'pointermove', 5 + SLOP_PX + 5, 5)   // a drag, but not a deliberate one
+    expect(drags()).toBe(0)
+    fire(grid, 'pointermove', 5 + DRAG_PX + 1, 5)
+    expect(drags()).toBe(1)
+    fire(grid, 'pointermove', 5 + DRAG_PX + 30, 5)
+    fire(grid, 'pointerup', 5 + DRAG_PX + 30, 5)
+    expect(drags()).toBe(1)
+    // A new gesture can fire it again.
+    fire(grid, 'pointerdown', 5, 5)
+    fire(grid, 'pointermove', 5 + DRAG_PX + 1, 5)
+    expect(drags()).toBe(2)
+  })
+
+  it('a sloppy long-press (drift past the slop, short of DRAG_PX) stays inert', () => {
+    const { grid, drags, presses } = setup()
+    fire(grid, 'pointerdown', 5, 5)
+    fire(grid, 'pointermove', 5 + SLOP_PX + 5, 5)
+    vi.advanceTimersByTime(LONG_PRESS_MS + 50)
+    fire(grid, 'pointerup', 5 + SLOP_PX + 5, 5)
+    expect(presses).toEqual([])
+    expect(drags()).toBe(0)
+  })
+
+  it('regrab re-measures under the held finger and pans the touch-down anchor back under it', () => {
+    const { grid, pans, geometry, gestures } = setup()
+    fire(grid, 'pointerdown', 5, 5)               // anchor (0,0)
+    fire(grid, 'pointermove', 45, 5)              // (4,0): pan (-4,0) reported
+    expect(pans).toEqual([{ x: -4, y: 0 }])
+    // The level map opened: cells are now 7px (X_MODE_SCALE), still origin
+    // (0,0) — the finger at x=45 sits over (6,0) on the new grid.
+    geometry.cellAt = (x, y) => ({ x: Math.floor(x / 7), y: Math.floor(y / 7) })
+    fire(grid, 'pointermove', 45, 5)              // stale tester: still (4,0)
+    expect(pans).toEqual([{ x: -4, y: 0 }, { x: -4, y: 0 }])
+    gestures.regrab()
+    expect(pans[2]).toEqual({ x: -6, y: 0 })     // anchor kept, not re-anchored
+    fire(grid, 'pointermove', 52, 5)              // (7,0) on the new grid
+    expect(pans[3]).toEqual({ x: -7, y: 0 })
+  })
+
+  it('regrab after the lift is a no-op', () => {
+    const { grid, pans, gestures } = setup()
+    fire(grid, 'pointerdown', 5, 5)
+    fire(grid, 'pointermove', 45, 5)
+    fire(grid, 'pointerup', 45, 5)
+    pans.length = 0
+    gestures.regrab()
+    expect(pans).toEqual([])
+  })
 })
 
 describe('mode gates', () => {
@@ -253,5 +325,14 @@ describe('mode gates', () => {
     // X level map runs MOUSE_MODE_NORMAL; the view-map flag alone allows it.
     expect(canDescribe(0, true)).toBe(true)
     expect(canDescribe(undefined, true)).toBe(true)
+  })
+
+  it('canOpenLevelMap: the command prompt only', () => {
+    expect(canOpenLevelMap(1)).toBe(true)
+    expect(canOpenLevelMap(0)).toBe(false)          // NORMAL (already in X)
+    expect(canOpenLevelMap(2)).toBe(false)          // TARGET: X would answer the chooser
+    expect(canOpenLevelMap(5)).toBe(false)          // MORE
+    expect(canOpenLevelMap(7)).toBe(false)          // PROMPT
+    expect(canOpenLevelMap(undefined)).toBe(false)
   })
 })

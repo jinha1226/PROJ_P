@@ -78,7 +78,7 @@ describe('passwordLogin', () => {
       onFail: (message) => { failure = message },
     })
 
-    feed({ msg: 'login_fail', message: 'bad password' })
+    feed({ msg: 'login_fail', reason: 'bad password' })
     expect(failure).toBe('bad password')
   })
 })

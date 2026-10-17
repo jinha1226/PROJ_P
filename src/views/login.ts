@@ -1,5 +1,6 @@
-import { WsConnection } from '../ws/connection'
-import { listSessions, type StoredSession } from '../auth/session'
+import { httpBaseOf, WsConnection } from '../ws/connection'
+import type { ServerMsg } from '../ws/types'
+import { listSessions, saveSession, type StoredSession } from '../auth/session'
 import { clearCredentials, loadCredentials, saveCredentials } from '../auth/credentials'
 import { passwordLogin } from '../auth/password-login'
 import { cncUserinfo } from '../dwem/cnc-userinfo'
@@ -8,6 +9,7 @@ import { findServer, KNOWN_SERVERS, SPECTATE_SERVERS, labelFor } from '../server
 import { getLastSpectateServer, getPref, setPref, setLastSpectateServer, LOGIN_SPRITES_CHANGED_EVENT } from '../prefs'
 import { openAboutDoc, openChangelogDoc, unreadDotHtml } from './docs'
 import { openSettings } from './settings-view'
+import { mountCardOverlay } from './overlay'
 import { decorateLogo } from '../logo'
 import { listAvatars } from '../avatars'
 import { paintAvatars } from './avatar-tiles'
@@ -19,6 +21,8 @@ import {
 } from '../offline/artifact-store'
 import { compactPlace, nameTitle } from '../game/char-label'
 import { escHtml } from '../game/dcss-colors'
+import { MessageHold } from '../ws/message-hold'
+import { registerViewDispose } from './view-dispose'
 
 export interface LoginResult {
   conn: WsConnection
@@ -34,9 +38,9 @@ export function buildLoginView(
   // Opens the offline lobby (save slots for the on-device WASM engine). When
   // absent the offline card is not rendered.
   onOffline?: () => void,
-  // Who was just signed out involuntarily (a resume whose saved session the
-  // server refused): the form opens on that server with the username filled
-  // in, so re-entry is the password alone. Only meaningful with `notice`.
+  // Who was just signed out involuntarily with their session record gone:
+  // the sign-in sheet fills in that server and username, so re-entry is the
+  // password alone (rules at `refill` below).
   prefill?: { wsUrl: string; username: string },
 ): HTMLElement {
   const view = document.createElement('div')
@@ -45,28 +49,32 @@ export function buildLoginView(
   const sessions = listSessions()
   const hasSessions = sessions.length > 0
 
-  // Reused form contents — wrapped in a `<details>` toggle when the user
-  // already has saved sessions, or rendered as a plain Sign-in section when
-  // they don't.
+  // The sign-in form, rendered only inside the sheet (openSignInSheet).
+  // One grouped cell: a Server row with its value
+  // trailing, then Username / Password rows named by placeholder and
+  // aria-label rather than a label line above each field. The error sits on
+  // the fields it is about, above the button.
   const formInnerHtml = `
-    <label class="login-label">
-      Server
-      <select id="server-select"></select>
-    </label>
-    <label class="login-label">
-      Username
-      <input id="login-user" type="text" autocomplete="username"
-             spellcheck="false" autocorrect="off" autocapitalize="off" required />
-    </label>
-    <label class="login-label">
-      Password
-      <input id="login-pass" type="password" autocomplete="current-password" required />
-    </label>
+    <div class="login-form-group">
+      <label class="login-form-row login-form-row--picker">
+        <span class="login-form-name">Server</span>
+        <select id="server-select"></select>
+      </label>
+      <div class="login-form-row">
+        <input id="login-user" type="text" autocomplete="username" placeholder="Username"
+               aria-label="Username" spellcheck="false" autocorrect="off" autocapitalize="off" required />
+      </div>
+      <div class="login-form-row">
+        <input id="login-pass" type="password" autocomplete="current-password" placeholder="Password"
+               aria-label="Password" required />
+      </div>
+    </div>
     <label class="login-remember">
       <input id="login-save-credentials" type="checkbox" autocomplete="off" />
       <span>Store credentials locally for token fallback</span>
     </label>
-    <button id="login-btn" type="submit" class="login-btn">Connect</button>
+    <div id="login-sheet-error" class="login-sheet-error" role="alert" hidden></div>
+    <button id="login-btn" type="submit" class="login-btn">Sign in</button>
   `
 
   // About / What's new are rendered in-app from the committed ABOUT.md /
@@ -84,21 +92,19 @@ export function buildLoginView(
     </div>
   `
 
+  // "Add account" opens the sign-in sheet in both states; only its weight
+  // follows the state. No saved accounts: it is the group's way in, so the
+  // primary fill. Saved accounts: the cards are the way in, so a text action
+  // under them. (Mock round r23; dev-material/login-add-account-sheet.md.)
   const addAccountSection = hasSessions
     ? `
-      <details id="add-account" class="login-subsection login-add-section">
-        <summary class="login-add-toggle">Add another account</summary>
-        <form id="login-form" autocomplete="on" novalidate class="login-add-form">
-          ${formInnerHtml}
-        </form>
-      </details>
+      <div class="login-subsection">
+        <button type="button" id="add-account" class="login-add-btn">Add account</button>
+      </div>
     `
     : `
-      <div class="login-subsection login-signin-section">
-        <div class="login-sub-label">Sign in</div>
-        <form id="login-form" autocomplete="on" novalidate>
-          ${formInnerHtml}
-        </form>
+      <div class="login-subsection">
+        <button type="button" id="add-account" class="login-btn">Add account</button>
       </div>
     `
 
@@ -139,12 +145,13 @@ export function buildLoginView(
         ${addAccountSection}
 
         <div class="login-subsection login-spectate-section">
-          <div class="login-sub-label">Spectate as guest</div>
           <div class="login-spectate-row">
             <select id="spectate-select" class="login-spectate-select" aria-label="Server"></select>
-            <button id="spectate-btn" type="button" class="login-btn login-btn-spectate">Spectate →</button>
+            <button id="spectate-btn" type="button" class="login-btn-spectate"
+                    aria-describedby="spectate-note">Spectate</button>
           </div>
           <div id="spectate-error" class="login-error" style="display:none" role="alert"></div>
+          <div id="spectate-note" class="login-sub-footer">Guest login.</div>
         </div>
         </details>
       </section>
@@ -171,14 +178,9 @@ export function buildLoginView(
     </div>
   `
 
-  const formSelect = view.querySelector<HTMLSelectElement>('#server-select')!
   const spectateSelect = view.querySelector<HTMLSelectElement>('#spectate-select')!
-  const userInput = view.querySelector<HTMLInputElement>('#login-user')!
-  const passInput = view.querySelector<HTMLInputElement>('#login-pass')!
-  const saveCredentialsInput = view.querySelector<HTMLInputElement>('#login-save-credentials')!
   const errorEl = view.querySelector<HTMLElement>('#login-error')!
   const spectateErrorEl = view.querySelector<HTMLElement>('#spectate-error')!
-  const btn = view.querySelector<HTMLButtonElement>('#login-btn')!
 
   decorateLogo(view.querySelector<HTMLElement>('.login-title')!)
 
@@ -200,16 +202,16 @@ export function buildLoginView(
     view.querySelector('.login-card')!.prepend(banner)
   }
 
-  if (notice) {
-    errorEl.textContent = notice
-    errorEl.style.display = ''
-  }
+  // The signed-out identity fills the sheet whenever it opens — only for a
+  // server the form can select (a username against the wrong server is
+  // worse than an empty field). With a notice it also opens the sheet on
+  // mount, carrying that notice. app.ts sends a prefill for every give-up
+  // whose session record is gone — a reconnect cancel and the age cutoff
+  // (no notice) included — so the notice alone says what happened.
+  const refill = prefill && findServer(prefill.wsUrl) ? prefill : undefined
+  const showNotice = (): void => { if (notice) showError(notice) }
+  if (!refill) showNotice()
 
-  for (const s of KNOWN_SERVERS) {
-    const o1 = document.createElement('option')
-    o1.value = s.wsUrl; o1.textContent = s.label
-    formSelect.appendChild(o1)
-  }
   // Hostnames, not the server tags: this is the home screen, where a visitor
   // without an account is the likeliest person to use it, and "CDI" means
   // nothing to them. The compressed row has the width for a hostname anyway
@@ -220,24 +222,10 @@ export function buildLoginView(
     spectateSelect.appendChild(o2)
   }
 
-  // Login-form dropdown follows the most-recently-used session's server.
   // Spectate dropdown prefers the saved pref (last explicit guest pick),
-  // falling back to the session-derived prior when that server is also
-  // anonymously spectatable, otherwise the list top.
+  // falling back to the most-recently-used session's server when that
+  // server is also anonymously spectatable, otherwise the list top.
   const topSession = sessions[0]
-  if (topSession && KNOWN_SERVERS.some(s => s.wsUrl === topSession.wsUrl)) {
-    formSelect.value = topSession.wsUrl
-  }
-  // Only when the server is one the form can select — a username against
-  // the wrong server is worse than an empty field. With other accounts
-  // saved the form sits inside the collapsed "Add another account"
-  // disclosure; open it, or the prefill is invisible.
-  if (prefill && KNOWN_SERVERS.some(s => s.wsUrl === prefill.wsUrl)) {
-    formSelect.value = prefill.wsUrl
-    userInput.value = prefill.username
-    const details = view.querySelector<HTMLDetailsElement>('#add-account')
-    if (details) details.open = true
-  }
   const savedSpectate = getLastSpectateServer()
   if (savedSpectate) {
     spectateSelect.value = savedSpectate
@@ -274,9 +262,22 @@ export function buildLoginView(
   const forceOnlineOpen = wireDisclosure('online-group', onlineOpen, 'loginOnlineOpen')
   wireDisclosure('offline-group', offlineOpen, 'loginOfflineOpen')
 
+  // One disposer per view (the registry keeps the last one registered), so
+  // every teardown of this view goes through this list.
+  const teardown: Array<() => void> = []
+  registerViewDispose(view, () => { for (const fn of teardown) fn() })
+  // The open sign-in sheet's close (openSignInSheet), or null. Declared
+  // before the mount-time open below reaches it.
+  let closeSheet: (() => void) | null = null
+
   renderResumeButtons()
   renderOfflineCard()
   renderAvatars()
+
+  view.querySelector('#add-account')!.addEventListener('click', () => openSignInSheet())
+  if (refill && notice) openSignInSheet(notice)
+  // The sheet is body-mounted: a view swapped out under it takes it along.
+  teardown.push(() => closeSheet?.())
 
   // Shelf of your recently-played character dolls (see ../avatars + ./avatar-tiles),
   // newest at the left. One newest-first order is shared with the crypt grid (newest
@@ -321,16 +322,14 @@ export function buildLoginView(
       }
     }
     paint()
-    // Self-unhooks once this view is gone (same pattern as game-view's pref
-    // listeners) — each buildLoginView mounts a fresh view.
-    const onSpritesPref = (): void => {
-      if (!view.isConnected) {
-        window.removeEventListener(LOGIN_SPRITES_CHANGED_EVENT, onSpritesPref)
-        return
-      }
-      paint()
-    }
+    const onSpritesPref = (): void => paint()
     window.addEventListener(LOGIN_SPRITES_CHANGED_EVENT, onSpritesPref)
+    // Each lobby drop mounts a fresh login view; without this every old one
+    // stays reachable from window until the pref next changes.
+    teardown.push(() => {
+      window.removeEventListener(LOGIN_SPRITES_CHANGED_EVENT, onSpritesPref)
+      painting?.abort()
+    })
   }
 
   // Offline card: one tap opens the offline lobby (save slots, backup
@@ -359,6 +358,8 @@ export function buildLoginView(
         ? Object.values(chars).sort((a, b) => b.when - a.when)[0]
         : undefined
       hasChar = rec !== undefined
+      // A character's name is game data (mono); the fallbacks are labels.
+      title.classList.toggle('is-label', !rec)
       if (!rec) {
         // No saves, or saves the browser knows nothing about (imported
         // pack, wiped localStorage) — the lobby labels the latter by stem.
@@ -519,52 +520,198 @@ export function buildLoginView(
     })
   }
 
-  const form = view.querySelector<HTMLFormElement>('#login-form')!
-  form.addEventListener('submit', async (e) => {
-    e.preventDefault()
-    clearErrors()
+  // The sign-in form's one host: a floating sheet at content height (the
+  // Settings/docs sheet anatomy, mountCardOverlay), built fresh per open.
+  // `againNotice`: opened on mount for an involuntary sign-out, titled as
+  // such and carrying the app's notice (refill fills it in).
+  function openSignInSheet(againNotice?: string): void {
+    if (closeSheet) return
+    const vv = window.visualViewport
+    let pending: WsConnection | null = null
+    let signedIn = false
+    const coarse = window.matchMedia?.('(pointer: coarse)').matches ?? false
+    const { backdrop, body, close } = mountCardOverlay(
+      againNotice ? 'Sign in again' : 'Add account',
+      { backdrop: 'login-sheet-backdrop', card: 'login-sheet', body: 'login-sheet-body' },
+      () => {
+        closeSheet = null
+        // A close mid-handshake (✕, Escape, scrim) must not sign in behind it.
+        pending?.close()
+        pending = null
+        vv?.removeEventListener('resize', fitAboveKeyboard)
+        vv?.removeEventListener('scroll', fitAboveKeyboard)
+        if (signedIn) return
+        // Dismissed without signing in: the reason it opened stays on the
+        // screen, and focus returns to the control that opens it again.
+        // Never ringed for a touch player: after the server <select>'s iOS
+        // picker, WebKit rings this programmatic focus (on-device,
+        // 2026-10-08; desktop WebKit doesn't reproduce).
+        if (againNotice) showNotice()
+        if (view.isConnected) {
+          view.querySelector<HTMLElement>('#add-account')
+            ?.focus({ preventScroll: true, ...(coarse && { focusVisible: false }) })
+        }
+      },
+    )
+    closeSheet = close
+    body.innerHTML = `
+      ${againNotice ? `<p id="login-sheet-msg" class="login-sheet-msg">${escHtml(againNotice)}</p>` : ''}
+      <form id="login-form" autocomplete="on" novalidate>${formInnerHtml}</form>
+      <p class="login-sheet-foot">No account?
+        <a class="login-sheet-register" target="_blank" rel="noopener"></a>.<br>
+        Pick a server near you for lower latency.</p>
+    `
+    const select = body.querySelector<HTMLSelectElement>('#server-select')!
+    const userInput = body.querySelector<HTMLInputElement>('#login-user')!
+    const passInput = body.querySelector<HTMLInputElement>('#login-pass')!
+    const sheetError = body.querySelector<HTMLElement>('#login-sheet-error')!
+    const btn = body.querySelector<HTMLButtonElement>('#login-btn')!
+    const register = body.querySelector<HTMLAnchorElement>('.login-sheet-register')!
+    const saveCredentialsInput = body.querySelector<HTMLInputElement>('#login-save-credentials')!
 
-    const wsUrl = formSelect.value
-    const username = userInput.value.trim()
-    const password = passInput.value
-    const shouldSaveCredentials = saveCredentialsInput.checked
+    // Region as group headers, not in the option text: "host · region"
+    // overran the closed row for 7 of 9 servers at 402px and clipped the
+    // region (measured 2026-10-08).
+    const groups = new Map<string, HTMLOptGroupElement>()
+    for (const s of KNOWN_SERVERS) {
+      let g = groups.get(s.region)
+      if (!g) {
+        g = document.createElement('optgroup')
+        g.label = s.region
+        groups.set(s.region, g)
+        select.appendChild(g)
+      }
+      const o = document.createElement('option')
+      o.value = s.wsUrl; o.textContent = s.label
+      g.appendChild(o)
+    }
+    // The signed-out identity, else the most-recently-used session's server.
+    const initial = refill?.wsUrl ?? listSessions()[0]?.wsUrl
+    if (initial && findServer(initial)) select.value = initial
+    if (refill) userInput.value = refill.username
+    // The server's own WebTiles page (httpBaseOf). A server can switch
+    // sign-up off (new_accounts_disabled), which upstream reports only once
+    // the register form is sent (userdb.py register_user).
+    const syncRegister = (): void => {
+      register.href = `${httpBaseOf(select.value)}/`
+      register.textContent = `Register on ${labelFor(select.value)}`
+    }
+    syncRegister()
+    select.addEventListener('change', syncRegister)
 
-    if (!username) { showError('Please enter a username.'); return }
-    if (!password) { showError('Please enter a password.'); return }
+    // iOS leaves fixed layers under the on-screen keyboard: lift the sheet
+    // by the part of the layout viewport the keyboard covers (the visual
+    // viewport shrinks, and may pan to the focused field).
+    // Pinch zoom (Safari tabs ignore user-scalable=no) shrinks the visual
+    // viewport too, with no keyboard: only measure unzoomed.
+    function fitAboveKeyboard(): void {
+      if (!vv) return
+      const covered = vv.scale > 1.01 ? 0 : Math.max(0, window.innerHeight - vv.height - vv.offsetTop)
+      backdrop.style.setProperty('--kb', `${covered}px`)
+      backdrop.classList.toggle('kb-up', covered > 0)
+    }
+    vv?.addEventListener('resize', fitAboveKeyboard)
+    vv?.addEventListener('scroll', fitAboveKeyboard)
 
-    btn.disabled = true
-    btn.textContent = 'Connecting…'
-
-    const conn = new WsConnection(wsUrl)
-    try {
-      await conn.connect()
-    } catch {
-      showError(`Could not connect to ${labelFor(wsUrl)}`)
-      btn.disabled = false
-      btn.textContent = 'Connect'
-      return
+    // Never focus a field for a touch player: on iOS that focus raises the
+    // system's "Sign In … Fill Password" autofill sheet over this one before
+    // the form has been seen (on-device, 2026-10-08) — the player's own tap
+    // on a field brings the keyboard or that prompt. Mouse and hardware
+    // keyboards get the first empty field. Otherwise (and for the
+    // sign-in-again sheet, which opens with no tap) the dialog itself takes
+    // focus, so a screen reader moves into it without raising a keyboard.
+    const card = body.parentElement!
+    if (againNotice) card.setAttribute('aria-describedby', 'login-sheet-msg')
+    if (!againNotice && !coarse) {
+      (userInput.value ? passInput : userInput).focus()
+    } else {
+      card.tabIndex = -1
+      card.focus({ preventScroll: true })
     }
 
-    passwordLogin(conn, { wsUrl, username, password }, {
-      onSuccess: (canonicalUsername, flush) => {
-        setPref('loginOnlineOpen', null)  // a login outranks an old collapse; back to auto
-        if (shouldSaveCredentials) {
-          saveCredentials(wsUrl, canonicalUsername, password)
-        } else {
-          clearCredentials(wsUrl, username)
-          clearCredentials(wsUrl, canonicalUsername)
+    // Shown first, then filled, and emptied on every submit: a role=alert
+    // region announces a content change, which a change while hidden — or
+    // the same sentence set twice — may not be.
+    const showSheetError = (msg: string): void => {
+      sheetError.hidden = false
+      sheetError.textContent = msg
+    }
+    const idle = (): void => {
+      btn.disabled = false
+      btn.textContent = 'Sign in'
+    }
+
+    body.querySelector<HTMLFormElement>('#login-form')!.addEventListener('submit', async (e) => {
+      e.preventDefault()
+      // The button is disabled while one is in flight; this also covers a
+      // submit that doesn't come from it.
+      if (pending) return
+      sheetError.hidden = true
+      sheetError.textContent = ''
+
+      const wsUrl = select.value
+      const username = userInput.value.trim()
+      const password = passInput.value
+      const shouldSaveCredentials = saveCredentialsInput.checked
+
+      if (!username) { showSheetError('Please enter a username.'); return }
+      if (!password) { showSheetError('Please enter a password.'); return }
+
+      btn.disabled = true
+      btn.textContent = 'Signing in…'
+
+      const conn = new WsConnection(wsUrl)
+      pending = conn
+      try {
+        await conn.connect()
+      } catch {
+        if (pending !== conn) return
+        pending = null
+        showSheetError(`Could not connect to ${labelFor(wsUrl)}`)
+        idle()
+        return
+      }
+      if (pending !== conn) return
+      // Dropped before any login reply: no login_fail will come. adoptConn
+      // (app.ts) takes onClose over once a login succeeds.
+      conn.onClose = () => {
+        if (pending !== conn) return
+        pending = null
+        showSheetError(`Lost the connection to ${labelFor(wsUrl)}`)
+        idle()
+      }
+
+      conn.send({ msg: 'login', username, password })
+
+      listenOnce(conn, (msg: ServerMsg) => {
+        if (pending !== conn) return
+        pending = null
+        if (msg.msg === 'login_success') {
+          setPref('loginOnlineOpen', null)  // a login outranks an old collapse; back to auto
+          if (shouldSaveCredentials) {
+            saveCredentials(wsUrl, msg.username, password)
+          } else {
+            clearCredentials(wsUrl, username)
+            clearCredentials(wsUrl, msg.username)
+          }
+          conn.onLoginCookie = (cookie, expiresDays) => {
+            saveSession(wsUrl, msg.username, cookie, expiresDays)
+          }
+          conn.send({ msg: 'set_login_cookie' })
+          signedIn = true
+          close()
+          onLogin({ conn, username: msg.username })
+        } else if (msg.msg === 'login_fail') {
+          // No reason = a plain password mismatch or unknown user
+          // (ws_handler.py login); a reason ("Account is disabled.") is the
+          // server's own sentence.
+          showSheetError(msg.reason || 'Incorrect username or password.')
+          conn.close()
+          idle()
         }
-        onLogin({ conn, username: canonicalUsername })
-        flush()
-      },
-      onFail: (message) => {
-        showError(message)
-        conn.close()
-        btn.disabled = false
-        btn.textContent = 'Connect'
-      },
+      })
     })
-  })
+  }
 
   const spectateBtn = view.querySelector<HTMLButtonElement>('#spectate-btn')!
   spectateBtn.addEventListener('click', async () => {
@@ -610,4 +757,28 @@ export function buildLoginView(
   }
 
   return view
+}
+
+// Install a one-shot handler that fires on the first login_success / login_fail.
+// The handler typically swaps the view, which reassigns conn.onMessage to the
+// next view's handler — in that case we leave the new handler in place. If the
+// handler doesn't reassign (e.g. login_fail), restore the prior onMessage.
+//
+// The WebTiles server pushes the lobby snapshot (lobby_clear / lobby_entry /
+// lobby_complete) immediately on socket open, before login_success arrives.
+// Buffer those pre-login messages and replay them to whichever handler owns
+// onMessage after the login handler runs, so the lobby view sees them.
+export function listenOnce(conn: { onMessage: (msg: ServerMsg) => void }, handler: (msg: ServerMsg) => void): void {
+  const prev = conn.onMessage
+  const held = new MessageHold()
+  const wrapper = (msg: ServerMsg) => {
+    if (msg.msg === 'login_success' || msg.msg === 'login_fail') {
+      handler(msg)
+      if (conn.onMessage === wrapper) conn.onMessage = prev
+      held.replay(conn)
+    } else {
+      held.hold(msg)
+    }
+  }
+  conn.onMessage = wrapper
 }

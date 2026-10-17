@@ -17,6 +17,45 @@ interface TranslationBuild {
   messages: string[]
 }
 
+/** Translate one wire message in place. `ui-stack` is a transport envelope:
+ * PocketZot re-dispatches its nested messages directly to the game view, so
+ * they would otherwise bypass IOHook and repaint translated overlays with the
+ * server's original text. */
+export function translateIncomingMessage(
+  data: IncomingMessage,
+  translator: Translator,
+  language: string,
+  debug = false,
+): void {
+  if (data.msg === 'ui-stack' && Array.isArray(data.items)) {
+    for (const item of data.items) {
+      if (item && typeof item === 'object' && typeof item.msg === 'string') {
+        translateIncomingMessage(item as IncomingMessage, translator, language, debug)
+      }
+    }
+  }
+
+  for (const [category, processor] of Object.entries(TranslationDataManager.processors)) {
+    if (!processor.match(data)) continue
+    const originals = processor.extract(data)
+    const translated = originals.map((text) => {
+      try {
+        return translator.translate(text, language, category)
+      } catch (err) {
+        if (debug) console.error('[DWEM][TranslationModule] translation failed', { category, text, err })
+        return { translation: text }
+      }
+    })
+    if (debug) {
+      for (let i = 0; i < originals.length; i++) {
+        console.log('[DWEM][TranslationModule]', category, originals[i], translated[i])
+      }
+    }
+    processor.restore(data, translated.map((result) =>
+      applySpecialPatterns(result.translation, TranslationDataManager.functions)))
+  }
+}
+
 export class TranslationModule {
   private config: TranslationConfig | null = null
   private translator: Translator | null = null
@@ -88,27 +127,12 @@ export class TranslationModule {
 
   private translateIncoming(data: IncomingMessage): void {
     if (!this.config?.translationLanguage || !this.translator) return
-
-    for (const [category, processor] of Object.entries(TranslationDataManager.processors)) {
-      if (!processor.match(data)) continue
-      const originals = processor.extract(data)
-      const translated = originals.map((text) => {
-        try {
-          return this.translator!.translate(text, this.config!.translationLanguage!, category)
-        } catch (err) {
-          if (this.config?.translationDebug) {
-            console.error('[DWEM][TranslationModule] translation failed', { category, text, err })
-          }
-          return { translation: text }
-        }
-      })
-      if (this.config.translationDebug) {
-        for (let i = 0; i < originals.length; i++) {
-          console.log('[DWEM][TranslationModule]', category, originals[i], translated[i])
-        }
-      }
-      processor.restore(data, translated.map((result) => applySpecialPatterns(result.translation, TranslationDataManager.functions)))
-    }
+    translateIncomingMessage(
+      data,
+      this.translator,
+      this.config.translationLanguage,
+      this.config.translationDebug,
+    )
   }
 
   private loadTranslationFont(language: string): void {

@@ -8,6 +8,7 @@ import { siteInformation } from './dwem/site-information'
 import { disposeView } from './views/view-dispose'
 import type { TileLoader } from './game/tiles/tile-loader'
 import { OFFLINE_GAME_ID } from './offline/offline-state'
+import { jspiSupported } from './offline/artifact-store'
 import { activeGameStart, attemptResume, clearGameStart, loadPersistedResume, markProactiveClose } from './reconnect'
 import { count, type CountFlags } from './counter'
 import { getActiveControlSet } from './game/input/control-sets'
@@ -108,7 +109,7 @@ function showOfflineLobby(exit?: GameExit): void {
 // (both gate on a truthy id), so offline characters join the login doll shelf
 // and crypt — wsUrl 'local://offline' + username=name keep their slot keys
 // disjoint from every server's, and captures eager-bake PNG thumbnails off
-// the same-origin pack (game-view maybeSaveAvatar). guest=false keeps
+// the same-origin pack (CharacterRecord.captureAvatar). guest=false keeps
 // canResumeAfterClose() false, so the visibilitychange handler never
 // proactively closes the "socket" (LocalConnection never reconnects — see its
 // header). Exit returns to the offline lobby, which shows the same
@@ -135,16 +136,17 @@ async function showOfflineGame(name: string): Promise<void> {
   // capture's character isn't yours and must not mint a phantom shelf entry.
   const gameId = params.get('engine') === 'fake' ? '' : OFFLINE_GAME_ID
   if (gameId) {
-    count('play-offline', gameStartFlags())
+    // J gates the Asyncify retirement (dev-material/jspi-migration.md).
+    count('play-offline', { ...gameStartFlags(), jspi: jspiSupported() })
     setPref('loginOfflineOpen', null)  // playing offline outranks an old collapse; back to auto
   }
   state = 'game'
   conn = boot.conn
   currentUsername = name
   currentIsGuest = false
-  setView(buildGameView(
-    boot.conn,
-    (exit) => {
+  setView(buildGameView({
+    conn: boot.conn,
+    onLobby: (exit) => {
       boot.dispose()
       conn = null
       // Drop the ?offline flag with the session: a later reload (e.g. the
@@ -158,13 +160,11 @@ async function showOfflineGame(name: string): Promise<void> {
       history.replaceState(null, '', location.pathname + (qs ? `?${qs}` : ''))
       showOfflineLobby(exit)
     },
-    undefined,
-    undefined,
-    currentUsername,
+    username: currentUsername,
     gameId,
-    currentIsGuest,
-    (filename) => boot.readMorgue(filename),
-  ))
+    guest: currentIsGuest,
+    readMorgue: (filename) => boot.readMorgue(filename),
+  }))
   boot.start()
 }
 
@@ -236,19 +236,22 @@ function gameStartFlags(): CountFlags {
   }
 }
 
-function showGame(spectating?: SpectateTarget, loader?: TileLoader, gameId?: string): void {
+function showGame(
+  spectating?: SpectateTarget, loader?: TileLoader, gameId?: string, resumed = false,
+): void {
   count(spectating ? 'spectate' : 'play', gameStartFlags())
   state = 'game'
   siteInformation.setGame(conn, currentUsername, currentIsGuest, spectating)
-  setView(buildGameView(
-    conn!,
-    (exit) => showLobby(currentUsername, currentIsGuest, exit),
+  setView(buildGameView({
+    conn: conn!,
+    onLobby: (exit) => showLobby(currentUsername, currentIsGuest, exit),
     spectating,
-    loader,
-    currentUsername,
+    initialLoader: loader,
+    username: currentUsername,
     gameId,
-    currentIsGuest,
-  ))
+    guest: currentIsGuest,
+    resumed,
+  }))
 }
 
 function adoptConn(c: GameConnection): void {
@@ -304,7 +307,7 @@ function startResume(wsUrl: string): void {
         markProactiveClose()
         newConn.close()
       }
-      showGame(spectating, loader, gameId)
+      showGame(spectating, loader, gameId, true)
     },
     onLobby: (newConn, exit) => {
       resumeActive = false

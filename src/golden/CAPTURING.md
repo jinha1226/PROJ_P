@@ -84,7 +84,7 @@ internals are renamed:
   (high-word `0x80000000` / `0xE0000000`). The unit test for
   `decodeFgThreatTier` uses our own constants; this proves they still
   match what DCSS emits.
-- **Examine mode** — `cursor` messages with absolute coords. Replayer
+- **Examine mode** — `cursor` messages (map-frame coords). Replayer
   needs to be extended to handle them first.
 - **Newgame-choice** — `ui-push` with `type:"newgame-choice"`. Only
   emitted at character creation; a saved-game session can't capture it.
@@ -123,6 +123,24 @@ A failing golden means one of three things:
 Tell these apart by reading the diff: if the failing assertion is a
 field you didn't touch, suspect (1) or (3). If it's a field you
 deliberately changed the behavior of, it's (2).
+
+## Screen traces
+
+`screen-trace.test.ts` also replays every fixture through the whole game
+view and pins, per frame, what the player sees (`screen-probe.ts`) and
+what the view sent back, in `__traces__/<name>.trace`. A new fixture's
+trace is written on its first run; review it like code. These guard
+restructuring of `game-view.ts`: the traces must not change unless the
+behaviour is meant to. After an intended change, review the diff and run
+`npx vitest run src/golden -u`.
+
+For these, the sequence matters more than wire-format edges, so
+overlay-stack captures (menu → describe → action, targeting under an open
+menu, prompts over menus, CRT screens, spectator joins) are worth
+recording even when their frames are routine. Two optional fixture
+fields mount the view differently: `"view": {"spectating": true}` for a
+capture taken while spectating, `"view": {"resumed": true}` for one taken
+by an auto-resumed view.
 
 ## What the replayer handles
 

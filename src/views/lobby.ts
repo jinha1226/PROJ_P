@@ -10,12 +10,27 @@ import { setLastSpectateServer } from '../prefs'
 import { fitToWidth } from './fit-terminal'
 import { openAboutDoc, openChangelogDoc, unreadDotHtml } from './docs'
 import { openSettings } from './settings-view'
-import { clearGameStart, FORCE_TERMINATE_WARNING, rememberGameStart } from '../reconnect'
+import { activeGameStart, clearGameStart, FORCE_TERMINATE_WARNING, rememberGameStart } from '../reconnect'
 import { classifyTransition } from '../ws/transition'
+import { combineHandlers, dispatch, type MsgOf } from '../ws/dispatcher'
+import { MessageHold } from '../ws/message-hold'
 import { isBelowSupportCutoff, parseDcssVersion } from '../util/dcss-version'
 import { attachScrollCue } from '../util/scroll-cue'
 import { ChatView } from './chat-view'
 import { CncPublicChatClient, CNC_PUBLIC_CHAT_BOT, isCncPublicChatAvailable } from '../dwem/cnc-public-chat'
+import { registerViewDispose } from './view-dispose'
+
+/** A `#lobby-notice` line, online and offline lobby alike. The kind picks its
+ *  leading mark (style.css `.lobby-notice[data-kind]`): a spinner while
+ *  something is in flight, a warn badge when it failed, none for plain info.
+ *  Empty text hides the notice. */
+export type NoticeKind = 'info' | 'progress' | 'error'
+export function setLobbyNotice(el: HTMLElement, text: string, kind: NoticeKind = 'info'): void {
+  el.textContent = text
+  el.hidden = text === ''
+  if (kind === 'info') delete el.dataset['kind']
+  else el.dataset['kind'] = kind
+}
 
 export function buildLobbyView(
   conn: GameConnection,
@@ -51,9 +66,10 @@ export function buildLobbyView(
   // game_client only arrives after the transition (e.g. CDI), where the game
   // view's own game_client handler resolves the loader instead.
   let activeLoader: TileLoader | null = null
-  // Messages the lobby doesn't handle, held for the game view (see handleMsg's
-  // default case) and replayed right after onGameStart mounts it.
-  const preGameMsgs: ServerMsg[] = []
+  // Messages the lobby doesn't handle, held for the game view (see
+  // handleMsg's fallback) and replayed right after onGameStart mounts it.
+  // Capped as a guard against a nonconforming server flooding the lobby.
+  const preGame = new MessageHold(100)
 
   const view = document.createElement('div')
   view.id = 'lobby-view'
@@ -77,7 +93,7 @@ export function buildLobbyView(
         <button id="lobby-server-chip" class="lobby-account-chip is-guest" type="button"
                 aria-haspopup="menu" aria-expanded="false" aria-label="Guest on ${escHtml(serverTag)}">
           ${guestChipInner}
-          <span class="lobby-chip-caret">▾</span>
+          <span class="lobby-chip-caret" aria-hidden="true"></span>
         </button>
         <div id="lobby-server-menu" class="lobby-account-menu" hidden>
           ${SPECTATE_SERVERS.map(s => `
@@ -97,7 +113,7 @@ export function buildLobbyView(
           <span class="lobby-chip-user">${renderUsername(username)}</span>
           <span class="lobby-chip-sep">·</span>
           <span class="lobby-chip-tag">${escHtml(serverTag)}</span>
-          <span class="lobby-chip-caret">▾</span>
+          <span class="lobby-chip-caret" aria-hidden="true"></span>
           ${unreadDotHtml('unread-dot-corner')}
         </button>
         <div id="lobby-account-menu" class="lobby-account-menu" hidden>
@@ -114,16 +130,18 @@ export function buildLobbyView(
 
   view.innerHTML = `
     <div class="lobby-header">
-      <button id="lobby-back" class="lobby-btn-ghost" aria-label="Back to login">← Login</button>
+      <button id="lobby-back" class="lobby-btn-ghost is-back" aria-label="Back to login">Login</button>
       ${headerRight}
     </div>
     <div class="lobby-scroll">
       <div id="lobby-notice" class="lobby-notice" hidden></div>
       ${gamesContainer}
-      <h2 class="lobby-section-title">Active Games</h2>
+      <h2 class="lobby-section-title">Active games</h2>
       <div id="lobby-list" class="lobby-list">
         <div class="lobby-loading">Loading…</div>
       </div>
+      <h2 class="lobby-section-title" id="lobby-idle-title" hidden>Idle</h2>
+      <div id="lobby-idle-list" class="lobby-list" hidden></div>
     </div>
   `
 
@@ -135,6 +153,8 @@ export function buildLobbyView(
   )
 
   const listEl = view.querySelector<HTMLElement>('#lobby-list')!
+  const idleTitleEl = view.querySelector<HTMLElement>('#lobby-idle-title')!
+  const idleListEl = view.querySelector<HTMLElement>('#lobby-idle-list')!
   const gamesEl = view.querySelector<HTMLElement>('#lobby-games')
   const noticeEl = view.querySelector<HTMLElement>('#lobby-notice')!
   const useCncPublicChat = isCncPublicChatAvailable(conn.wsUrl)
@@ -190,15 +210,6 @@ export function buildLobbyView(
       document.addEventListener('pointerdown', onOutside, true)
     }
     function onOutside(e: Event): void {
-      // Self-unhooks once the view is gone (same pattern as login.ts's pref
-      // listener): a lobby can be torn down with the menu still open — an
-      // inbound `close`, or a dropped socket — and nothing calls closeMenu on
-      // those paths, so without this the listener keeps the whole detached
-      // view (games map, tile loader, connection) alive on `document`.
-      if (!chip.isConnected) {
-        document.removeEventListener('pointerdown', onOutside, true)
-        return
-      }
       const t = e.target as Node | null
       if (!t) return
       if (chip.contains(t) || menuEl.contains(t)) return
@@ -226,15 +237,14 @@ export function buildLobbyView(
         // pick made there leave the same trace.
         setLastSpectateServer(wsUrl)
         chip.disabled = true
-        noticeEl.textContent = `Connecting to ${labelFor(wsUrl)}…`
-        noticeEl.hidden = false
+        setLobbyNotice(noticeEl, `Connecting to ${labelFor(wsUrl)}…`, 'progress')
         // By the time it resolves this view is gone — swapped for the new
         // server's lobby, or for whatever the user navigated to meanwhile. So
         // only the failure path has anything left to clean up, and it leaves
         // the current lobby live.
         void onSwitchServer!(wsUrl).catch(() => {
           chip.disabled = false
-          noticeEl.textContent = `Could not connect to ${labelFor(wsUrl)}.`
+          setLobbyNotice(noticeEl, `Could not connect to ${labelFor(wsUrl)}.`, 'error')
         })
       })
     }
@@ -274,6 +284,36 @@ export function buildLobbyView(
     })
   }
 
+  const handlers = combineHandlers({
+    set_game_links: (msg) => renderGameButtons(msg.content),
+    lobby_entry: onLobbyEntry,
+    lobby_remove: (msg) => {
+      games.delete(String(msg.id))
+      idleSinceMs.delete(String(msg.id))
+      if (complete) renderList()
+    },
+    lobby_clear: () => { games.clear(); idleSinceMs.clear() },
+    lobby_complete: () => { complete = true; renderList() },
+    close: () => onDisconnect(),
+    go_lobby: () => abortGameStart(),
+    game_ended: onGameEnded,
+    auth_error: (msg) => {
+      abortGameStart()
+      setLobbyNotice(noticeEl, msg.reason, 'error')
+    },
+    // A previous session of ours still holds the game's lockfile (typical
+    // after a phone app-swap: the server hasn't noticed the dead socket
+    // yet). The server waits ~msg.timeout seconds, tells the old process to
+    // save, then proceeds to game_started on its own — without this notice
+    // the lobby just sits silently unresponsive for 10–20s.
+    stale_processes: () => {
+      setLobbyNotice(noticeEl,
+        'Closing your previous session — the game will start in a moment…', 'progress')
+    },
+    'force_terminate?': () => showForceTerminatePrompt(),
+    hide_dialog: () => setLobbyNotice(noticeEl, ''),
+  })
+
   conn.onMessage = handleMsg
 
   function handleMsg(msg: ServerMsg): void {
@@ -282,13 +322,7 @@ export function buildLobbyView(
     const transition = classifyTransition(msg)
     if (transition) {
       if (transition.type === 'capture-loader') {
-        // game_client is sent on `watch` *before* watching_started (and before
-        // game_started on CPO-ordered servers), so it lands while the lobby is
-        // still the active handler. Resolve this game's per-version loader now
-        // and hand it over at the transition — the server won't resend the
-        // version once the game view has mounted. Stays null when game_client
-        // only arrives after the transition (e.g. CDI), where the game view's
-        // own handler resolves the loader instead.
+        // See activeLoader.
         activeLoader = getTileLoader(conn.httpBase, transition.version)
       } else {
         // playedGameId is only set by the play button (makeGameBtn); a watch
@@ -298,83 +332,55 @@ export function buildLobbyView(
         onGameStart(transition.spectating, activeLoader ?? undefined, playedGameId)
         // onGameStart mounted the game view synchronously (app.ts:showGame),
         // so conn.onMessage is now its handler — replay the pre-transition
-        // game state into it. splice-then-iterate so a replay that somehow
-        // lands back here (handler unchanged) re-buffers instead of looping.
-        if (conn.onMessage !== handleMsg) {
-          for (const m of preGameMsgs.splice(0)) conn.onMessage?.(m)
-        }
+        // game state into it.
+        preGame.replay(conn, handleMsg)
       }
       return
     }
-    switch (msg.msg) {
-      case 'set_game_links':
-        renderGameButtons((msg as unknown as { content: string }).content)
-        break
-      case 'lobby_entry': {
-        const e = msg as ServerMsg & LobbyEntry
-        if (e.username === CNC_PUBLIC_CHAT_BOT) break
-        const id = String(e.id)
-        games.set(id, e)
-        if (e.idle_time && e.idle_time > 0) {
-          idleSinceMs.set(id, Date.now() - e.idle_time * 1000)
-        } else {
-          idleSinceMs.delete(id)
-        }
-        if (complete) renderList()
-        break
-      }
-      case 'lobby_remove':
-        games.delete(String(msg.id))
-        idleSinceMs.delete(String(msg.id))
-        if (complete) renderList()
-        break
-      case 'lobby_clear':
-        games.clear()
-        idleSinceMs.clear()
-        break
-      case 'lobby_complete':
-        complete = true
-        renderList()
-        break
-      case 'close':
-        onDisconnect()
-        break
-      case 'go_lobby':
-        abortGameStart()
-        break
-      case 'auth_error':
-        abortGameStart()
-        noticeEl.textContent = msg.reason
-        noticeEl.hidden = false
-        break
-      // A previous session of ours still holds the game's lockfile (typical
-      // after a phone app-swap: the server hasn't noticed the dead socket
-      // yet). The server waits ~msg.timeout seconds, tells the old process to
-      // save, then proceeds to game_started on its own — without this notice
-      // the lobby just sits silently unresponsive for 10–20s.
-      case 'stale_processes':
-        noticeEl.textContent =
-          'Closing your previous session — the game will start in a moment…'
-        noticeEl.hidden = false
-        break
-      case 'force_terminate?':
-        showForceTerminatePrompt()
-        break
-      case 'hide_dialog':
-        noticeEl.textContent = ''
-        noticeEl.hidden = true
-        break
-      default:
-        // Not the lobby's message: game state can arrive before the transition
-        // trigger — on a spectate join, update_spectators (and any join-time
-        // chat) land between game_client and watching_started, while this
-        // lobby still owns conn.onMessage. Hold everything unhandled for the
-        // game view and replay it at handover (the transition branch above),
-        // the same contract as the auto-resume handler (reconnect.ts); without
-        // this the initial spectator count and join-time chat are silently lost.
-        // Capped as a guard against a nonconforming server flooding the lobby.
-        if (preGameMsgs.length < 100) preGameMsgs.push(msg)
+    if (dispatch(handlers, msg)) return
+    // Not the lobby's message: game state can arrive before the transition
+    // trigger — on a spectate join, update_spectators (and any join-time
+    // chat) land between game_client and watching_started, while this
+    // lobby still owns conn.onMessage. Hold everything unhandled for the
+    // game view and replay it at handover (the transition branch above);
+    // without this the initial spectator count and join-time chat are
+    // silently lost.
+    preGame.hold(msg)
+  }
+
+  function onLobbyEntry(e: MsgOf<'lobby_entry'>): void {
+    if (e.username === CNC_PUBLIC_CHAT_BOT) return
+    const id = String(e.id)
+    games.set(id, e)
+    if (e.idle_time && e.idle_time > 0) {
+      idleSinceMs.set(id, Date.now() - e.idle_time * 1000)
+    } else {
+      idleSinceMs.delete(id)
     }
+    if (complete) renderList()
+  }
+
+  // The game we asked for ended before it started: a failed start sends
+  // game_ended then go_lobby with no game_started (trunk ws_handler.py
+  // _on_crawl_end; process_handler.py "Error while starting the Crawl
+  // process!"), so the lobby still owns the handler. Held for replay
+  // instead, it died in the go_lobby flush and Play silently did nothing.
+  // Only a start still in flight is answered: entering the lobby clears
+  // it (app.ts showLobby), so with none this is the tail of a game we
+  // already left — a client go_lobby gets its go_lobby before the
+  // stopped process's game_ended (ws_handler.py go_lobby: stop is async;
+  // traced 2026-09-27 on a resume abandoning character creation).
+  function onGameEnded(msg: MsgOf<'game_ended'>): void {
+    const start = activeGameStart()
+    if (!start) return
+    abortGameStart()
+    maybeShowExitDialog(view, {
+      reason: msg.reason,
+      message: msg.message,
+      dump: msg.dump,
+      spectated: start.kind === 'watch',
+      spectatedName: start.kind === 'watch' ? start.username : undefined,
+    })
   }
 
   // A play/watch attempt was aborted while the lobby stayed mounted
@@ -386,16 +392,12 @@ export function buildLobbyView(
   // die with it too — they belong to the game that never started.
   function abortGameStart(): void {
     clearGameStart()
-    preGameMsgs.length = 0
+    preGame.clear()
   }
 
   // The stale process didn't exit when asked; the server wants a yes/no.
   // Yes force-kills it (skipping its save), no abandons the play attempt.
   function showForceTerminatePrompt(): void {
-    noticeEl.textContent = ''
-    noticeEl.hidden = false
-    const label = document.createElement('div')
-    label.textContent = FORCE_TERMINATE_WARNING
     const actions = document.createElement('div')
     actions.className = 'lobby-notice-actions'
     const yes = document.createElement('button')
@@ -406,13 +408,14 @@ export function buildLobbyView(
     no.textContent = 'Leave it'
     const answer = (a: boolean) => () => {
       conn.send({ msg: 'force_terminate', answer: a })
-      noticeEl.textContent = a ? 'Force-closing previous session…' : ''
-      noticeEl.hidden = !a
+      if (a) setLobbyNotice(noticeEl, 'Force-closing previous session…', 'progress')
+      else setLobbyNotice(noticeEl, '')
     }
     yes.addEventListener('click', answer(true))
     no.addEventListener('click', answer(false))
     actions.append(yes, no)
-    noticeEl.append(label, actions)
+    setLobbyNotice(noticeEl, FORCE_TERMINATE_WARNING)
+    noticeEl.append(actions)
   }
 
   function renderGameButtons(html: string): void {
@@ -510,11 +513,9 @@ export function buildLobbyView(
     return btn
   }
 
+  // Two sections, each its own card: Active games, then Idle (hidden while
+  // empty). A divider inside one card broke the card's corners.
   function renderList(): void {
-    if (games.size === 0) {
-      listEl.innerHTML = '<div class="lobby-empty">No active games.</div>'
-      return
-    }
     const all = [...games.values()]
     const active = all.filter(g => !idleSinceMs.has(String(g.id)))
     const idle = all.filter(g => idleSinceMs.has(String(g.id)))
@@ -527,17 +528,16 @@ export function buildLobbyView(
       (idleSinceMs.get(String(b.id)) ?? 0) - (idleSinceMs.get(String(a.id)) ?? 0),
     )
 
-    listEl.innerHTML = ''
+    listEl.innerHTML = active.length === 0 ? '<div class="lobby-empty">No active games.</div>' : ''
     for (const g of active) listEl.appendChild(buildRow(g))
-    if (active.length > 0 && idle.length > 0) {
-      const div = document.createElement('div')
-      div.className = 'lobby-section-divider'
-      div.textContent = '─ idle ─'
-      listEl.appendChild(div)
-    }
-    for (const g of idle) listEl.appendChild(buildRow(g))
+    idleListEl.innerHTML = ''
+    for (const g of idle) idleListEl.appendChild(buildRow(g))
+    idleTitleEl.hidden = idleListEl.hidden = idle.length === 0
   }
 
+  // Line 2 keeps the character string whole ("MiFi XL:27 Zot:5" reads as one
+  // unit, as in milestones) with the version as a dim suffix; only the
+  // spectator count — what you scan for when picking a game — trails the row.
   function buildRow(g: LobbyEntry): HTMLElement {
     const parts: string[] = []
     const hasMeta = g.char || g.xl != null || g.place
@@ -547,13 +547,12 @@ export function buildLobbyView(
     if (!hasMeta && g.milestone) parts.push(`<i>${escHtml(g.milestone.replace(/^started /, ''))}</i>`)
     const ver = versionLabel(g.game_id)
     if (ver) parts.push(`<span class="lobby-game-version">${escHtml(ver)}</span>`)
-    if (g.spectator_count && g.spectator_count > 0) {
-      parts.push(`<span class="lobby-game-spectators">${g.spectator_count} spectator${g.spectator_count === 1 ? '' : 's'}</span>`)
-    }
+    const spectators = g.spectator_count && g.spectator_count > 0
+      ? `<span class="lobby-game-spectators">${g.spectator_count} spectator${g.spectator_count === 1 ? '' : 's'}</span>`
+      : ''
     const id = String(g.id)
-    const isIdle = idleSinceMs.has(id)
     const row = document.createElement('div')
-    row.className = 'lobby-game-row' + (isIdle ? ' is-idle' : '')
+    row.className = 'lobby-game-row'
     row.setAttribute('role', 'button')
     row.tabIndex = 0
     row.innerHTML = `
@@ -564,6 +563,7 @@ export function buildLobbyView(
         </div>
         <span class="lobby-game-info">${parts.join(' ')}</span>
       </div>
+      ${spectators}
     `
     const startWatch = (): void => {
       rememberGameStart(
@@ -601,16 +601,18 @@ export function buildLobbyView(
     }
   }
 
-  const ticker = window.setInterval(() => {
-    if (!view.isConnected) { window.clearInterval(ticker); return }
-    updateIdleLabels()
-  }, 1000)
-  const publicChatCleanupTimer = window.setInterval(() => {
-    if (view.isConnected) return
-    window.clearInterval(publicChatCleanupTimer)
+  const ticker = window.setInterval(updateIdleLabels, 1000)
+
+  // A lobby can be torn down with a chip menu still open — an inbound
+  // `close`, or a dropped socket — and nothing else calls closeMenu on those
+  // paths; its document listener would keep the whole detached view (games
+  // map, tile loader, connection) alive.
+  registerViewDispose(view, () => {
+    closeChipMenu?.()
+    window.clearInterval(ticker)
     publicChatClient?.close()
     publicChatClient = null
-  }, 1000)
+  })
 
   if (exit) maybeShowExitDialog(view, exit)
 
@@ -679,9 +681,9 @@ export function maybeShowExitDialog(view: HTMLElement, exit: GameExit): void {
   if (exit.message) {
     parts.push(`<pre class="lobby-exit-summary">${escHtml(dedent(exit.message))}</pre>`)
   }
-  // Footer action row, separated from the recap by a hairline. Close sits left
-  // and the morgue link is pushed right, matching the reference webtiles exit
-  // dialog so returning players' muscle memory holds.
+  // Footer action row. Close sits left and the morgue link right, matching
+  // the reference webtiles exit dialog so returning players' muscle memory
+  // holds.
   const actions: string[] = ['<button type="button" class="lobby-exit-close">Close</button>']
   if (exit.dump) {
     const href = `${exit.dump}.txt`

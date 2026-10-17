@@ -29,12 +29,13 @@ import { escHtml } from '../game/dcss-colors'
 import { paintAvatars, type DollRecipe } from './avatar-tiles'
 import { resolveRuneSource, sourceSprite } from './rune-sprites'
 import { dropTileLoader, TEX } from '../game/tiles/tile-loader'
-import { maybeShowExitDialog } from './lobby'
+import { maybeShowExitDialog, setLobbyNotice, type NoticeKind } from './lobby'
 import { openRcEditor } from './rc-editor'
 import { openGameRecords } from './records-view'
 import { liveDollRecipe, materializeDollSidecars, readGameRecords } from '../offline/game-records'
 import type { XlogRecord } from '../offline/xlog'
 import { attachScrollCue } from '../util/scroll-cue'
+import { strokeIcon } from '../util/svg-icon'
 
 // Slot-row doll size: 64px (32px cell × 2) — the character is the row's
 // subject, and a 32px multiple keeps the pixel grid even on 2x and 3x
@@ -44,6 +45,18 @@ const SLOT_DOLL_SCALE = 2
 
 // Failure notices show the message alone, not "Error: message".
 const errMsg = (e: unknown): string => (e instanceof Error ? e.message : String(e))
+
+// Device-row icons, drawn as stroke icons rather than as font glyphs (✎ ⇅
+// rendered at mismatched weights per fallback font).
+const rowIcon = (body: string): string =>
+  strokeIcon(16, 16, body, ' stroke-width="1.5" stroke-linejoin="round"')
+const PENCIL_ICON = rowIcon('<path d="M10.5 2.5l3 3L6 13l-3.5.5L3 10z"/><path d="M9 4l3 3"/>')
+const TRANSFER_ICON = rowIcon(
+  '<path d="M5 13V3M2.5 5.5L5 3l2.5 2.5"/><path d="M11 3v10M8.5 10.5L11 13l2.5-2.5"/>')
+// The menu card's packless fallbacks (paintMenuIcons swaps in the pack's
+// sprites): New game's +, Scores and morgues' dagger.
+const PLUS_ICON = rowIcon('<path d="M8 3v10M3 8h10"/>')
+const DAGGER_ICON = rowIcon('<path d="M8 2v11M4.5 5.5h7M8 13v1.5"/>')
 
 export function buildOfflineLobbyView(
   onPlay: (name: string) => void,
@@ -56,7 +69,7 @@ export function buildOfflineLobbyView(
 
   view.innerHTML = `
     <div class="lobby-header">
-      <button id="lobby-back" class="lobby-btn-ghost" aria-label="Back to login">← Login</button>
+      <button id="lobby-back" class="lobby-btn-ghost is-back" aria-label="Back to login">Login</button>
       <div class="lobby-account-chip is-guest">
         <span class="lobby-chip-tag">⌂ This device</span>
       </div>
@@ -79,26 +92,26 @@ export function buildOfflineLobbyView(
         </form>
       </div>
       <div id="offline-gate-note" class="offline-gate-note" hidden></div>
-      <h2 class="lobby-section-title" id="offline-saves-title">Saved Games</h2>
+      <h2 class="lobby-section-title" id="offline-saves-title">Saved games</h2>
       <div id="offline-saves" class="lobby-list">
         <div class="lobby-loading">Loading…</div>
       </div>
       <div class="offline-device" id="offline-menu-card" hidden>
         <div id="offline-new-row" class="offline-device-row offline-nav-row" role="button" tabindex="0" hidden>
-          <span class="offline-device-glyph offline-menu-icon" data-menu-icon="STARTUP_STONESOUP" aria-hidden="true">+</span>
+          <span class="offline-device-glyph offline-menu-icon" data-menu-icon="STARTUP_STONESOUP" aria-hidden="true">${PLUS_ICON}</span>
           <span class="offline-device-lines">
             <span class="offline-device-label">New game</span>
           </span>
         </div>
         <div id="offline-records-row" class="offline-device-row offline-nav-row" role="button" tabindex="0" hidden>
-          <span class="offline-device-glyph offline-menu-icon" data-menu-icon="STARTUP_HIGH_SCORES" aria-hidden="true">†</span>
+          <span class="offline-device-glyph offline-menu-icon" data-menu-icon="STARTUP_HIGH_SCORES" aria-hidden="true">${DAGGER_ICON}</span>
           <span class="offline-device-lines">
             <span class="offline-device-label">Scores and morgues</span>
             <span class="offline-device-sub" id="offline-records-sub"></span>
           </span>
         </div>
       </div>
-      <h2 class="lobby-section-title">On This Device</h2>
+      <h2 class="lobby-section-title">On this device</h2>
       <div class="offline-device">
         <div id="offline-readiness" class="offline-device-row">
           <span id="offline-ready-glyph" class="offline-device-glyph is-dot">●</span>
@@ -109,7 +122,7 @@ export function buildOfflineLobbyView(
           <button type="button" id="offline-download" class="offline-device-btn is-accent" hidden></button>
         </div>
         <div class="offline-device-row">
-          <span class="offline-device-glyph">✎</span>
+          <span class="offline-device-glyph" aria-hidden="true">${PENCIL_ICON}</span>
           <span class="offline-device-lines">
             <span class="offline-device-label">Options file</span>
             <span class="offline-device-sub">init.txt</span>
@@ -117,7 +130,7 @@ export function buildOfflineLobbyView(
           <button type="button" id="offline-rc" class="offline-device-btn">Edit</button>
         </div>
         <div class="offline-device-row">
-          <span class="offline-device-glyph">⇅</span>
+          <span class="offline-device-glyph" aria-hidden="true">${TRANSFER_ICON}</span>
           <span class="offline-device-lines">
             <span class="offline-device-label">Backup</span>
             <span class="offline-device-sub">Saves, morgues, scores, and options</span>
@@ -147,8 +160,9 @@ export function buildOfflineLobbyView(
   const nameError = view.querySelector<HTMLElement>('#offline-name-error')!
 
   // Stems of the slots currently shown — the new-character collision check
-  // and per-row actions key off this. Records-only when the probe is
-  // unavailable (listOfflineSaves → null).
+  // and per-row actions key off this. Records-only until the mount-time probe
+  // lands (seeded from them at the bottom of this function), and after it too
+  // when the probe is unavailable (listOfflineSaves → null).
   let knownStems = new Set<string>()
   // One boot per mount: every path out of this view unmounts it, so a second
   // tap on any slot/start button would just double-boot the engine.
@@ -192,10 +206,8 @@ export function buildOfflineLobbyView(
     gatedRun(() => launch(name))
   }
 
-  const showNotice = (text: string): void => {
-    noticeEl.textContent = text
-    noticeEl.hidden = text === ''
-  }
+  const showNotice = (text: string, kind?: NoticeKind): void =>
+    setLobbyNotice(noticeEl, text, kind)
 
   // --- New character -------------------------------------------------------
 
@@ -222,11 +234,14 @@ export function buildOfflineLobbyView(
       else actionsEl.append(nameForm)
     }
     // The gate note prices the next launch tap, so it hangs off the launch
-    // controls: under the bar, or — with the bar gone — under the SAVED
-    // GAMES heading as the list's caption. Never alone above the heading,
-    // where it prices nothing in particular.
+    // controls: a caption under the bar, or — with the bar gone — a boxed
+    // notice under the SAVED GAMES heading (a bare line there read as the
+    // heading's caption; a box under the bar read as a second, disabled
+    // button). Never alone above the heading, where it prices nothing in
+    // particular.
     const noteAnchor = hasSaves ? savesTitleEl : actionsEl
     if (gateNoteEl.previousElementSibling !== noteAnchor) noteAnchor.after(gateNoteEl)
+    gateNoteEl.classList.toggle('is-boxed', hasSaves)
     newBtn.hidden = hasSaves || nameFormOpen
     newRow.hidden = !hasSaves || nameFormOpen
     actionsEl.hidden = hasSaves
@@ -254,12 +269,38 @@ export function buildOfflineLobbyView(
     for (const b of nameForm.querySelectorAll('button')) b.disabled = disabled
   }
 
-  function showNameForm(): void {
+  // The form opens holding the last finished game's name — the logfile's
+  // last entry (`records`, Past games below) — when no saved game has it.
+  // File order, never sortRecords' end-time order: the engine only appends
+  // and an import replaces the file whole, so the tail IS the last game,
+  // while `end` is local wall-clock (xlog.ts) and runs backwards across a
+  // timezone change or DST fallback. Dying and going again under the same
+  // name is the common trip, and crawl's own startup menu does the same
+  // (remember_name, startup.cc). Selected, so typing replaces it. Only ever
+  // that one name —
+  // never fall back to an older free one: this field becomes the save's
+  // permanent identity, and a name from weeks ago is a guess. The logfile is
+  // the source rather than a client key because it rides along in backups and
+  // a creation cancelled before a character exists (a likely typo) never
+  // reaches it.
+  //
+  // Awaiting the mount-time read is what confines the fill to it: a later
+  // re-read (a records-browser delete, a backup import) has no path back into
+  // an open form. focus() above stays synchronous inside the tap so phones
+  // still raise the keyboard (gatedRun) — only the fill waits.
+  async function showNameForm(): Promise<void> {
     nameFormOpen = true
     newBtn.hidden = true
     newRow.hidden = true
     nameForm.hidden = false
     nameInput.focus()
+    await recordsReady
+    if (!nameFormOpen || nameInput.value !== '') return
+    const last = records[records.length - 1]?.['name']
+    if (!last || validateOfflineName(last) !== null) return
+    if (knownStems.has(slotStem(last))) return
+    nameInput.value = last
+    nameInput.select()
   }
 
   // Cancel / Escape: back to the control the form replaced. The typed name
@@ -298,8 +339,9 @@ export function buildOfflineLobbyView(
   nameForm.addEventListener('submit', async (e) => {
     e.preventDefault()
     // The collision check below needs the mount-time probe to have landed —
-    // knownStems is empty until then, and a fast submit of an existing name
-    // would silently resume that character instead of erroring.
+    // knownStems is records-only until then, so a save with no record yet (an
+    // imported one) would let a fast submit of that name silently resume the
+    // character instead of erroring.
     await savesReady
     // Cancelled while this waited: stop here. (It could not launch anyway —
     // closeNameForm reset the input, so validation below would fail — but it
@@ -451,7 +493,8 @@ export function buildOfflineLobbyView(
       openRecords()
     }
   })
-  void refreshRecords()
+  // Held so the name form can wait on exactly this read (showNameForm).
+  const recordsReady = refreshRecords()
 
   // The entries' icons are the reference main menu's own (startup.cc entries
   // table: GAME_TYPE_NORMAL → TILEG_STARTUP_STONESOUP, GAME_TYPE_HIGH_SCORES
@@ -470,7 +513,7 @@ export function buildOfflineLobbyView(
   // Local pack only. The packless page must read as finished, not as missing
   // art — it is the first impression, and also what cache eviction or a
   // backup imported onto a new device shows beside existing saved games: the
-  // menu card's boxes start with a text glyph in the settings rows' idiom
+  // menu card's boxes start with a drawn icon in the device rows' idiom
   // (the rune cells' placeholder-then-swap pattern), the bar's empty box
   // collapses. Painted at mount and again by runDownload (an in-lobby
   // install paints without a remount) — every icon every time, hidden rows
@@ -493,10 +536,10 @@ export function buildOfflineLobbyView(
         }, 1).catch(() => null)
         if (!el) continue
         // sourceSprite's self-heal removes a bake that fails to decode;
-        // put the glyph back rather than leave the column blank. Kept on
-        // the box: a repaint finds an <img> where the text was.
-        const glyph = box.dataset.menuGlyph ??= box.textContent ?? ''
-        el.addEventListener('error', () => { box.textContent = glyph })
+        // put the fallback icon back rather than leave the column blank.
+        // Kept on the box: a repaint finds an <img> where the icon was.
+        const fallback = box.dataset.menuFallback ??= box.innerHTML
+        el.addEventListener('error', () => { box.innerHTML = fallback })
         box.replaceChildren(el)
       }
     } catch { /* decoration only */ }
@@ -595,10 +638,18 @@ export function buildOfflineLobbyView(
               // the button isn't showing. Say so before the tap, not after it
               // fails.
               : migratesSaves(r)
-                ? `Finishing also installs DCSS ${r.updateVersion} and updates your saved games — use ${downloadBtn.textContent} below`
+                // Short like its siblings, and versionless so it holds one
+                // line at phone width whatever the version string ("0.36-a0"
+                // wrapped it): the game-data row it points at names the
+                // version; this keeps the consent fact and the pointer.
+                ? `Updates your saved games — use ${downloadBtn.textContent} below`
                 : `Finishes a ${TILES_SIZE_LABEL} download first`)
             : null
-    gateNoteEl.textContent = note ?? ''
+    // The text rides an inner span — the boxed part (.offline-gate-note in
+    // style.css says why the element itself can't be).
+    const box = document.createElement('span')
+    box.textContent = note ?? ''
+    gateNoteEl.replaceChildren(box)
     gateNoteEl.hidden = note === null
   }
 
@@ -717,7 +768,7 @@ export function buildOfflineLobbyView(
     // back as a failure.
     if (readiness?.state === 'offline-not-cached'
       || (readiness?.state === 'ready' && readiness.deploy === 'unreachable')) {
-      showNotice('No connection — connect once to download the offline data.')
+      showNotice('No connection — connect once to download the offline data.', 'error')
       return false
     }
     // The deploy serves only its current build, so finishing a partial set
@@ -743,7 +794,7 @@ export function buildOfflineLobbyView(
       const name = readiness ? packName(readiness) : 'Game data'
       await downloadOfflineData((label) => setReadiness('dim', name, label))
     } catch (e) {
-      showNotice(`Download failed: ${errMsg(e)}`)
+      showNotice(`Download failed: ${errMsg(e)}`, 'error')
     }
     downloading = false
     downloadBtn.disabled = false
@@ -785,7 +836,7 @@ export function buildOfflineLobbyView(
           showNotice('Backup exported.')
         }
       } catch (e) {
-        showNotice(`Export failed: ${errMsg(e)}`)
+        showNotice(`Export failed: ${errMsg(e)}`, 'error')
       }
     })()
   })
@@ -795,7 +846,7 @@ export function buildOfflineLobbyView(
   // lobby is mounted. The editor writes only on Save (rc-editor.ts).
 
   view.querySelector('#offline-rc')!.addEventListener('click', () => {
-    void openRcEditor(showNotice).catch((e: unknown) => showNotice(`Could not open the options file: ${errMsg(e)}`))
+    void openRcEditor(showNotice).catch((e: unknown) => showNotice(`Could not open the options file: ${errMsg(e)}`, 'error'))
   })
 
   view.querySelector('#offline-import')!.addEventListener('click', () => {
@@ -814,7 +865,7 @@ export function buildOfflineLobbyView(
           const when = meta.exportedAt ? ` from ${meta.exportedAt.slice(0, 10)}` : ''
           showNotice(`Restored backup${when}.`)
         } catch (e) {
-          showNotice(`Import failed: ${errMsg(e)}`)
+          showNotice(`Import failed: ${errMsg(e)}`, 'error')
         }
         // The pack can carry both save files and the logfile; refresh every
         // surface either lands on.
@@ -831,7 +882,8 @@ export function buildOfflineLobbyView(
   // lobby with no way to start a game is worse than one whose bar turns
   // into a row a moment late. It also settles the gate note's anchor and the
   // menu card's shape before the readiness and records reads can land.
-  placeNewGame(Object.keys(getOfflineChars()).length > 0)
+  knownStems = new Set(Object.keys(getOfflineChars()))
+  placeNewGame(knownStems.size > 0)
   const savesReady = refreshSaves()
 
   if (exit) maybeShowExitDialog(view, exit)

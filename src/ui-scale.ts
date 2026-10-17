@@ -1,7 +1,7 @@
 // Size prefs (settings sliders) applied as CSS variables on the document
 // root: --pz-dpad, --pz-msglog-lines, --pz-msglog-font. style.css consumes
-// each with the stock value as var() fallback (#touch-controls --tc-dpad,
-// #game-view --msglog-font / --msglog-h), so the stylesheet alone renders
+// each with the stock value as var() fallback (--tc-dpad, --msglog-font /
+// --msglog-h), so the stylesheet alone renders
 // correctly and this module only ever overrides. A mounted game view needs no
 // listener of its own: changing --tc-dpad or --msglog-h resizes #map-grid's
 // content box, and the ResizeObserver in game-view.ts refits the map.

@@ -62,30 +62,6 @@ export function decodeMdam(fg: number | number[] | undefined): string {
   return 'uninjured'
 }
 
-// Decodes monster condition flags from t.fg into short status names.
-// These are the only MB_ flags expressed as tile flags in the WebTiles protocol;
-// flags like MB_ALLY_TARGET / MB_ABJURABLE are not transmitted via t.fg.
-export function decodeFgStatuses(fg: number | number[] | undefined): string[] {
-  if (fg === undefined) return []
-  const f = fgFlags(fg)
-  const out: string[] = []
-
-  if (f.STAB) out.push('asleep')
-  else if (f.MAY_STAB) out.push('wandering')
-  else if (f.FLEEING) out.push('fleeing')
-  else if (f.PARALYSED) out.push('paralysed')
-
-  if (f.NET) out.push('caught')
-  if (f.WEB) out.push('webbed')
-
-  if (f.POISON) out.push('poisoned')
-  else if (f.MORE_POISON) out.push('very poisoned')
-  else if (f.MAX_POISON) out.push('extremely poisoned')
-
-  return out
-}
-
-
 // A status icon to overlay on a monster sprite: either a named tile-constant
 // (resolved against tileinfo-icons by the caller) or a raw numeric id from
 // cell.icons, plus the cell-space pixel offset draw_foreground would place it at.
@@ -195,7 +171,9 @@ export function buildStatusOverlays(
   let shift = 0
   if (f.PARALYSED) { overlays.push({ name: 'PARALYSED', xofs: 0, yofs: 0 }); shift += 12 }
   else if (f.STAB) { overlays.push({ name: 'STAB_BRAND', xofs: 0, yofs: 0 }); shift += 12 }
-  else if (f.MAY_STAB) { overlays.push({ name: 'UNAWARE', xofs: 0, yofs: 0 }); shift += 7 }
+  // Same "?" art, named MAY_STAB_BRAND through 0.33-a0 (dc-icons.txt; renamed
+  // by 0.33-b1).
+  else if (f.MAY_STAB) { overlays.push({ name: 'UNAWARE', altName: 'MAY_STAB_BRAND', xofs: 0, yofs: 0 }); shift += 7 }
   else if (f.FLEEING) { overlays.push({ name: 'FLEEING', xofs: 0, yofs: 0 }); shift += 3 }
 
   // `-shift || 0` avoids a -0 xofs when nothing has shifted yet (paints the

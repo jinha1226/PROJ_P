@@ -2,12 +2,12 @@
 // shell classes, opened from the login footer and from the HUD id line's
 // ⚙ chip in-game. The home page is a stack of sections (map display,
 // touch controls, help); a section may take over the body for a
-// sub-page (the control-set editor) and return via renderHome. Changes apply
+// sub-page (the control-set editor) and return via backHome. Changes apply
 // live via window events, fired by the stores themselves (control-sets.ts
 // mutators, setPref in prefs.ts): CONTROLS_CHANGED_EVENT (touch panel
 // re-renders), RENDER_MODE_CHANGED_EVENT (game view swaps renderers).
 
-import { mountCardOverlay, mountOverlay } from './overlay'
+import { mountBackdrop, mountCardOverlay, mountOverlay, type CloseIntercept } from './overlay'
 import {
   cloneSet, deleteControlSet, encodeControlSet, getActiveControlSet,
   importControlSet, isValidTabName, listControlSets, newSetId, saveControlSet,
@@ -19,6 +19,7 @@ import { dcssToHtml } from '../game/dcss-colors'
 import { DPAD_LAYOUT } from '../game/input/touch'
 import { defaultPref, getPref, setPref, type Prefs } from '../prefs'
 import { DPAD_STOPS, MSGLOG_FONT_STOPS, MSGLOG_LINE_STOPS, nearestStop } from '../ui-scale'
+import { strokeIcon } from '../util/svg-icon'
 import { openGesturesDoc } from './docs'
 
 // Close handle of the last-mounted settings card, for surfaces that replace
@@ -26,13 +27,25 @@ import { openGesturesDoc } from './docs'
 // card — harmless, mountOverlay's close() is idempotent.
 let closeSettings: (() => void) | null = null
 
+// The showing page's say over the card's close requests (overlay.ts
+// CloseIntercept): sub-pages take Escape/back as one step back, and the
+// editor holds ✕/scrim while it has unsaved edits. Null on the home page
+// and once the sheet has closed (so a closed editor isn't kept alive by it).
+let pageIntercept: CloseIntercept | null = null
+
+// The home page's scroll offset when a sub-page (which opens at its own top)
+// took over the body, recorded by leaveHome and restored by backHome so you
+// land back at the set list rather than wherever the sub-page's height
+// clamped it.
+let homeScroll = 0
+
 export function openSettings(): void {
   closePalette?.()  // one surface at a time; a stale palette would desync
   const { body, close } = mountCardOverlay('Settings', {
     backdrop: 'settings-backdrop',
     card: 'settings-card',
     body: 'settings-body',
-  })
+  }, () => { pageIntercept = null }, via => pageIntercept?.(via) ?? false)
   closeSettings = close
   renderHome(body)
 }
@@ -55,6 +68,29 @@ function button(label: string, className: string, onTap: () => void): HTMLButton
   return b
 }
 
+// One home-page section in grouped-list anatomy: a header, one cell holding
+// the controls, and the explanation as a footer under the cell. `bare`
+// holds the controls in a plain box instead (a lone segmented control sits
+// on the sheet itself); `list` drops the cell's padding
+// for row lists.
+function section(
+  body: HTMLElement, title: string,
+  opts: { footer?: string; bare?: boolean; list?: boolean } = {},
+): HTMLElement {
+  const sec = el('section', 'settings-sec')
+  sec.appendChild(el('h2', 'settings-h', title))
+  const cell = el('div', opts.bare ? '' : 'settings-cell' + (opts.list ? ' is-list' : ''))
+  sec.appendChild(cell)
+  if (opts.footer) sec.appendChild(el('p', 'settings-footer', opts.footer))
+  body.appendChild(sec)
+  return cell
+}
+
+// A row that opens something else (a doc, the palette): label + chevron.
+function navRow(label: string, onTap: () => void): HTMLButtonElement {
+  return button(label, 'settings-nav', onTap)
+}
+
 // Crawl keys/macros and player names aren't prose — keep mobile keyboards
 // from "helping".
 function noAutofix<T extends HTMLInputElement | HTMLTextAreaElement>(field: T): T {
@@ -74,7 +110,7 @@ function freshName(): string {
 }
 
 // A clone with a new id and a fresh untaken name — the basis of Duplicate,
-// ＋ New set, and Duplicate & edit.
+// New set, and Duplicate & edit.
 function freshClone(base: ControlSet): ControlSet {
   return cloneSet(base, newSetId(), freshName())
 }
@@ -90,6 +126,7 @@ function freshClone(base: ControlSet): ControlSet {
 // floating palette over the live game.
 function renderHome(body: HTMLElement): void {
   body.innerHTML = ''
+  pageIntercept = null
   renderDisplaySection(body)
   renderMonsterListSection(body)
   if (document.getElementById('game-view')) {
@@ -103,16 +140,27 @@ function renderHome(body: HTMLElement): void {
   renderHelpSection(body)
 }
 
+// Sub-page navigation (viewer, editor); see homeScroll.
+function leaveHome(body: HTMLElement): void {
+  homeScroll = body.scrollTop
+}
+
+function backHome(body: HTMLElement): void {
+  renderHome(body)
+  body.scrollTop = homeScroll
+}
+
 // --- touch-controls section (control-set list) --------------------------------
 
 // D-pad size (out-of-game only): slider plus a real-size specimen pad
 // (settings covers the whole screen, so without one the resize would be
 // adjusted blind). The full 3×3 shows what one button alone can't — the
 // pad's overall footprint. It tracks --pz-dpad via CSS; no re-render needed
-// on tap. In portrait the whole strip scales with the d-pad (its height cap
-// derives from --tc-dpad); in landscape only the floating d-pad does.
+// as the slider moves. In portrait the whole strip scales with the d-pad
+// (its height cap derives from --tc-dpad); in landscape only the floating
+// d-pad does.
 function renderDpadSection(body: HTMLElement): void {
-  body.appendChild(el('h2', 'settings-h', 'D-pad'))
+  const cell = section(body, 'D-pad')
   const preview = el('div', 'set-dpad-preview')
   preview.setAttribute('aria-hidden', 'true')
   const pad = el('div', 'set-dpad-pad')
@@ -123,14 +171,17 @@ function renderDpadSection(body: HTMLElement): void {
     pad.appendChild(el('div', 'set-dpad-specimen' + (isWait ? ' wait' : ''), d.label))
   }
   preview.appendChild(pad)
-  body.appendChild(preview)
-  body.appendChild(dpadSlider())
+  cell.appendChild(preview)
+  cell.appendChild(dpadSlider())
 }
 
+const DELETE_ARM_MS = 4000
+
 function renderControlsSection(body: HTMLElement): void {
-  body.appendChild(el('h2', 'settings-h', 'Control sets'))
-  body.appendChild(el('p', 'settings-hint',
-    'Control sets define the buttons on the three control tabs.'))
+  const cell = section(body, 'Control sets', {
+    list: true,
+    footer: 'Control sets define the buttons on the three control tabs.',
+  })
 
   const sets = listControlSets()
   // Reuse the list already built above rather than getActiveControlSet(), which
@@ -139,7 +190,7 @@ function renderControlsSection(body: HTMLElement): void {
   const wanted = getPref('controlSetId')
   const activeId = sets.some(s => s.id === wanted) ? wanted : STANDARD_ID
   const list = el('div', 'set-list')
-  body.appendChild(list)
+  cell.appendChild(list)
 
   for (const set of sets) {
     const row = el('div', 'set-row' + (set.id === activeId ? ' active' : ''))
@@ -148,7 +199,9 @@ function renderControlsSection(body: HTMLElement): void {
       setActiveControlSet(set.id)
       renderHome(body)
     })
-    main.appendChild(el('span', 'set-radio', set.id === activeId ? '●' : '○'))
+    // A leading ✓ column: marks the active set and
+    // holds the text column for the rows without one.
+    main.appendChild(el('span', 'set-radio', set.id === activeId ? '✓' : ''))
     main.appendChild(el('span', 'set-name', set.name))
     if (set.builtin) main.appendChild(el('span', 'set-badge', 'built-in'))
     row.appendChild(main)
@@ -160,9 +213,15 @@ function renderControlsSection(body: HTMLElement): void {
     row.appendChild(more)
     list.appendChild(row)
 
-    actions.appendChild(button('View', 'set-action', () => renderViewer(body, set)))
+    actions.appendChild(button('View', 'set-action', () => {
+      leaveHome(body)
+      renderViewer(body, set)
+    }))
     if (!set.builtin) {
-      actions.appendChild(button('Edit', 'set-action', () => renderEditor(body, set, false)))
+      actions.appendChild(button('Edit', 'set-action', () => {
+        leaveHome(body)
+        renderEditor(body, set, false)
+      }))
     }
     actions.appendChild(button('Duplicate', 'set-action', () => {
       saveControlSet(freshClone(set))
@@ -175,6 +234,11 @@ function renderControlsSection(body: HTMLElement): void {
         if (del.dataset.armed !== '1') {
           del.dataset.armed = '1'
           del.textContent = 'Really delete?'
+          // An arming left alone lapses, so a later stray tap can't confirm it.
+          setTimeout(() => {
+            delete del.dataset.armed
+            del.textContent = 'Delete'
+          }, DELETE_ARM_MS)
           return
         }
         deleteControlSet(set.id)
@@ -185,8 +249,9 @@ function renderControlsSection(body: HTMLElement): void {
     list.appendChild(actions)
   }
 
-  const actionsBar = el('div', 'settings-actions')
-  body.appendChild(actionsBar)
+  // New set / Import… are the list's own action rows, on its text column.
+  const actionsBar = el('div', 'set-action-rows')
+  cell.appendChild(actionsBar)
 
   // Import area (collapsed behind the button)
   const importWrap = el('div', 'settings-import')
@@ -211,15 +276,16 @@ function renderControlsSection(body: HTMLElement): void {
   importWrap.appendChild(importErr)
   importWrap.appendChild(importGo)
 
-  actionsBar.appendChild(button('＋ New set', 'settings-btn', () => {
+  actionsBar.appendChild(button('New set', 'set-action-row', () => {
     // Start from whatever is active — the closest thing to "what I have now".
+    leaveHome(body)
     renderEditor(body, freshClone(getActiveControlSet()), true)
   }))
-  actionsBar.appendChild(button('Import…', 'settings-btn', () => {
+  actionsBar.appendChild(button('Import…', 'set-action-row', () => {
     importWrap.hidden = !importWrap.hidden
     if (!importWrap.hidden) importField.focus()
   }))
-  body.appendChild(importWrap)
+  cell.appendChild(importWrap)
 }
 
 // --- display sections ----------------------------------------------------------
@@ -240,7 +306,10 @@ function segPref<K extends 'mapRenderMode' | 'monsterListMode' | 'loginSprites'>
     const b = button(label, 'settings-btn' + (value === active ? ' active' : ''), () => {
       if (getPref(prefKey) === value) return
       setPref(prefKey, value)
-      markChecked(seg, b)
+      for (const sib of seg.children) {
+        sib.classList.toggle('active', sib === b)
+        sib.setAttribute('aria-checked', String(sib === b))
+      }
     })
     b.setAttribute('role', 'radio')
     b.setAttribute('aria-checked', String(value === active))
@@ -249,91 +318,93 @@ function segPref<K extends 'mapRenderMode' | 'monsterListMode' | 'loginSprites'>
   return seg
 }
 
-// Re-mark `chosen` as the selected radio among its group's children (class +
-// aria-checked). Shared by segPref and sliderPref, whose children are all
-// radio buttons.
-function markChecked(group: HTMLElement, chosen: Element): void {
-  for (const sib of group.children) {
-    sib.classList.toggle('active', sib === chosen)
-    sib.setAttribute('aria-checked', String(sib === chosen))
-  }
-}
-
 // Numeric prefs whose legal values are a stop table (ui-scale.ts).
 type SliderPrefKey = 'dpadSize' | 'msglogLines' | 'msglogFont'
 
-// Discrete slider bound to a stop-table pref: a radiogroup of tap-dots on a
-// track — the page's ordered-magnitude counterpart to segPref's state
-// adjectives. Labels render under dots (endpoint words via `ends`, every
-// value via `numbered`, or `specimen` text at both ends sized to the end
-// stops themselves — which assumes the stop table is in rem), the stock stop
-// keeps a hollow ring, and the stored value snaps to the nearest stop for
-// display, mirroring ui-scale's clamp. setPref fires the live-apply event;
-// ui-scale rewrites the CSS variables, which is also what updates the
-// specimen/preview elements.
+// Discrete slider bound to a stop-table pref — the page's ordered-magnitude
+// counterpart to segPref's state adjectives. A native range input over the
+// stop indices, so the browser owns drag, scroll-vs-drag, keyboard and
+// VoiceOver; no gesture code of ours (a tap-stop radiogroup looked like a
+// slider but couldn't be dragged). Laid out with
+// a small and a large symbol inline at the track's ends (`ends`,
+// decorative), ticks under the track at the stops; no captions — each
+// slider's live preview shows the value. No fill left of the knob: WebKit
+// has no CSS hook for it, and it isn't worth script. The stock stop keeps a
+// ring tick, and the stored value snaps to the nearest stop for display,
+// mirroring ui-scale's clamp. setPref fires the live-apply event (and bails
+// on an equal value); ui-scale rewrites the CSS variables, which is also
+// what updates the previews. Returns the row; the input carries the
+// aria-label.
 function sliderPref(
   ariaLabel: string,
   prefKey: SliderPrefKey,
   stops: readonly number[],
-  opts: { ends?: [string, string]; specimen?: string; numbered?: boolean } = {},
+  ends: [string, string],
 ): HTMLElement {
-  const slider = el('div', 'set-slider')
-  slider.setAttribute('role', 'radiogroup')
-  slider.setAttribute('aria-label', ariaLabel)
-  slider.style.setProperty('--stops', String(stops.length))
+  const input = el('input', 'set-slider')
+  input.type = 'range'
+  input.min = '0'
+  input.max = String(stops.length - 1)
+  input.step = '1'
+  input.value = String(stops.indexOf(nearestStop(stops, getPref(prefKey))))
+  input.setAttribute('aria-label', ariaLabel)
+  const sync = (): void => input.setAttribute('aria-valuetext', String(stops[Number(input.value)]))
+  sync()
+  input.addEventListener('input', () => {
+    setPref(prefKey, stops[Number(input.value)])
+    sync()
+  })
   const stock = defaultPref(prefKey)
-  const active = nearestStop(stops, getPref(prefKey))
-  for (const value of stops) {
-    // Re-tapping the active dot is a no-op via setPref's own equal-value
-    // bail (no write, no event); markChecked is idempotent.
-    const dot = button('', 'set-slider-dot'
-      + (value === active ? ' active' : '') + (value === stock ? ' default' : ''), () => {
-      setPref(prefKey, value)
-      markChecked(slider, dot)
-    })
-    dot.setAttribute('role', 'radio')
-    dot.setAttribute('aria-checked', String(value === active))
-    dot.setAttribute('aria-label', String(value))
-    dot.appendChild(el('span', 'set-slider-mark'))
-    const isEnd = value === stops[0] || value === stops[stops.length - 1]
-    const sub = opts.numbered ? String(value)
-      : isEnd ? opts.specimen ?? opts.ends?.[value === stops[0] ? 0 : 1]
-      : undefined
-    if (sub !== undefined) {
-      const label = el('span', 'set-slider-num', sub)
-      if (opts.specimen !== undefined) {
-        // The end label IS this dot's stop, worn at its own size — derived
-        // in place, so it can't drift from the table.
-        label.classList.add('set-slider-spec')
-        label.style.fontSize = `${value}rem`
-      }
-      dot.appendChild(label)
-    }
-    slider.appendChild(dot)
-  }
-  return slider
+  const ticks = el('div', 'set-slider-ticks')
+  ticks.setAttribute('aria-hidden', 'true')
+  for (const value of stops) ticks.appendChild(el('span', 'set-slider-tick' + (value === stock ? ' default' : '')))
+  const body = el('div', 'set-slider-body')
+  body.append(input, ticks)
+  const [start, end] = ends.map((html) => {
+    const span = el('span', 'set-slider-end')
+    span.setAttribute('aria-hidden', 'true')
+    span.innerHTML = html
+    return span
+  })
+  const row = el('div', 'set-slider-row')
+  row.append(start, body, end)
+  return row
 }
 
+// End symbols: small at the start, large at the end (A / A).
+// Symbols, not specimens — the live previews show the true size.
+const linesIcon = (n: number, w: number, h: number): string => strokeIcon(w, h,
+  Array.from({ length: n }, (_, i) => {
+    const y = 1 + i * ((h - 2) / (n - 1))
+    return `<path d="M1 ${y.toFixed(1)}H${w - 1}" stroke-width="1.8"/>`
+  }).join(''))
+const padIcon = (s: number): string => {
+  const c = (s - 2) / 3
+  const cells: string[] = []
+  for (let r = 0; r < 3; r++) for (let k = 0; k < 3; k++) {
+    cells.push(`<rect x="${(1.6 + k * c).toFixed(1)}" y="${(1.6 + r * c).toFixed(1)}"`
+      + ` width="${(c - 1.2).toFixed(1)}" height="${(c - 1.2).toFixed(1)}" rx="1" stroke-width="1.2"/>`)
+  }
+  return strokeIcon(s, s, cells.join(''))
+}
+const letterIcon = (px: number): string =>
+  `<span class="set-slider-letter" style="font-size:${px}px">A</span>`
+
 // One spec per slider, shared by the settings sections and the floating
-// palette so stops, labels, and aria-labels (also test selectors) can't
+// palette so stops, symbols, and aria-labels (also test selectors) can't
 // diverge between the two surfaces.
-//
-// The font slider's end labels are specimens, not words: "Aa" at the two
-// extreme stops' TRUE sizes, in the log's mono font (.set-slider-spec) —
-// the ends show exactly what they set. The d-pad slider keeps words: its
-// true sizes are label-row-impossible, and scaled-down glyph stand-ins read
-// worse than "Tiny"/"Chunky" (tried and reverted).
 const dpadSlider = () =>
-  sliderPref('D-pad size', 'dpadSize', DPAD_STOPS, { ends: ['Tiny', 'Chunky'] })
+  sliderPref('D-pad size', 'dpadSize', DPAD_STOPS, [padIcon(13), padIcon(21)])
 const msglogLinesSlider = () =>
-  sliderPref('Message log lines', 'msglogLines', MSGLOG_LINE_STOPS, { numbered: true })
+  sliderPref('Message log lines', 'msglogLines', MSGLOG_LINE_STOPS,
+    [linesIcon(3, 16, 10), linesIcon(6, 18, 18)])
 const msglogFontSlider = () =>
-  sliderPref('Message log text size', 'msglogFont', MSGLOG_FONT_STOPS, { specimen: 'Aa' })
+  sliderPref('Message log text size', 'msglogFont', MSGLOG_FONT_STOPS, [letterIcon(13), letterIcon(21)])
 
 // --- floating size palette ----------------------------------------------------
 
 // Close handle of the open palette; null when none. openSettings invokes it
-// so the two surfaces never coexist (a covered palette would show stale dots).
+// so the two surfaces never coexist (a covered palette would show stale values).
 let closePalette: (() => void) | null = null
 
 // The "Adjust sizes" palette: the same sliders, floating bare over the live
@@ -348,12 +419,12 @@ function openSizePalette(): void {
   const palette = el('div', 'size-palette')
   // Keep slider taps from stealing keyboard focus off the game view.
   palette.addEventListener('mousedown', (e) => e.preventDefault())
-  const close = mountOverlay(palette)
-  const dismiss = (): void => {
+  // Cleanup rides onClose, so Escape (which closes via the overlay stack,
+  // never through dismiss) releases the watch and the handle too.
+  const dismiss = mountOverlay(palette, () => {
     unmountWatch.disconnect()
     closePalette = null
-    close()
-  }
+  })
   closePalette = dismiss
   // The game ending would strand the palette over the lobby — close along
   // with the game view.
@@ -363,21 +434,20 @@ function openSizePalette(): void {
   const app = document.getElementById('app')
   if (app) unmountWatch.observe(app, { childList: true })
 
-  // ✕ shares a header row with the first caption — absolutely positioning it
-  // in the corner would overlap the top slider's rightmost dot's tap area.
+  // ✕ heads its own row — absolutely positioning it in the corner would
+  // overlap the top slider's large end symbol. No captions: each slider's
+  // end symbols name it, and the live game underneath is the preview.
   // Slider order mirrors the game's vertical stack (log above the touch
   // strip), so each control sits on the palette the way its subject sits on
   // the screen: message log first, d-pad last.
-  const x = button('✕', 'doc-close size-palette-close', dismiss)
+  const x = button('✕', 'size-palette-close', dismiss)
   x.setAttribute('aria-label', 'Close')
   const header = el('div', 'size-palette-header')
-  header.appendChild(el('p', 'set-slider-cap', 'Message log lines'))
+  header.appendChild(el('p', 'size-palette-title', 'Sizes'))
   header.appendChild(x)
   palette.appendChild(header)
   palette.appendChild(msglogLinesSlider())
-  palette.appendChild(el('p', 'set-slider-cap', 'Message log text size'))
   palette.appendChild(msglogFontSlider())
-  palette.appendChild(el('p', 'set-slider-cap', 'D-pad'))
   palette.appendChild(dpadSlider())
 }
 
@@ -388,21 +458,20 @@ function openSizePalette(): void {
 // behind, the palette would float over the login screen adjusting nothing
 // visible, and a disabled button would just sit there unactionable.
 function renderSizesSection(body: HTMLElement): void {
-  body.appendChild(el('h2', 'settings-h', 'D-pad and message log'))
-  body.appendChild(el('p', 'settings-hint',
-    'Adjust D-pad and message log sizes over the live game.'))
-  const row = el('div', 'settings-actions')
-  row.appendChild(button('Adjust sizes', 'settings-btn', () => {
+  const cell = section(body, 'D-pad and message log', {
+    list: true,
+    footer: 'Adjust D-pad and message log sizes over the live game.',
+  })
+  cell.appendChild(navRow('Adjust sizes', () => {
     closeSettings?.()
     openSizePalette()
   }))
-  body.appendChild(row)
 }
 
 function renderMsglogSection(body: HTMLElement): void {
-  body.appendChild(el('h2', 'settings-h', 'Message log'))
-  body.appendChild(el('p', 'settings-hint',
-    'Recent messages shown over the map. Tap the log in-game for full history.'))
+  const cell = section(body, 'Message log', {
+    footer: 'Recent messages shown over the map. Tap the log in-game for full history.',
+  })
   // Fake log both sliders manipulate. DOM order is newest-first: the preview
   // is column-reverse like the real log, so index 0 lands at the visual
   // bottom and extra lines get trimmed off the top. Texts are real game
@@ -424,7 +493,7 @@ function renderMsglogSection(body: HTMLElement): void {
   const preview = el('div', 'set-msglog-preview msglog-box')
   preview.setAttribute('aria-hidden', 'true')
   for (const line of SAMPLE_LINES) {
-    // Mirror appendMessage's row shape (game-view.ts): turn-mark slot plus
+    // Mirror the message log's row shape (message-log.ts row): turn-mark slot plus
     // dcssToHtml-rendered content, so metrics and colors match the real log.
     const p = el('p', 'game-msg')
     p.appendChild(el('span', 'msg-turn-mark', ' '))
@@ -434,28 +503,26 @@ function renderMsglogSection(body: HTMLElement): void {
     preview.appendChild(p)
   }
   frame.appendChild(preview)
-  body.appendChild(frame)
-  body.appendChild(el('p', 'set-slider-cap', 'Lines'))
-  body.appendChild(msglogLinesSlider())
-  body.appendChild(el('p', 'set-slider-cap', 'Text size'))
-  body.appendChild(msglogFontSlider())
+  cell.appendChild(frame)
+  cell.appendChild(msglogLinesSlider())
+  cell.appendChild(msglogFontSlider())
 }
 
 function renderDisplaySection(body: HTMLElement): void {
-  body.appendChild(el('h2', 'settings-h', 'Map display'))
-  body.appendChild(el('p', 'settings-hint',
-    'A two-finger long-press on the map also toggles this mid-game.'))
-  body.appendChild(segPref('Map display', 'mapRenderMode', [
+  section(body, 'Map display', {
+    bare: true,
+    footer: 'A two-finger long-press on the map also toggles this mid-game.',
+  }).appendChild(segPref('Map display', 'mapRenderMode', [
     { value: 'ascii', label: 'ASCII' },
     { value: 'tiles', label: 'Tiles' },
   ]))
 }
 
 function renderMonsterListSection(body: HTMLElement): void {
-  body.appendChild(el('h2', 'settings-h', 'Monster list'))
-  body.appendChild(el('p', 'settings-hint',
-    'In-game list of monsters in view.'))
-  body.appendChild(segPref('Monster list', 'monsterListMode', [
+  section(body, 'Monster list', {
+    bare: true,
+    footer: 'In-game list of monsters in view.',
+  }).appendChild(segPref('Monster list', 'monsterListMode', [
     { value: 'hidden', label: 'Hidden' },
     { value: 'collapsed', label: 'Collapsed' },
     { value: 'full', label: 'Full' },
@@ -465,10 +532,10 @@ function renderMonsterListSection(body: HTMLElement): void {
 // Hidden/Shown segments rather than a lone checkbox: matches the page's
 // segmented idiom (state adjectives, like the monster list's).
 function renderSpritesSection(body: HTMLElement): void {
-  body.appendChild(el('h2', 'settings-h', 'Character sprites'))
-  body.appendChild(el('p', 'settings-hint',
-    'Recently played characters shown on the login screen.'))
-  body.appendChild(segPref('Character sprites', 'loginSprites', [
+  section(body, 'Character sprites', {
+    bare: true,
+    footer: 'Recently played characters shown on the login screen.',
+  }).appendChild(segPref('Character sprites', 'loginSprites', [
     { value: false, label: 'Hidden' },
     { value: true, label: 'Shown' },
   ]))
@@ -477,13 +544,10 @@ function renderSpritesSection(body: HTMLElement): void {
 // --- help section --------------------------------------------------------------
 
 function renderHelpSection(body: HTMLElement): void {
-  body.appendChild(el('h2', 'settings-h', 'Help'))
-  const row = el('div', 'settings-actions')
   // The docs mount their own card above this one (doc z-index > settings).
   // About and What's new live on the login/lobby footers; in-game Help just
   // surfaces the gesture cheatsheet.
-  row.appendChild(button('Gestures', 'settings-btn', openGesturesDoc))
-  body.appendChild(row)
+  section(body, 'Help', { list: true }).appendChild(navRow('Gestures', openGesturesDoc))
 }
 
 // Copy the export string; iOS clipboard needs a user gesture, which this is.
@@ -568,10 +632,10 @@ function renderViewer(body: HTMLElement, set: ControlSet): void {
     tabsHost.appendChild(box)
   }
 
-  const foot = el('div', 'settings-actions')
-  foot.appendChild(button('Back', 'settings-btn', () => renderHome(body)))
+  const foot = el('div', 'settings-actions is-pinned')
+  foot.appendChild(button('Back', 'settings-btn', () => backHome(body)))
   if (set.builtin) {
-    // Same path as ＋ New set: an unsaved clone, saved (and activated) only
+    // Same path as New set: an unsaved clone, saved (and activated) only
     // on the editor's own Save.
     foot.appendChild(button('Duplicate & edit', 'settings-btn settings-btn-primary', () =>
       renderEditor(body, freshClone(set), true)))
@@ -580,6 +644,12 @@ function renderViewer(body: HTMLElement, set: ControlSet): void {
       renderEditor(body, set, false)))
   }
   body.appendChild(foot)
+  body.scrollTop = 0
+  pageIntercept = (via) => {
+    if (via === 'dismiss') return false
+    backHome(body)
+    return true
+  }
 }
 
 // --- editor ------------------------------------------------------------------
@@ -609,6 +679,15 @@ function cropGrid(grid: (SlotDef | null)[], cols: 3 | 4): (SlotDef | null)[] {
   return slots
 }
 
+// Ready an editor bubble to follow its slot's row in an .ed-grid: it spans
+// the full row, and --notch-x centres the notch on column `col` of `cols`
+// equal tracks separated by the grid's --ed-gap.
+function placeBubble(bubble: HTMLElement, col: number, cols: number): HTMLElement {
+  bubble.style.setProperty('--notch-x',
+    `calc((100% - ${cols - 1} * var(--ed-gap)) * ${(col + 0.5) / cols} + ${col} * var(--ed-gap))`)
+  return bubble
+}
+
 function renderEditor(body: HTMLElement, set: ControlSet, isNew: boolean): void {
   body.innerHTML = ''
   // A new set always opens at 3×4 — the full canvas — regardless of the
@@ -636,14 +715,11 @@ function renderEditor(body: HTMLElement, set: ControlSet, isNew: boolean): void 
   const tabsHost = el('div', 'ed-tabs')
   body.appendChild(tabsHost)
 
-  // Move-in-progress banner, shown between the grids and the picker
-  const moveHint = el('div', 'ed-move-hint')
-  moveHint.hidden = true
-  body.appendChild(moveHint)
-
-  // Key picker — one shared panel below the grids; assigns into `picking`.
-  const picker = el('div', 'ed-picker')
-  picker.hidden = true
+  // The key picker (assigns into `picking`) and the move-in-progress hint
+  // are bubbles: renderTabs slots whichever is live into the edited tab's
+  // grid right under the slot's row, notch pointing up at the slot.
+  const picker = el('div', 'ed-picker ed-bubble')
+  const moveHint = el('div', 'ed-move-hint ed-bubble')
 
   function renderTabs(): void {
     tabsHost.innerHTML = ''
@@ -671,7 +747,11 @@ function renderEditor(body: HTMLElement, set: ControlSet, isNew: boolean): void 
       for (const cols of [3, 4] as const) {
         const sb = button(`3×${cols}`, 'ed-size-btn' + (tab.cols === cols ? ' active' : ''), () => {
           tab.cols = cols
-          if (picking?.tab === ti) closePicker()
+          // A bubble whose slot this just hid (4th column, now 3×3) goes
+          const hidden = (at: typeof picking): boolean =>
+            at?.tab === ti && at.cell % MAX_COLS >= cols
+          if (hidden(picking)) picking = null
+          if (hidden(moving)) moving = null
           renderTabs()
         })
         sizeToggle.appendChild(sb)
@@ -694,7 +774,9 @@ function renderEditor(body: HTMLElement, set: ControlSet, isNew: boolean): void 
               cancelMove()
               return
             }
-            openPicker(ti, cell)
+            // A second tap on the slot under edit closes its bubble
+            if (picking?.tab === ti && picking.cell === cell) closePicker()
+            else openPicker(ti, cell)
           })
           if (slot) {
             const title = slotTitle(slot)
@@ -704,6 +786,10 @@ function renderEditor(body: HTMLElement, set: ControlSet, isNew: boolean): void 
           if (marked && marked.tab === ti && marked.cell === cell) sb.classList.add('picking')
           grid.appendChild(sb)
         }
+        const at = picking ?? moving
+        if (at && at.tab === ti && Math.floor(at.cell / MAX_COLS) === r) {
+          grid.appendChild(placeBubble(picking ? picker : moveHint, at.cell % MAX_COLS, tab.cols))
+        }
       }
       box.appendChild(grid)
       tabsHost.appendChild(box)
@@ -712,7 +798,6 @@ function renderEditor(body: HTMLElement, set: ControlSet, isNew: boolean): void 
 
   function openPicker(tab: number, cell: number): void {
     picking = { tab, cell }
-    picker.hidden = false
     buildPicker()
     renderTabs()
     picker.scrollIntoView({ block: 'nearest' })
@@ -720,7 +805,6 @@ function renderEditor(body: HTMLElement, set: ControlSet, isNew: boolean): void 
 
   function closePicker(): void {
     picking = null
-    picker.hidden = true
     renderTabs()
   }
 
@@ -740,26 +824,18 @@ function renderEditor(body: HTMLElement, set: ControlSet, isNew: boolean): void 
     moveHint.appendChild(el('span', 'ed-move-hint-text',
       `Moving ${faceLabel(slot)} — tap the key to swap it with.`))
     moveHint.appendChild(button('Cancel', 'set-action', cancelMove))
-    moveHint.hidden = false
-    closePicker()  // re-renders tabs, now highlighting the move source
+    closePicker()  // re-renders tabs: the hint takes the picker's place
   }
 
   function cancelMove(): void {
     moving = null
-    moveHint.hidden = true
     renderTabs()
   }
 
   function buildPicker(): void {
     picker.innerHTML = ''
     if (!picking) return
-    const tab = tabs[picking.tab]
-    const row = Math.floor(picking.cell / MAX_COLS) + 1
-    const col = (picking.cell % MAX_COLS) + 1
-    picker.appendChild(el('div', 'ed-picker-title',
-      `Tab ${tab.name} · row ${row}, key ${col}`))
-
-    const current = tab.grid[picking.cell]
+    const current = tabs[picking.tab].grid[picking.cell]
 
     // Description line — the tooltip replacement (no title tooltips on iOS).
     // Narrates the current assignment, the text being typed, or an armed
@@ -783,7 +859,8 @@ function renderEditor(body: HTMLElement, set: ControlSet, isNew: boolean): void 
     const textInput = noAutofix(el('input', 'ed-picker-text settings-input'))
     textInput.maxLength = MAX_MACRO_LEN
     textInput.placeholder = "key(s), e.g. 'o' or 'za.'"
-    if (current?.text) textInput.value = current.text
+    // Starts empty, never holding the current text: typing after a prefilled
+    // "5" made the macro "5o" (the info line names the current assignment).
     const setText = (): void => { if (textInput.value) assign({ text: textInput.value }) }
     textInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); setText() } })
     textInput.addEventListener('input', () => {
@@ -792,7 +869,7 @@ function renderEditor(body: HTMLElement, set: ControlSet, isNew: boolean): void 
       else setInfo(current)
     })
     textRow.appendChild(textInput)
-    textRow.appendChild(button('Set', 'settings-btn ed-picker-set', setText))
+    textRow.appendChild(button('Set', 'set-action ed-picker-set', setText))
     picker.appendChild(textRow)
 
     const keys = el('div', 'ed-picker-keys')
@@ -816,30 +893,85 @@ function renderEditor(body: HTMLElement, set: ControlSet, isNew: boolean): void 
     const foot = el('div', 'ed-picker-foot')
     if (current) foot.appendChild(button('Move', 'set-action', armMove))
     foot.appendChild(button('Clear key', 'set-action', () => assign(null)))
-    foot.appendChild(button('Cancel', 'set-action', closePicker))
+    // "Close", not "Cancel": the editor's own Cancel sits just below
+    foot.appendChild(button('Close', 'set-action', closePicker))
     picker.appendChild(foot)
   }
 
-  body.appendChild(picker)
-
-  const foot = el('div', 'settings-actions')
-  foot.appendChild(button('Cancel', 'settings-btn', () => renderHome(body)))
-  foot.appendChild(button('Save', 'settings-btn settings-btn-primary', () => {
-    const name = nameInput.value.trim() || set.name
-    const saved: ControlSet = {
+  // What Save stores; its JSON against the opening state is the dirty test.
+  function edited(): ControlSet {
+    return {
       id: set.id,
-      name,
+      name: nameInput.value.trim() || set.name,
       tabs: tabs.map(tab => ({
         name: tab.name,
         cols: tab.cols,
         slots: cropGrid(tab.grid, tab.cols),
       })) as ControlSet['tabs'],
     }
+  }
+  const isDirty = (): boolean => JSON.stringify(edited()) !== pristine
+
+  // Leaving by Cancel, Escape or back: asks first when there are edits.
+  function leave(): void {
+    if (isDirty()) confirmDiscard(() => backHome(body))
+    else backHome(body)
+  }
+
+  const foot = el('div', 'settings-actions is-pinned')
+  foot.appendChild(button('Cancel', 'settings-btn', leave))
+  foot.appendChild(button('Save', 'settings-btn settings-btn-primary', () => {
+    const saved = edited()
     saveControlSet(saved)
     if (isNew) setActiveControlSet(saved.id)  // you just built it — use it
-    renderHome(body)
+    backHome(body)
   }))
   body.appendChild(foot)
 
   renderTabs()
+  const pristine = JSON.stringify(edited())
+  body.scrollTop = 0
+  // Escape/back steps out one level: bubble, then the editor itself. ✕ and
+  // the scrim leave Settings outright — after asking, if there are edits.
+  pageIntercept = (via) => {
+    if (via === 'back') {
+      if (picking) closePicker()
+      else if (moving) cancelMove()
+      else leave()
+      return true
+    }
+    if (!isDirty()) return false
+    confirmDiscard(() => closeSettings?.())
+    return true
+  }
+}
+
+// The app's alert, asking before unsaved edits are thrown away. Stacks over
+// the Settings sheet as its own overlay, so Escape or a scrim tap keeps
+// editing; only Discard runs `onDiscard`.
+function confirmDiscard(onDiscard: () => void): void {
+  // Focus returns to the control that raised the alert, so a Keep leaves the
+  // editor exactly as it was (after a Discard that control goes with the
+  // editor). The backdrop is .doc-backdrop: --z-doc, over the sheet.
+  const opener = document.activeElement
+  const { backdrop, close } = mountBackdrop(undefined, () => {
+    if (opener instanceof HTMLElement && opener.isConnected) opener.focus({ preventScroll: true })
+  })
+  const card = el('div', 'settings-alert')
+  card.setAttribute('role', 'alertdialog')
+  card.setAttribute('aria-modal', 'true')
+  const title = el('p', 'settings-alert-title', 'Discard changes?')
+  title.id = 'settings-alert-title'
+  card.setAttribute('aria-labelledby', title.id)
+  card.appendChild(title)
+  const actions = el('div', 'settings-alert-actions')
+  const keep = button('Keep editing', 'settings-alert-btn settings-alert-keep', close)
+  actions.appendChild(keep)
+  actions.appendChild(button('Discard', 'settings-alert-btn settings-alert-discard', () => {
+    close()
+    onDiscard()
+  }))
+  card.appendChild(actions)
+  backdrop.appendChild(card)
+  keep.focus()
 }

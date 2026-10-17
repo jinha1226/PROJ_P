@@ -21,6 +21,7 @@
 import { WsConnection } from './ws/connection'
 import type { ClientMsg, GameExit, ServerMsg } from './ws/types'
 import { classifyTransition } from './ws/transition'
+import { MessageHold } from './ws/message-hold'
 import { loadSession } from './auth/session'
 import { clearCredentials, loadCredentials, saveCredentials, type StoredCredentials } from './auth/credentials'
 import { passwordLogin } from './auth/password-login'
@@ -177,7 +178,8 @@ export interface ResumeSuccess {
   loader?: TileLoader
   // game_id of the replayed play (absent for watch resumes) — forwarded to the
   // rebuilt game view so the login-doll shelf keeps capturing after a resume;
-  // without it maybeSaveAvatar stays disabled for the rest of the session.
+  // without it CharacterRecord.captureAvatar stays disabled for the rest of
+  // the session.
   gameId?: string
   // Present when the lobby outcome came from game_ended (the replayed play
   // crashed on startup, or the spectated game ended mid-resume): the lobby
@@ -186,8 +188,7 @@ export interface ResumeSuccess {
   exit?: GameExit
   // Replays messages that arrived after (or batched with) the transition
   // trigger into the *current* conn.onMessage. Call after the destination
-  // view has been mounted and owns onMessage — same buffering contract as
-  // login.ts:listenOnce.
+  // view has been mounted and owns onMessage (ws/message-hold.ts).
   flush: () => void
 }
 
@@ -217,8 +218,8 @@ export function resumeOnConn(
     let settled = false
     let deadline: number | null = null
     let loader: TileLoader | undefined
-    const buffered: ServerMsg[] = []
-    const bufferHandler = (m: ServerMsg): void => { buffered.push(m) }
+    const held = new MessageHold()
+    const bufferHandler = (m: ServerMsg): void => { held.hold(m) }
 
     function clearDeadline(): void {
       if (deadline != null) { window.clearTimeout(deadline); deadline = null }
@@ -244,16 +245,7 @@ export function resumeOnConn(
       conn.onMessage = bufferHandler
       resolve({
         ...outcome,
-        flush: () => {
-          // If no destination view took over onMessage, replaying would feed
-          // the buffer straight back into itself forever.
-          if (conn.onMessage === bufferHandler) return
-          // Index loop (shift() is quadratic on a big buffered lobby stream);
-          // re-read conn.onMessage each round — a replayed message can itself
-          // reassign the handler.
-          for (let i = 0; i < buffered.length; i++) conn.onMessage(buffered[i]!)
-          buffered.length = 0
-        },
+        flush: () => held.replay(conn, bufferHandler),
       })
     }
 
@@ -348,7 +340,7 @@ export function resumeOnConn(
         default:
           // Everything else (pre-login lobby snapshot, post-abort lobby list,
           // …) is held for the destination view.
-          buffered.push(msg)
+          held.hold(msg)
       }
     }
 
@@ -562,7 +554,9 @@ interface Overlay extends ResumeUi {
 }
 
 // Dim overlay over the (frozen) game view. Kept outside #app so view swaps
-// underneath never disturb it.
+// underneath never disturb it. Status shows as a capsule (a status is not a
+// question, so no alert); askForceTerminate turns the card into a centred
+// dialog (.is-question) until it's answered.
 function buildOverlay(onCancel: () => void): Overlay {
   const backdrop = document.createElement('div')
   backdrop.className = 'reconnect-backdrop'
@@ -600,6 +594,8 @@ function buildOverlay(onCancel: () => void): Overlay {
     },
     askForceTerminate(answer: (yes: boolean) => void): void {
       spinnerEl.hidden = true
+      backdrop.classList.add('is-question')
+      statusEl.textContent = 'Previous session still running'
       questionEl.textContent = FORCE_TERMINATE_WARNING
       questionEl.hidden = false
       actionsEl.innerHTML = `
@@ -610,6 +606,7 @@ function buildOverlay(onCancel: () => void): Overlay {
       const respond = (yes: boolean): void => {
         if (answered) return
         answered = true
+        backdrop.classList.remove('is-question')
         spinnerEl.hidden = false
         questionEl.hidden = true
         renderCancelAction()

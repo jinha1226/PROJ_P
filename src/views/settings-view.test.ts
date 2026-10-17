@@ -14,6 +14,7 @@ import {
   getPref, LOGIN_SPRITES_CHANGED_EVENT, MONSTER_LIST_MODE_CHANGED_EVENT,
   RENDER_MODE_CHANGED_EVENT, UI_SCALE_CHANGED_EVENT,
 } from '../prefs'
+import { DPAD_STOPS, MSGLOG_FONT_STOPS, MSGLOG_LINE_STOPS } from '../ui-scale'
 
 beforeEach(() => {
   localStorage.clear()
@@ -102,7 +103,7 @@ describe('settings overlay', () => {
 
   it('creates, edits, and saves a new set through the editor', () => {
     openSettings()
-    findButton('＋ New set').click()
+    findButton('New set').click()
 
     // editor is showing, seeded from the active (Standard) set
     expect($('.settings-h')!.textContent).toBe('New control set')
@@ -148,7 +149,7 @@ describe('settings overlay', () => {
     seedThreeColSet()
     openSettings()
     $$('.set-row-main')[1].click()  // activate the custom set (3×3 first tabs)
-    findButton('＋ New set').click()
+    findButton('New set').click()
     for (const tab of $$('.ed-tab')) {
       expect(tab.querySelectorAll('.ed-slot')).toHaveLength(12)
     }
@@ -159,7 +160,7 @@ describe('settings overlay', () => {
 
   it('toggling a tab 4→3→4 in the editor keeps the 4th-column keys', () => {
     openSettings()
-    findButton('＋ New set').click()
+    findButton('New set').click()
     const firstTabBox = $('.ed-tab')!
     findButton('3×3', firstTabBox).click()
     findButton('3×4', $('.ed-tab')!).click()
@@ -215,7 +216,7 @@ describe('settings overlay', () => {
 
   it('describes the current key and typed text in the picker info line', () => {
     openSettings()
-    findButton('＋ New set').click()
+    findButton('New set').click()
     $$('.ed-slot')[0].click()  // Standard slot 1 = Tab
     const info = $('.ed-picker-info')!
     expect(info.textContent).toContain('auto-fight')
@@ -231,7 +232,7 @@ describe('settings overlay', () => {
 
   it('assigns a special key on the second tap only', () => {
     openSettings()
-    findButton('＋ New set').click()
+    findButton('New set').click()
     $$('.ed-slot')[0].click()
     const f1 = findButton('F1', $('.ed-picker-keys')!)
     f1.click()
@@ -240,12 +241,12 @@ describe('settings overlay', () => {
     expect($('.ed-picker-info')!.textContent).toContain('tap again')
     f1.click()
     expect($$('.ed-slot')[0].textContent).toBe('F1')
-    expect($('.ed-picker')!.hidden).toBe(true)
+    expect($('.ed-picker')).toBeNull()
   })
 
   it('marks the slot\'s current special key in the picker', () => {
     openSettings()
-    findButton('＋ New set').click()
+    findButton('New set').click()
     $$('.ed-slot')[0].click()  // holds Tab
     const marked = $$('.ed-key.current')
     expect(marked).toHaveLength(1)
@@ -254,32 +255,187 @@ describe('settings overlay', () => {
 
   it('moves a key by swapping it with a tapped destination', () => {
     openSettings()
-    findButton('＋ New set').click()
+    findButton('New set').click()
     $$('.ed-slot')[0].click()
     findButton('Move').click()
-    expect($('.ed-move-hint')!.hidden).toBe(false)
-    expect($('.ed-picker')!.hidden).toBe(true)
+    // the hint takes the picker's place, under the source slot's row
+    expect($('.ed-move-hint')!.previousElementSibling).toBe($$('.ed-slot')[3])
+    expect($('.ed-picker')).toBeNull()
     expect($$('.ed-slot')[0].classList.contains('picking')).toBe(true)
 
     $$('.ed-slot')[1].click()  // swap ⇥ with 5
     const faces = $$('.ed-slot').map(s => s.textContent)
     expect(faces.slice(0, 2)).toEqual(['5', '⇥'])
-    expect($('.ed-move-hint')!.hidden).toBe(true)
+    expect($('.ed-move-hint')).toBeNull()
   })
 
   it('cancels a move by tapping the source slot again', () => {
     openSettings()
-    findButton('＋ New set').click()
+    findButton('New set').click()
     $$('.ed-slot')[0].click()
     findButton('Move').click()
     $$('.ed-slot')[0].click()
-    expect($('.ed-move-hint')!.hidden).toBe(true)
+    expect($('.ed-move-hint')).toBeNull()
     expect($$('.ed-slot')[0].textContent).toBe('⇥')  // unchanged
+  })
+
+  it('opens the picker as a bubble under the tapped slot\'s row', () => {
+    openSettings()
+    findButton('New set').click()
+    // re-queried: every edit re-renders the tab boxes
+    const secondTab = () => $$('.ed-tab')[1]
+    const slots = () => [...secondTab().querySelectorAll<HTMLElement>('.ed-slot')]
+    slots()[5].click()  // row 2, column 2
+    const picker = $('.ed-picker')!
+    expect(picker.parentElement).toBe(secondTab().querySelector('.ed-grid'))
+    expect(picker.previousElementSibling).toBe(slots()[7])  // after row 2's last key
+    expect(picker.style.getPropertyValue('--notch-x')).toContain('* 0.375')  // (1 + 0.5) / 4
+    expect($$('.ed-picker')).toHaveLength(1)
+
+    slots()[5].click()  // the same slot again closes it
+    expect($('.ed-picker')).toBeNull()
+  })
+
+  it('keeps a move armed across size toggles unless its slot gets hidden', () => {
+    openSettings()
+    findButton('New set').click()
+    $$('.ed-slot')[0].click()
+    findButton('Move').click()
+    findButton('3×3', $('.ed-tab')!).click()  // source in column 1 stays visible
+    expect($('.ed-move-hint')).not.toBeNull()
+    findButton('Cancel', $('.ed-move-hint')!).click()
+
+    findButton('3×4', $('.ed-tab')!).click()
+    $$('.ed-slot')[3].click()  // column 4
+    findButton('Move').click()
+    findButton('3×3', $('.ed-tab')!).click()
+    expect($('.ed-move-hint')).toBeNull()
+    expect($$('.ed-slot')[0].textContent).toBe('⇥')  // nothing swapped
+  })
+
+  it('starts the picker\'s text field empty, so typing replaces the key', () => {
+    openSettings()
+    findButton('New set').click()
+    $$('.ed-slot')[1].click()  // holds "5"
+    const pickerInput = $<HTMLInputElement>('.ed-picker-text')!
+    expect(pickerInput.value).toBe('')
+    pickerInput.value = 'o'
+    findButton('Set').click()
+    expect($$('.ed-slot')[1].textContent).toBe('o')
+  })
+})
+
+describe('settings sub-page navigation', () => {
+  const esc = () => document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }))
+  const onHome = () => $$('.settings-h').some(h => h.textContent === 'Control sets')
+  const settingsOpen = () => $('.settings-backdrop') !== null
+  const alert = () => $('.settings-alert')
+
+  it('steps back one level per Escape: bubble, editor, then Settings', () => {
+    openSettings()
+    findButton('New set').click()
+    $$('.ed-slot')[0].click()
+    esc()
+    expect($('.ed-picker')).toBeNull()
+    expect($('.ed-name-input')).not.toBeNull()  // still editing
+    esc()
+    expect(onHome()).toBe(true)  // nothing edited: no question
+    expect(alert()).toBeNull()
+    esc()
+    expect(settingsOpen()).toBe(false)
+  })
+
+  it('cancels an armed move on Escape, staying in the editor', () => {
+    openSettings()
+    findButton('New set').click()
+    $$('.ed-slot')[0].click()
+    findButton('Move').click()
+    esc()
+    expect($('.ed-move-hint')).toBeNull()
+    expect($('.ed-name-input')).not.toBeNull()
+  })
+
+  it('steps back from the viewer on Escape', () => {
+    openSettings()
+    $$('.set-row-more')[0].click()
+    findButton('View', $$('.set-row-actions')[0]).click()
+    esc()
+    expect(onHome()).toBe(true)
+    expect(settingsOpen()).toBe(true)
+  })
+
+  it('asks before Cancel or Escape throws away edits', () => {
+    openSettings()
+    findButton('New set').click()
+    $<HTMLInputElement>('.ed-name-input')!.value = 'Changed'
+
+    esc()
+    expect(alert()).not.toBeNull()
+    findButton('Keep editing').click()
+    expect(alert()).toBeNull()
+    expect($('.ed-name-input')).not.toBeNull()
+
+    findButton('Cancel', $('.settings-actions')!).click()
+    expect(alert()).not.toBeNull()
+    esc()  // Escape on the alert keeps editing too
+    expect(alert()).toBeNull()
+    expect($('.ed-name-input')).not.toBeNull()
+
+    findButton('Cancel', $('.settings-actions')!).click()
+    findButton('Discard').click()
+    expect(onHome()).toBe(true)
+    expect(listControlSets()).toHaveLength(1)  // nothing saved
+  })
+
+  it('asks before ✕ closes Settings over edits, and closes at once without', () => {
+    openSettings()
+    findButton('New set').click()
+    $$('.ed-slot')[0].click()
+    findButton('Clear key').click()
+    $<HTMLButtonElement>('.doc-close')!.click()
+    expect(alert()).not.toBeNull()
+    expect(settingsOpen()).toBe(true)
+    findButton('Discard').click()
+    expect(settingsOpen()).toBe(false)
+    expect(alert()).toBeNull()
+
+    openSettings()
+    findButton('New set').click()
+    $<HTMLButtonElement>('.doc-close')!.click()
+    expect(settingsOpen()).toBe(false)
+  })
+
+  it('opens sub-pages at their top and returns to the list\'s scroll offset', () => {
+    openSettings()
+    const body = $('.settings-body')!
+    body.scrollTop = 420
+    findButton('New set').click()
+    expect(body.scrollTop).toBe(0)
+    findButton('Cancel', $('.settings-actions')!).click()
+    expect(body.scrollTop).toBe(420)
+  })
+
+  it('lets an armed Delete lapse', () => {
+    vi.useFakeTimers()
+    try {
+      openSettings()
+      $$('.set-row-more')[0].click()
+      findButton('Duplicate').click()
+      $$('.set-row-more')[1].click()
+      const del = findButton('Delete')
+      del.click()
+      vi.advanceTimersByTime(5000)
+      expect(del.textContent).toBe('Delete')
+      del.click()  // re-arms rather than deleting
+      expect(listControlSets()).toHaveLength(2)
+    } finally {
+      vi.useRealTimers()
+    }
   })
 
   it('accepts a surrogate-pair emoji tab label but not two characters', () => {
     openSettings()
-    findButton('＋ New set').click()
+    findButton('New set').click()
     const charInput = $<HTMLInputElement>('.ed-tab-char')!
 
     charInput.value = 'ab'
@@ -446,62 +602,60 @@ describe('settings overlay', () => {
   })
 })
 
+// A slider is a range input over its stop table's indices, by aria-label.
+const slider = (label: string, root: ParentNode = document) =>
+  root.querySelector<HTMLInputElement>(`input[type="range"][aria-label="${label}"]`)!
+// What a drag does: the browser moves the value and fires `input`.
+const slideTo = (input: HTMLInputElement, stops: readonly number[], value: number) => {
+  input.value = String(stops.indexOf(value))
+  input.dispatchEvent(new Event('input', { bubbles: true }))
+}
+
 describe('size sliders', () => {
-  // Dots within a slider, found by their aria-label (the stop value).
-  const dot = (group: HTMLElement, value: number) =>
-    group.querySelector<HTMLButtonElement>(`[aria-label="${value}"]`)!
+  const ticksOf = (input: HTMLInputElement) =>
+    [...input.closest('.set-slider-row')!.querySelectorAll('.set-slider-tick')]
 
-  it('renders all three sliders with the active and stock dots marked', () => {
+  it('renders all three sliders on the stock stop, with the stock tick marked', () => {
     openSettings()
-    const dpad = segGroup('D-pad size')
-    expect(dpad.querySelectorAll('[role="radio"]')).toHaveLength(5)
-    // fresh install: active IS the stock stop — one dot carries both marks
-    const active = dot(dpad, 3.5)
-    expect(active.classList.contains('active')).toBe(true)
-    expect(active.classList.contains('default')).toBe(true)
-    expect(active.getAttribute('aria-checked')).toBe('true')
-    expect(segGroup('Message log lines').querySelectorAll('[role="radio"]')).toHaveLength(5)
-    expect(segGroup('Message log text size').querySelectorAll('[role="radio"]')).toHaveLength(5)
+    const dpad = slider('D-pad size')
+    expect(dpad.max).toBe(String(DPAD_STOPS.length - 1))
+    expect(dpad.value).toBe(String(DPAD_STOPS.indexOf(3.5)))
+    expect(dpad.getAttribute('aria-valuetext')).toBe('3.5')
+    const ticks = ticksOf(dpad)
+    expect(ticks).toHaveLength(5)
+    expect(ticks.map(t => t.classList.contains('default')))
+      .toEqual(DPAD_STOPS.map(v => v === 3.5))
+    expect(ticksOf(slider('Message log lines'))).toHaveLength(5)
+    expect(ticksOf(slider('Message log text size'))).toHaveLength(5)
   })
 
-  it('labels the lines slider dots with their values', () => {
+  it('flanks every slider with decorative end symbols', () => {
     openSettings()
-    const nums = [...segGroup('Message log lines').querySelectorAll('.set-slider-num')]
-    expect(nums.map(n => n.textContent)).toEqual(['3', '4', '5', '6', '7'])
+    for (const name of ['Message log lines', 'Message log text size', 'D-pad size']) {
+      const row = slider(name).closest('.set-slider-row')!
+      const ends = [...row.children].filter(c => c.classList.contains('set-slider-end'))
+      expect(ends).toHaveLength(2)
+      expect(row.firstElementChild).toBe(ends[0])
+      expect(row.lastElementChild).toBe(ends[1])
+      for (const e of ends) expect(e.getAttribute('aria-hidden')).toBe('true')
+    }
   })
 
-  it('labels only the endpoint dots of a worded slider', () => {
+  it('sliding stores the pref and updates the spoken value', () => {
     openSettings()
-    const nums = [...segGroup('D-pad size').querySelectorAll('.set-slider-num')]
-    expect(nums.map(n => n.textContent)).toEqual(['Tiny', 'Chunky'])
-  })
-
-  it('renders the font slider ends as "Aa" specimens at the true stop sizes', () => {
-    openSettings()
-    const ends = [...segGroup('Message log text size').querySelectorAll('.set-slider-num')]
-    expect(ends.map(n => n.textContent)).toEqual(['Aa', 'Aa'])
-    expect(ends.map(n => (n as HTMLElement).style.fontSize)).toEqual(['0.65rem', '0.85rem'])
-    for (const n of ends) expect(n.classList.contains('set-slider-spec')).toBe(true)
-  })
-
-  it('tapping a dot stores the pref and moves the marks', () => {
-    openSettings()
-    const dpad = segGroup('D-pad size')
-    dot(dpad, 3.9).click()
+    const dpad = slider('D-pad size')
+    slideTo(dpad, DPAD_STOPS, 3.9)
     expect(getPref('dpadSize')).toBe(3.9)
-    expect(dot(dpad, 3.9).classList.contains('active')).toBe(true)
-    expect(dot(dpad, 3.9).getAttribute('aria-checked')).toBe('true')
-    expect(dot(dpad, 3.5).classList.contains('active')).toBe(false)
-    expect(dot(dpad, 3.5).getAttribute('aria-checked')).toBe('false')
-    // the stock stop keeps its hollow-ring marker after moving off it
-    expect(dot(dpad, 3.5).classList.contains('default')).toBe(true)
+    expect(dpad.getAttribute('aria-valuetext')).toBe('3.9')
+    // the stock stop keeps its ring tick after moving off it
+    expect(ticksOf(dpad)[DPAD_STOPS.indexOf(3.5)].classList.contains('default')).toBe(true)
   })
 
   it('fires the ui-scale live-apply event on change', () => {
     openSettings()
     const seen = vi.fn()
     window.addEventListener(UI_SCALE_CHANGED_EVENT, seen)
-    dot(segGroup('Message log lines'), 6).click()
+    slideTo(slider('Message log lines'), MSGLOG_LINE_STOPS, 6)
     expect(seen).toHaveBeenCalledTimes(1)
     expect(getPref('msglogLines')).toBe(6)
     window.removeEventListener(UI_SCALE_CHANGED_EVENT, seen)
@@ -510,14 +664,14 @@ describe('size sliders', () => {
   it('snaps a hand-edited stored value to the nearest stop for display', () => {
     localStorage.setItem('pocketzot:prefs', JSON.stringify({ msglogFont: 0.72 }))
     openSettings()
-    expect(dot(segGroup('Message log text size'), 0.7).classList.contains('active')).toBe(true)
+    expect(slider('Message log text size').value).toBe(String(MSGLOG_FONT_STOPS.indexOf(0.7)))
   })
 
-  it('re-tapping the active dot is a no-op (no write, no event)', () => {
+  it('an input on the current stop is a no-op (no write, no event)', () => {
     openSettings()
     const seen = vi.fn()
     window.addEventListener(UI_SCALE_CHANGED_EVENT, seen)
-    dot(segGroup('D-pad size'), 3.5).click()
+    slideTo(slider('D-pad size'), DPAD_STOPS, 3.5)
     expect(seen).not.toHaveBeenCalled()
     window.removeEventListener(UI_SCALE_CHANGED_EVENT, seen)
   })
@@ -570,8 +724,8 @@ describe('floating size palette', () => {
     adjustButtons()[0].click()
     expect(document.querySelector('.settings-card')).toBeNull()
     const palette = document.querySelector<HTMLElement>('.size-palette')!
-    expect(palette.querySelectorAll('[role="radiogroup"]')).toHaveLength(3)
-    palette.querySelector<HTMLButtonElement>('[aria-label="D-pad size"] [aria-label="3.7"]')!.click()
+    expect(palette.querySelectorAll('input[type="range"]')).toHaveLength(3)
+    slideTo(slider('D-pad size', palette), DPAD_STOPS, 3.7)
     expect(getPref('dpadSize')).toBe(3.7)
   })
 
@@ -587,6 +741,19 @@ describe('floating size palette', () => {
     expect(document.querySelector('.size-palette')).not.toBeNull()
     document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }))
     expect(document.querySelector('.size-palette')).toBeNull()
+  })
+
+  it('releases its game-view watch when Escape closes it', () => {
+    mountFakeGameView()
+    openSettings()
+    adjustButtons()[0].click()
+    const disconnect = vi.spyOn(MutationObserver.prototype, 'disconnect')
+    try {
+      document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }))
+      expect(disconnect).toHaveBeenCalled()
+    } finally {
+      disconnect.mockRestore()
+    }
   })
 
   it('closes itself when the game view unmounts', async () => {

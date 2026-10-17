@@ -81,7 +81,7 @@ describe('tokenLogin', () => {
       onSuccess: () => { throw new Error('unexpected') },
       onFail: () => { failed = true },
     })
-    feed({ msg: 'login_fail', message: 'nope' })
+    feed({ msg: 'login_fail' })
     expect(failed).toBe(true)
     expect(loadSession(WS_URL, USER)).toBeNull()
     expect(SESSION_EXPIRED_NOTICE).toMatch(/sign in/)

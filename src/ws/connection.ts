@@ -1,6 +1,7 @@
 import type { ClientMsg, ServerMsg } from './types'
 import { ioHook, type IncomingMessage, type OutgoingMessage } from '../dwem/io-hook'
 import { recordFrame } from '../perf/recorder'
+import { devRingPush } from '../util/dev-ring'
 
 export type MessageHandler = (msg: ServerMsg) => void
 export type StateHandler = () => void
@@ -17,6 +18,13 @@ export interface GameConnection {
   readonly httpBase: string
   onMessage: MessageHandler
   onClose: StateHandler
+}
+
+// A WebTiles server's HTTP origin, derived from its socket URL: swap the ws
+// scheme for http and drop the trailing /socket (webtiles/server.py serves
+// /, /socket and /gamedata from one host and port).
+export function httpBaseOf(wsUrl: string): string {
+  return wsUrl.replace(/^ws/, 'http').replace(/\/socket\/?$/, '')
 }
 
 // Default handshake bound for connect() — generous for a cellular TLS
@@ -49,10 +57,9 @@ export class WsConnection implements GameConnection {
   }
 
   // HTTP base for version-pinned gamedata assets (tile atlases served at
-  // /gamedata/<version>/). Derived from the socket URL: swap the ws scheme
-  // for http and drop the trailing /socket.
+  // /gamedata/<version>/): httpBaseOf.
   get httpBase(): string {
-    return this.url.replace(/^ws/, 'http').replace(/\/socket\/?$/, '')
+    return httpBaseOf(this.url)
   }
 
   // Resolves on open. Every other outcome rejects AND leaves no socket
@@ -194,14 +201,9 @@ export class WsConnection implements GameConnection {
 // Dev-only circular WS message log accessible via window.__dcssWsLog.
 // Exported so LocalConnection (offline play) logs into the same window, and
 // input routing can be eyeballed identically in both transports.
-type LogEntry = { dir: 'in' | 'out'; ts: number; msg: unknown }
 const MAX_LOG = 200
 export function devLog(dir: 'in' | 'out', msg: unknown): void {
-  const w = window as unknown as Record<string, unknown>
-  if (!Array.isArray(w['__dcssWsLog'])) w['__dcssWsLog'] = []
-  const log = w['__dcssWsLog'] as LogEntry[]
-  log.push({ dir, ts: Date.now(), msg })
-  if (log.length > MAX_LOG) log.splice(0, log.length - MAX_LOG)
+  devRingPush('__dcssWsLog', MAX_LOG, { dir, ts: Date.now(), msg })
 }
 
 // Strip password/cookie fields before any debug logging, so a screenshare

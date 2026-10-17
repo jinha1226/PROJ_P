@@ -5,7 +5,10 @@
 // AGPL-3.0-or-later work. See ATTRIBUTION.md and LICENSE.
 
 import { TEX, type TileLoader, type TileSprite } from './tile-loader'
-import { buildStatusOverlays, fgTileIndex, mayHaveStatusOverlays, resolveOverlayId, type StatusOverlayOpts } from '../hud/monster-style'
+import {
+  buildStatusOverlays, fgHaloDngnName, fgThreatDngnName, fgTileIndex, mayHaveStatusOverlays,
+  resolveOverlayId, type StatusOverlayOpts,
+} from '../hud/monster-style'
 import { getStatusIconSizer } from '../map/icon-sizes'
 import { bgFlags, fgFlags } from '../map/flag-decode'
 
@@ -234,6 +237,24 @@ export function appendMonsterActor(loader: TileLoader | null, wrap: HTMLElement,
   } else {
     appendTiles(loader, wrap, spec, scale, opts)
   }
+}
+
+// The list's and panel's whole monster stack, bottom-up as the map draws it
+// (tile-map-view drawCell): floor, halo, threat wash, summoner ring, sprite.
+// prependDngn* slots in at index 0 of the DOM, so the prepends run in
+// reverse of paint order. Icon overlays are the caller's: whether MDAM
+// draws differs per surface.
+export function appendMonsterStack(
+  loader: TileLoader | null, wrap: HTMLElement,
+  cell: (ActorCell & { highlighted_summoner?: boolean }) | undefined, scale = 1,
+): void {
+  appendMonsterActor(loader, wrap, cell, scale)
+  if (cell?.highlighted_summoner) prependDngnLayer(loader, wrap, 'HALO_SUMMONER', scale)
+  const threat = fgThreatDngnName(cell?.fg)
+  if (threat) prependDngnLayer(loader, wrap, threat, scale)
+  const halo = fgHaloDngnName(cell?.fg)
+  if (halo) prependDngnLayer(loader, wrap, halo, scale)
+  if (cell?.t_bg !== undefined) prependDngnIndex(loader, wrap, bgFlags(cell.t_bg).value, scale)
 }
 
 function splitGroup(wrap: HTMLElement, opacity: number, clipPath?: string): HTMLElement {

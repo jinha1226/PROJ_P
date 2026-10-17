@@ -7,7 +7,69 @@ formatting and HTML chrome differ. Drift is a bug.
 
 # What's new
 
-Notable changes to PocketZot, newest first.
+## 2026-10-16
+
+- Changed the key layout for the 'm' menu.
+- Improved handling for when the system keyboard is shown.
+
+## 2026-10-08
+
+- *Your surroundings seem slightly different.*
+- Added `^F` and `?` to the `M` menu.
+- Improved the control set editor.
+- Other improvements.
+
+## 2026-10-04
+
+- Improved spell and ability menu layouts for phones and tablets.
+- Characters and character cards now show collected gems.
+- Remodeled the crypt.
+- Tiles mode: altars, portals, and other features now animate as in the
+  desktop client.
+- Other improvements.
+
+## 2026-09-30
+
+- Spell rail: long-press a spell and drag to rearrange.
+- Spell rail: you can now scroll horizontally when needed.
+- Spell rail: added an `I` button at the right end to list your spells.
+- X-mode: you can now tap or drag on the minimap to pan the view.
+- Improved the appearance of stacked prompts.
+- Text inputs now open the system keyboard after tapping the field.
+- Character creation on versions <= 0.23 now shows the d-pad and virtual
+  keyboard, needed for navigation in older versions.
+- Other improvements.
+
+## 2026-09-26
+
+- Dragging the map in normal play now opens X-mode.
+- X-mode now has its own buttons and a minimap.
+- Landscape now shows the minimap in the sidebar on tablets, and on
+  phones while spectating.
+- The Standard control set has changed on the `@` and `>` tabs.
+  Custom control sets are not affected. If you'd like a copy of the old
+  layout, import it in Settings:
+  `pocketzot-controls{v1|Old Standard|@4:{Tab} 5 i o q r f v a ' x ,|>4:w R t P d {^F} G {^O} X e < >|?4:@ % ^ = A m {rb} \ $ M I ?}`
+- Dungeon overview (`^O`) branch, altar, and shop lists are now
+  reformatted for portrait.
+- God power costs are now listed under the power instead of offscreen
+  to the right.
+- The monster panel now shows more text labels for various status
+  effects.
+- Other improvements.
+
+## 2026-09-20
+
+- X-mode: dragging the map to pan should now work on Android,
+  instead of only on iOS.
+- X-mode: fixed an issue with map centering when adjusting depth
+  with `[`/`]`.
+- Offline: released a new build of the engine that uses new
+  WebAssembly tech to run several times faster for startup, level
+  gen, and other heavy loads. Available on iOS 27, and Android
+  with current Chrome/Firefox.
+- Offline: the name used in your last game is now pre-filled if
+  the slot is available.
 
 ## 2026-09-17
 

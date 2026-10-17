@@ -2,6 +2,7 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { buildGameView, type SpectateTarget } from './game-view'
+import { disposeView } from './view-dispose'
 import { unwrapHangingIndents } from './overlay-body'
 import { ENABLE_SPELL_TAB } from '../game/input/touch'
 import type { WsConnection } from '../ws/connection'
@@ -10,6 +11,8 @@ import type { MapStore } from '../game/map/map-store'
 import { setPref } from '../prefs'
 import { fakeStorage } from '../test/fake-storage'
 import { listAllAvatars, saveAvatar } from '../avatars'
+import stashSearchGolden from '../golden/22-stash-search-describe-highlight.golden.json'
+import searchPlacementsGolden from '../golden/23-stash-search-highlight-placements.golden.json'
 
 // game-view.ts exports buildGameView (plus unwrapHangingIndents/HANG_MARK for
 // the data-file sweep test), so it's exercised end-to-end the way
@@ -31,7 +34,7 @@ interface Harness {
   dispatch: (msg: unknown) => void
 }
 
-function setup(spectating?: SpectateTarget, gameId = ''): Harness {
+function setup(spectating?: SpectateTarget, gameId = '', resumed = false): Harness {
   setPref('mapRenderMode', 'ascii')
   const send = vi.fn()
   const conn = {
@@ -44,17 +47,40 @@ function setup(spectating?: SpectateTarget, gameId = ''): Harness {
     close: vi.fn(),
   } as unknown as WsConnection
   const onLobby = vi.fn()
-  const view = buildGameView(conn, onLobby, spectating, undefined, '', gameId)
+  const view = buildGameView({ conn, onLobby, spectating, gameId, resumed })
+  mounted.push(view)
   document.body.appendChild(view)
   return { view, send, onLobby, dispatch: (msg) => conn.onMessage(msg as ServerMsg) }
 }
 
-afterEach(() => {
-  document.body.innerHTML = ''
+// Views mounted by a test, disposed after it as the app shell would
+// (dispose is the only release of their document/window listeners).
+const mounted: HTMLElement[] = []
+
+beforeEach(() => {
+  vi.stubGlobal('localStorage', fakeStorage())
 })
 
+afterEach(() => {
+  for (const view of mounted.splice(0)) disposeView(view)
+  document.body.innerHTML = ''
+  vi.unstubAllGlobals()
+})
+
+// At a command-key read (input_mode 1), the only state where the harvest may
+// inject its `I` (game-view's uiQuiet). The once-per-game auto-harvest that
+// entry fires is settled with a no-spells reply and the send log cleared, so
+// a test starts idle with an empty rail and drives harvests itself.
+function setupAtCommand(spectating?: SpectateTarget): Harness {
+  const h = setup(spectating)
+  h.dispatch({ msg: 'input_mode', mode: 1 })
+  h.dispatch({ msg: 'msgs', messages: [{ text: "You don't know any spells." }] })
+  h.send.mockClear()
+  return h
+}
+
 // Offline variant: wires the readMorgue seam the way app.ts does from
-// boot.readMorgue (positional tail of buildGameView).
+// boot.readMorgue.
 function setupOffline(readMorgue: (f: string) => Promise<Uint8Array<ArrayBuffer> | null>): Harness {
   setPref('mapRenderMode', 'ascii')
   const send = vi.fn()
@@ -68,7 +94,8 @@ function setupOffline(readMorgue: (f: string) => Promise<Uint8Array<ArrayBuffer>
     close: vi.fn(),
   } as unknown as WsConnection
   const onLobby = vi.fn()
-  const view = buildGameView(conn, onLobby, undefined, undefined, 'Dumptest', 'offline', false, readMorgue)
+  const view = buildGameView({ conn, onLobby, username: 'Dumptest', gameId: 'offline', readMorgue })
+  mounted.push(view)
   document.body.appendChild(view)
   return { view, send, onLobby, dispatch: (msg) => conn.onMessage(msg as ServerMsg) }
 }
@@ -111,6 +138,50 @@ describe('message log (msgs)', () => {
     expect(btn).toBeTruthy()
     btn!.click()
     expect(sent(h)).toContainEqual({ msg: 'input', text: 'S' })
+  })
+
+  // Wire text from 14-cast-then-examine (x examine's print_key_hints).
+  it('renders the x-examine key-hints line as one button per key, "." included', () => {
+    const h = setup()
+    h.dispatch({ msg: 'msgs', messages: [
+      { text: '<cyan>Press: ? - help, v - describe, . - travel<lightgrey>', channel: 2 },
+    ] })
+    const btns = [...msgLog(h).querySelectorAll<HTMLButtonElement>('.game-prompt .action-btn')]
+    expect(btns.map(b => b.textContent)).toEqual(['? - help', 'v - describe', '. - travel'])
+    btns[2].click()
+    expect(sent(h)).toContainEqual({ msg: 'input', text: '.' })
+  })
+
+  // Wire text from 10-adjust-under-cutoff: the follow-up prompt's hint is
+  // <white>-marked, so it renders plain — the earlier row must still retire.
+  it('a later prompt-channel line retires live buttons, even with none of its own', () => {
+    const h = setup()
+    h.dispatch({ msg: 'msgs', messages: [{ text: '<cyan>Adjust (g)ear, (s)pells or (p)otions?', channel: 2 }] })
+    const buttons = () => [...msgLog(h).querySelectorAll<HTMLButtonElement>('.game-prompt button')]
+    expect(buttons().length).toBeGreaterThan(0)
+    h.dispatch({ msg: 'msgs', messages: [{ text: '<lightgrey>g - a potion of magic', channel: 0 }] })
+    expect(buttons().every(b => !b.disabled)).toBe(true)
+    h.dispatch({ msg: 'msgs', messages: [{
+      text: '<cyan>Adjust to which letter?  (<white>?<cyan> for menu, <white>Esc<cyan> to quit)', channel: 2,
+    }] })
+    expect(buttons().every(b => b.disabled)).toBe(true)
+  })
+
+  // PromptMenu::show_in_msgpane (RC prompt_menu = false) sends its option
+  // rows, then the title, as separate prompt lines of one batch.
+  it('every prompt row of one batch stays live, the title after them included', () => {
+    const h = setup()
+    h.dispatch({ msg: 'msgs', messages: [
+      { text: '(D) Dungeon  (T) Temple', channel: 2 },
+      { text: '(L) Lair  (O) Orcish Mines', channel: 2 },
+      { text: 'Where to? (_ - list branches)', channel: 2 },
+    ] })
+    const live = [...msgLog(h).querySelectorAll<HTMLButtonElement>('.game-prompt button:not([disabled])')]
+    const keys = live.map(b => b.textContent?.match(/\((.)\)/)?.[1]).sort()
+    expect(keys).toEqual(['D', 'L', 'O', 'T'])
+    h.send.mockClear()
+    live.find(b => b.textContent?.startsWith('(T)'))!.click()
+    expect(sent(h)).toEqual([{ msg: 'input', text: 'T' }])
   })
 
   // The offline '#' dump line: {msg:'dump'} (mini-server synthesis) arms the
@@ -406,6 +477,19 @@ describe('X-mode describe strip', () => {
     expect(strip(h).textContent).not.toContain('kobold')
   })
 
+  it('keeps only the newest lines when feedback piles up without a cursor move', () => {
+    const h = setup()
+    enterX(h)
+    h.dispatch(describeBatch(0, 'A kobold.', 'Floor.'))
+    // Each cancelled G prompt adds one temporary "Okay, then." (canned_msg
+    // MSG_OK); no cursor move, so no rollback clears them.
+    for (let i = 0; i < 8; i++) h.dispatch({ msg: 'msgs', messages: [{ text: 'Okay, then.' }] })
+    const lines = [...strip(h).querySelectorAll('.xdesc-line')].map((l) => l.textContent)
+    expect(lines).toEqual(Array(5).fill('Okay, then.'))
+    // The real log still takes every line, so the exit rollback count holds.
+    expect(msgTexts(h).filter((t) => t === 'Okay, then.').length).toBe(8)
+  })
+
   it('clears and hides on X-mode exit, leaving the real log rolled back clean', () => {
     const h = setup()
     h.dispatch({ msg: 'msgs', messages: [{ text: 'You enter the dungeon.' }] })
@@ -436,6 +520,44 @@ describe('cursor-mode d-pad state class (x examine / targeting)', () => {
     h.dispatch({ msg: 'cursor', id: 2, loc: { x: 3, y: 4 } })
     expect(touch(h).classList.contains('cursor-mode')).toBe(false)
     expect(touch(h).classList.contains('x-mode')).toBe(true)
+  })
+})
+
+// A spectator joining makes the engine re-send every cursor id to the player
+// too (tileweb.cc _send_everything: id 0, id 1, then id 2 after the map).
+// Each id has its own slot, so the loc-less resends of the others must not
+// touch the one in use.
+describe('spectator-join cursor resend', () => {
+  const touch = (h: Harness) => h.view.querySelector<HTMLElement>('#touch-controls')!
+  const cursorCell = (h: Harness) => h.view.querySelector('.map-cursor')
+
+  it('keeps the aiming reticle and cursor-mode through the burst', () => {
+    const h = setup()
+    h.dispatch({ msg: 'map', cells: [], vgrdc: { x: 3, y: 4 } })
+    h.dispatch({ msg: 'cursor', id: 0, loc: { x: 3, y: 4 } })
+    expect(cursorCell(h)).not.toBeNull()
+    for (const m of [
+      { msg: 'cursor', id: 0, loc: { x: 3, y: 4 } },
+      { msg: 'cursor', id: 1 },
+      { msg: 'cursor', id: 2 },
+    ]) {
+      h.dispatch(m)
+      expect(touch(h).classList.contains('cursor-mode')).toBe(true)
+      expect(cursorCell(h)).not.toBeNull()
+    }
+  })
+
+  it('never drops out of X mode mid-burst', () => {
+    const h = setup()
+    h.dispatch({ msg: 'cursor', id: 2, loc: { x: 3, y: 4 } })
+    for (const m of [
+      { msg: 'cursor', id: 0 },
+      { msg: 'cursor', id: 1 },
+      { msg: 'cursor', id: 2, loc: { x: 3, y: 4 } },
+    ]) {
+      h.dispatch(m)
+      expect(touch(h).classList.contains('x-mode')).toBe(true)
+    }
   })
 })
 
@@ -578,6 +700,388 @@ describe('ui_cutoff (engine runs the map under the popup stack)', () => {
   })
 })
 
+// Behaviours that read several overlay structures at once (menus, pushes,
+// CRT, cutoff, dialog, game-over): each one pinned before those structures
+// merge into one popup stack.
+describe('overlay-stack cross-reads', () => {
+  // A fresh message per use: the view keeps and mutates the menu it's given
+  // (update_menu writes into it), as the engine's messages are one-shot.
+  const inv = () => ({ msg: 'menu', tag: 'inventory', title: { text: 'Inventory' },
+    items: [{ level: 2, text: 'a - a wand of flame (15)', hotkeys: [97] }] })
+  const bar = (h: Harness) => h.view.querySelector<HTMLElement>('#menu-controls')!
+  const labels = (h: Harness) => [...bar(h).querySelectorAll<HTMLElement>('.menu-ctrl-btn')].map(b => b.textContent)
+  const title = (h: Harness) => overlay(h).querySelector('.overlay-title span')?.textContent
+  const shown = (h: Harness, sel: string) => !isHidden(h.view.querySelector<HTMLElement>(sel)!)
+  const sentI = (h: Harness) => sent(h).filter(m => m.msg === 'input' && (m as { text?: string }).text === 'I')
+  const back = () => (window as unknown as { __dcssBack: () => void }).__dcssBack()
+
+  it('the auto spell harvest waits while anything is open, a cutoff-hidden menu included', () => {
+    const states: Array<(h: Harness) => void> = [
+      (h) => h.dispatch(inv()),
+      (h) => h.dispatch({ msg: 'ui-push', type: 'describe-item', title: 'x', body: 'y' }),
+      (h) => h.dispatch({ msg: 'menu', type: 'crt', tag: 'skills' }),
+      (h) => h.dispatch({ msg: 'show_dialog', html: '<button data-key="N">No</button>' }),
+      (h) => { h.dispatch(inv()); h.dispatch({ msg: 'ui_cutoff', cutoff: 1 }) },
+    ]
+    for (const open of states) {
+      const h = setup()
+      open(h)
+      h.dispatch({ msg: 'input_mode', mode: 1 })
+      expect(sentI(h)).toEqual([])
+    }
+    const idle = setup()
+    idle.dispatch({ msg: 'input_mode', mode: 1 })
+    expect(sentI(idle)).toHaveLength(1)
+  })
+
+  it('back offers the save prompt only when idle; over a menu it is Esc', () => {
+    const h = setup()
+    h.dispatch({ msg: 'input_mode', mode: 1 })                  // auto harvest: I
+    h.dispatch({ msg: 'menu', tag: 'spell', items: [] })        // captured, Esc sent
+    h.dispatch({ msg: 'close_menu' })                           // swallowed
+    h.send.mockClear()
+    back()
+    expect(sent(h)).toEqual([{ msg: 'input', text: 'S' }])
+    h.send.mockClear()
+    h.dispatch(inv())
+    back()
+    expect(sent(h)).toEqual([{ msg: 'key', keycode: 27 }])
+  })
+
+  it('stash preview without a cutoff: the map replaces the results, Esc brings them back', () => {
+    const h = setup()
+    h.dispatch({ msg: 'menu', tag: 'stash', title: { text: 'Search results' }, flags: 0x40000,
+      items: [{ level: 2, text: 'a - a stone', hotkeys: [97] }] })
+    h.dispatch({ msg: 'cursor', id: 2, loc: { x: 5, y: 5 } })
+    expect(isHidden(overlay(h))).toBe(true)
+    expect(shown(h, '#map-grid') && shown(h, '#touch-controls')).toBe(true)
+    // Arrows reach the server (the cursor), not the hidden menu's hover.
+    h.send.mockClear()
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', keyCode: 40, bubbles: true }))
+    expect(sent(h)).toEqual([{ msg: 'key', keycode: -253 }])
+    h.dispatch({ msg: 'cursor', id: 2 })
+    expect(title(h)).toBe('Search results')
+    expect(shown(h, '#map-grid')).toBe(false)
+    expect(shown(h, '#menu-controls')).toBe(true)
+  })
+
+  it('leaving a cutoff-covered stash preview keeps the map until the cutoff lifts', () => {
+    const h = setup()
+    h.dispatch({ msg: 'menu', tag: 'stash', title: { text: 'Search results' }, flags: 0x40000,
+      items: [{ level: 2, text: 'a - a stone', hotkeys: [97] }] })
+    h.dispatch({ msg: 'ui_cutoff', cutoff: 1 })
+    h.dispatch({ msg: 'cursor', id: 2, loc: { x: 5, y: 5 } })
+    h.dispatch({ msg: 'cursor', id: 2 })
+    // The results menu is still cutoff-hidden: no empty overlay over the map.
+    expect(isHidden(overlay(h))).toBe(true)
+    expect(shown(h, '#map-grid')).toBe(true)
+    h.dispatch({ msg: 'ui_cutoff', cutoff: -1 })
+    expect(title(h)).toBe('Search results')
+    expect(shown(h, '#menu-controls')).toBe(true)
+  })
+
+  it('the monster panel opened during a stash preview is visible', () => {
+    const h = setup()
+    h.dispatch({ msg: 'menu', tag: 'stash', title: { text: 'Search results' }, flags: 0x40000,
+      items: [{ level: 2, text: 'a - a stone', hotkeys: [97] }] })
+    h.dispatch({ msg: 'ui_cutoff', cutoff: 1 })
+    h.dispatch({ msg: 'cursor', id: 2, loc: { x: 5, y: 5 } })
+    h.dispatch({ msg: 'map', cells: [{ x: 5, y: 5, g: 'o', col: 7, mon: { id: 1, name: 'orc', att: 1, type: 1 } }] })
+    h.view.querySelector<HTMLElement>('#monster-list')!.click()
+    expect(overlay(h).querySelector('.mp-list')).not.toBeNull()
+    expect(isHidden(overlay(h))).toBe(false)
+  })
+
+  it('a server dialog over the monster panel closes it; keys work after hide_dialog', () => {
+    const h = setup()
+    h.dispatch({ msg: 'map', cells: [{ x: 5, y: 5, g: 'o', col: 7, mon: { id: 1, name: 'orc', att: 1, type: 1 } }] })
+    h.view.querySelector<HTMLElement>('#monster-list')!.click()
+    h.dispatch({ msg: 'show_dialog', html: '<button data-key="N">No</button>' })
+    h.dispatch({ msg: 'hide_dialog' })
+    h.send.mockClear()
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', keyCode: 40, bubbles: true }))
+    expect(sent(h)).toEqual([{ msg: 'key', keycode: -253 }])
+  })
+
+  it('an offline empty ui-stack snapshot leaves a server dialog up', () => {
+    const h = setupOffline(() => Promise.resolve(null))
+    h.dispatch({ msg: 'show_dialog', html: 'Transfer? <button data-key="N">No</button>' })
+    h.dispatch({ msg: 'ui-stack', items: [] })
+    expect(overlay(h).querySelector('.dialog-body')).not.toBeNull()
+    expect(isHidden(overlay(h))).toBe(false)
+  })
+
+  it('the game-over screen outlives every teardown the engine sends after it', () => {
+    const h = setup()
+    h.dispatch({ msg: 'ui-push', type: 'game-over', title: 'Goodbye', body: 'You die...' })
+    for (const m of [{ msg: 'ui-pop' }, { msg: 'close_menu' }, { msg: 'close_all_menus' }]) {
+      h.dispatch(m)
+      expect(title(h)).toBe('Goodbye')
+      expect(shown(h, '#map-grid') || shown(h, '#game-messages')).toBe(false)
+    }
+  })
+
+  it('a ui-state body swap keeps the title and the promoted (!)details action', () => {
+    const h = setup()
+    h.dispatch({ msg: 'ui-push', type: 'describe-monster', title: 'a rat',
+      body: 'A rat. (press \'!\' for details)', actions: '(v)iew.' })
+    const actionsText = () => overlay(h).querySelector('.overlay-actions')?.textContent ?? ''
+    expect(actionsText()).toContain('details')
+    h.dispatch({ msg: 'ui-state', type: 'describe-monster', body: 'Rat stats.' })
+    expect(title(h)).toBe('a rat')
+    expect(overlay(h).querySelector('.overlay-body')?.textContent).toContain('Rat stats.')
+    expect(actionsText()).toContain('details')
+  })
+
+  it('a text page (ui-state text, no layout open) shows until close_all_menus', () => {
+    const h = setup()
+    h.dispatch({ msg: 'ui-state', type: 'formatted-scroller', text: 'line one\nline two' })
+    expect(isHidden(overlay(h))).toBe(false)
+    h.dispatch({ msg: 'close_all_menus' })
+    expect(isHidden(overlay(h))).toBe(true)
+  })
+
+  it('a server dialog is exempt from ui_cutoff, and a prompt over it does not float', () => {
+    const h = setup()
+    h.dispatch({ msg: 'show_dialog', html: '<button data-key="N">No</button>' })
+    h.dispatch({ msg: 'ui_cutoff', cutoff: 0 })
+    expect(overlay(h).querySelector('.dialog-body')).not.toBeNull()
+    h.dispatch({ msg: 'menu', tag: 'prompt', title: { text: 'Sure?' }, items: [] })
+    expect(overlay(h).classList.contains('overlay-float')).toBe(false)
+  })
+
+  it('a prompt floats over the map mid-cutoff, but over a visible menu it floats over that menu', () => {
+    const cut = setup()
+    cut.dispatch(inv())
+    cut.dispatch({ msg: 'ui_cutoff', cutoff: 1 })
+    cut.dispatch({ msg: 'menu', tag: 'prompt', title: { text: 'Really zap?' }, items: [] })
+    expect(overlay(cut).classList.contains('overlay-float')).toBe(true)
+    expect(shown(cut, '#map-grid')).toBe(true)
+    const over = setup()
+    over.dispatch(inv())
+    over.dispatch({ msg: 'menu', tag: 'prompt', title: { text: 'Really drop?' }, items: [] })
+    expect(overlay(over).classList.contains('overlay-float')).toBe(false)
+    expect(shown(over, '#map-grid')).toBe(false)
+    expect(overlay(over).querySelector('.overlay-covered')?.textContent).toContain('Inventory')
+  })
+
+  it('YESNO inside a menu swaps its bar to ⎋ Y N and back', () => {
+    const shop = setup()
+    shop.dispatch({ msg: 'menu', tag: 'shop', title: { text: 'Shop' }, items: [] })
+    const shopBar = labels(shop)
+    shop.dispatch({ msg: 'input_mode', mode: 8 })
+    expect(labels(shop)).toEqual(['⎋', 'Y', 'N'])
+    shop.dispatch({ msg: 'input_mode', mode: 0 })
+    expect(labels(shop)).toEqual(shopBar)
+    const plain = setup()
+    plain.dispatch(inv())
+    expect(shown(plain, '#menu-controls')).toBe(false)
+    plain.dispatch({ msg: 'input_mode', mode: 8 })
+    expect(shown(plain, '#menu-controls')).toBe(true)
+    plain.dispatch({ msg: 'input_mode', mode: 0 })
+    expect(shown(plain, '#menu-controls')).toBe(false)
+  })
+
+  it('a monster-panel row tap under a cutoff-hidden menu closes the panel, no describe', () => {
+    const h = setup()
+    h.dispatch(inv())
+    h.dispatch({ msg: 'ui_cutoff', cutoff: 1 })
+    h.dispatch({ msg: 'map', cells: [{ x: 5, y: 5, g: 'o', col: 7, mon: { id: 1, name: 'orc', att: 1, type: 1 } }] })
+    h.view.querySelector<HTMLElement>('#monster-list')!.click()
+    h.send.mockClear()
+    overlay(h).querySelector<HTMLElement>('.mp-row')!.click()
+    expect(sent(h).filter(m => m.msg === 'click_cell')).toEqual([])
+    expect(overlay(h).querySelector('.mp-list')).toBeNull()
+  })
+
+  it('the menu filter (title_prompt) types locally and sends once on Enter', () => {
+    const h = setup()
+    h.dispatch(inv())
+    h.dispatch({ msg: 'title_prompt', prompt: 'Search for what? ' })
+    h.dispatch({ msg: 'init_input', type: 'messages', prefill: '', maxlen: 80 })  // suppressed artifact
+    expect(msgLog(h).querySelector('.game-text-input-row')).toBeNull()
+    const field = () => overlay(h).querySelector<HTMLInputElement>('.menu-filter-input')
+    expect(field()).not.toBeNull()
+    h.dispatch({ msg: 'update_menu', title: { text: 'Inventory (filtered)' } })
+    expect(field()).not.toBeNull()                 // the title slot is still the field
+    h.dispatch({ msg: 'close_input' })             // suppressed artifact
+    field()!.value = 'wand'
+    h.send.mockClear()
+    field()!.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }))
+    expect(sent(h)).toEqual([{ msg: 'input', text: 'wand\r' }])
+    expect(field()).toBeNull()
+    expect(title(h)).toBe('Inventory (filtered)')
+  })
+
+  // Single-stack order (tileweb.cc pop_menu pops the top frame of any kind).
+  it('close_menu over [menu, CRT] ends the CRT and returns to the menu', () => {
+    const h = setup()
+    h.dispatch(inv())
+    h.dispatch({ msg: 'menu', type: 'crt', tag: 'skills' })
+    h.dispatch({ msg: 'close_menu' })
+    expect(overlay(h).querySelector('#crt-display')).toBeNull()
+    expect(title(h)).toBe('Inventory')
+    h.dispatch({ msg: 'close_menu' })
+    expect(isHidden(overlay(h))).toBe(true)
+  })
+
+  it('closing a menu stacked on a describe returns to the describe, not the menu under it', () => {
+    const h = setup()
+    h.dispatch(inv())
+    h.dispatch({ msg: 'ui-push', type: 'describe-item', title: 'a wand of flame', body: 'A magical device.' })
+    h.dispatch({ msg: 'menu', tag: 'prompt', title: { text: 'Really evoke?' }, items: [] })
+    h.dispatch({ msg: 'close_menu' })
+    expect(title(h)).toBe('a wand of flame')
+    h.dispatch({ msg: 'ui-pop' })
+    expect(title(h)).toBe('Inventory')
+  })
+
+  it('after go_lobby the disposed view sends nothing, keys or debounced scrolls', () => {
+    vi.useFakeTimers()
+    try {
+      const h = setup()
+      const items = Array.from({ length: 30 }, (_, i) => ({ level: 2, text: `${i}`, hotkeys: [97] }))
+      h.dispatch({ ...inv(), flags: 0x40000, items })
+      document.dispatchEvent(new KeyboardEvent('keydown', { key: 'End', keyCode: 35, bubbles: true }))
+      h.dispatch({ msg: 'go_lobby' })
+      h.send.mockClear()
+      vi.advanceTimersByTime(500)
+      document.dispatchEvent(new KeyboardEvent('keydown', { key: 'a', keyCode: 65, bubbles: true }))
+      expect(sent(h)).toEqual([])
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+})
+
+// A prompt over another frame shows as a card over an inert copy of that
+// frame (the reference's #ui-stack keeps the covered popup mounted).
+describe('prompt layered over the frame it covers', () => {
+  const PROMPT = { msg: 'menu', tag: 'prompt', title: { text: 'Really drop?' }, flags: 0x40000, last_hovered: 1,
+    items: [{ level: 2, text: 'Y - Yes', hotkeys: [89] }, { level: 2, text: 'N - No', hotkeys: [78] }] }
+  const longInv = () => ({ msg: 'menu', tag: 'inventory', title: { text: 'Inventory' }, flags: 0x40000,
+    items: Array.from({ length: 30 }, (_, i) => ({ level: 2, text: `${String.fromCharCode(97 + i % 26)} - item ${i}`, hotkeys: [97 + i % 26] })) })
+  const covered = (h: Harness) => overlay(h).querySelector<HTMLElement>('.overlay-covered')
+  const card = (h: Harness) => overlay(h).querySelector<HTMLElement>('.overlay-layer .overlay-card')
+
+  it('shows the covered menu, inert and where it was scrolled, under the prompt card', () => {
+    const h = setup()
+    h.dispatch(longInv())
+    overlay(h).querySelector<HTMLElement>('.overlay-list')!.scrollTop = 300
+    h.dispatch(PROMPT)
+    expect(covered(h)?.inert).toBe(true)
+    expect(covered(h)?.textContent).toContain('item 29')
+    expect(covered(h)?.querySelector<HTMLElement>('.overlay-list')?.scrollTop).toBe(300)
+    expect(card(h)?.textContent).toContain('Really drop?')
+    expect(overlay(h).querySelector('.overlay-layer')?.classList.contains('prompt-menu')).toBe(true)
+  })
+
+  it('the prompt, not the covered menu, owns hover and the backdrop tap is Esc', () => {
+    const h = setup()
+    h.dispatch(longInv())
+    h.dispatch(PROMPT)
+    h.send.mockClear()
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowUp', keyCode: 38, bubbles: true }))
+    expect(sent(h)).toEqual([{ msg: 'menu_hover', hover: 0, mouse: false }])
+    expect(card(h)?.querySelector('.item-hovered')?.textContent).toContain('Yes')
+    expect(covered(h)?.querySelector('.item-hovered')).toBeNull()
+    h.send.mockClear()
+    const layer = overlay(h).querySelector<HTMLElement>('.overlay-layer')!
+    layer.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true }))
+    layer.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+    expect(sent(h)).toEqual([{ msg: 'key', keycode: 27 }])
+  })
+
+  it('stays layered after a help screen over it pops, and closing it returns to the live menu', () => {
+    const h = setup()
+    h.dispatch(longInv())
+    h.dispatch(PROMPT)
+    h.dispatch({ msg: 'ui-push', type: 'formatted-scroller', text: 'Help text' })
+    expect(covered(h)).toBeNull()
+    h.dispatch({ msg: 'ui-pop' })
+    expect(covered(h)?.textContent).toContain('Inventory')
+    expect(card(h)?.textContent).toContain('Really drop?')
+    h.dispatch({ msg: 'close_menu' })
+    expect(covered(h)).toBeNull()
+    expect(overlay(h).querySelector('.overlay-title span')?.textContent).toBe('Inventory')
+  })
+
+  it('layers over a describe too', () => {
+    const h = setup()
+    h.dispatch({ msg: 'ui-push', type: 'describe-item', title: 'a wand of flame', body: 'A magical device.' })
+    h.dispatch(PROMPT)
+    expect(covered(h)?.textContent).toContain('a wand of flame')
+    expect(card(h)?.textContent).toContain('Really drop?')
+  })
+
+  // A spectator joining re-sends the covered CRT's text under the prompt
+  // (tileweb.cc _send_everything → m_text_menu.send(true)).
+  it('txt for a covered CRT updates its lines, not the copy or the prompt’s bar', () => {
+    const h = setup()
+    h.dispatch({ msg: 'menu', type: 'crt', tag: 'skills' })
+    h.dispatch({ msg: 'txt', id: 'crt', lines: { '0': 'old row' } })
+    overlay(h).querySelector<HTMLElement>('#crt-display')!.scrollLeft = 40
+    h.dispatch(PROMPT)
+    // The new row carries a hotkey, so a txt that leaked into the prompt's
+    // bar would mint a keyboard there.
+    h.dispatch({ msg: 'txt', id: 'crt', clear: true, lines: { '0': '  a + New row' } })
+    expect(covered(h)?.textContent).toContain('old row')
+    expect(covered(h)?.querySelector<HTMLElement>('#crt-display')?.scrollLeft).toBe(40)
+    expect(document.querySelectorAll('.skill-kbd')).toHaveLength(0)
+    h.dispatch({ msg: 'close_menu' })
+    expect(overlay(h).querySelector('#crt-display')?.textContent).toContain('New row')
+    expect(document.querySelectorAll('.skill-kbd')).toHaveLength(1)
+  })
+
+  // A rejected key closes the popup and pushes a fresh one carrying the
+  // error as `more` (prompt.cc, pop.show() each loop).
+  it('a yesno reopened with its error stays layered, the alert on the layer', () => {
+    const h = setup()
+    h.dispatch(longInv())
+    h.dispatch(PROMPT)
+    h.dispatch({ msg: 'close_menu' })
+    const err = 'Uppercase [Y]es or [N]o only, please.'
+    h.dispatch({ ...PROMPT, more: err, alt_more: err })
+    expect(covered(h)?.textContent).toContain('Inventory')
+    const layer = overlay(h).querySelector('.overlay-layer')
+    expect(layer?.classList.contains('prompt-menu-alert')).toBe(true)
+    expect(card(h)?.querySelector('.overlay-footer')?.textContent).toContain(err)
+  })
+
+  it('the live menu keeps its scroll when the prompt over it closes', () => {
+    const h = setup()
+    h.dispatch(longInv())
+    overlay(h).querySelector<HTMLElement>('.overlay-list')!.scrollTop = 300
+    h.dispatch(PROMPT)
+    h.dispatch({ msg: 'close_menu' })
+    expect(overlay(h).querySelector<HTMLElement>('.overlay-list')?.scrollTop).toBe(300)
+  })
+
+  // Inscribing from the open inventory (message.cc msgwin_get_line: a popup
+  // while a layout is up).
+  it('a line box over the inventory layers over it, and state sync fills the live field', () => {
+    const h = setup()
+    h.dispatch(longInv())
+    h.dispatch({ msg: 'ui-push', type: 'msgwin-get-line', prompt: 'Inscribe with what? ', generation_id: 3 })
+    expect(covered(h)?.textContent).toContain('Inventory')
+    const field = card(h)?.querySelector<HTMLInputElement>('.input-dialog-field')
+    expect(field).toBeTruthy()
+    h.dispatch({ msg: 'ui-state-sync', widget_id: 'input', text: '!d', generation_id: 3 })
+    expect(field!.value).toBe('!d')
+    h.dispatch({ msg: 'ui-pop' })
+    expect(covered(h)).toBeNull()
+    expect(overlay(h).querySelector('.overlay-title span')?.textContent).toBe('Inventory')
+  })
+
+  it('under a server dialog the prompt stays full-screen', () => {
+    const h = setup()
+    h.dispatch(longInv())
+    h.dispatch({ msg: 'show_dialog', html: '<button data-key="N">No</button>' })
+    h.dispatch(PROMPT)
+    expect(covered(h)).toBeNull()
+  })
+})
+
 describe('ui-push / ui-pop overlay stack', () => {
   it('renders a pushed overlay with title + body and shows the overlay', () => {
     const h = setup()
@@ -660,7 +1164,7 @@ describe('ui-push / ui-pop overlay stack', () => {
     h.dispatch({ msg: 'ui-push', type: 'describe-item', title: 'c - an orb of mesmerism', body })
     // Marked rows keep their original `label + padding` prefix; wrapped text
     // hangs at the description column (style --hang-col) for padded labels,
-    // or at the 2ch default for run-in labels like `'Of mesmerism': `.
+    // or at a compact 2ch for run-in labels like `'Of mesmerism': `.
     const hangEls = [...overlay(h).querySelectorAll<HTMLElement>('.overlay-line--hang')]
     expect(hangEls.map(el => el.textContent)).toEqual([
       "'Of mesmerism': When you are struck in melee, it briefly dazes all nearby "
@@ -672,7 +1176,7 @@ describe('ui-push / ui-pop overlay stack', () => {
       // wrapping within the column when they don't
       'Will+:     It increases your willpower.',
     ])
-    expect(hangEls.map(el => el.style.getPropertyValue('--hang-col'))).toEqual(['', '11ch', '11ch'])
+    expect(hangEls.map(el => el.style.getPropertyValue('--hang-col'))).toEqual(['2ch', '11ch', '11ch'])
     // Single-space-after-colon lines are ordinary prose — untouched — and no
     // line carries the HANG_MARK sentinel into the DOM.
     const lines = [...overlay(h).querySelectorAll('.overlay-line')]
@@ -680,6 +1184,55 @@ describe('ui-push / ui-pop overlay stack', () => {
     expect(radiusLine?.classList.contains('overlay-line--hang')).toBe(false)
     expect(radiusLine?.textContent).toBe('Mesmerism radius: 2 (max 4)')
     expect(lines.some(el => el.textContent?.includes('\u0001'))).toBe(false)
+  })
+
+  it('keeps a multi-paragraph ego block in its description column (trunk mesmerism)', () => {
+    const h = setup()
+    // describe.cc _format_prop_desc pads every newline of the description,
+    // so a paragraph break inside it arrives as a pad-only line (exactly the
+    // column's spaces) and the next paragraph's lines carry the column
+    // indent. Both label forms: the mundane run-in `'Of X': ` (16-col) and
+    // the artefact 11-col padded one.
+    const body = [
+      'A sphere of crystal, carried in place of a shield.',
+      '',
+      "'Of mesmerism': When you are struck in melee, it briefly dazes all nearby",
+      '                enemies, then must recharge by standing still for a while.',
+      '                ',
+      '                It goes briefly dormant whenever you enter a different',
+      '                floor.',
+      '',
+      'Mesmerism: When you are struck in melee, it briefly dazes all nearby',
+      '           enemies, then must recharge by standing still for a while.',
+      '           ',
+      '           It goes briefly dormant whenever you enter a different floor.',
+      '',
+      'Mesmerism radius: 2 (max 4)',
+    ].join('\n')
+    h.dispatch({ msg: 'ui-push', type: 'describe-item', title: 'g - an orb of mesmerism', body })
+    const shape = [...overlay(h).querySelectorAll<HTMLElement>('.overlay-line')]
+      .map(el => `${el.className}|${el.style.getPropertyValue('--hang-col')}|${el.textContent}`)
+    // The later paragraph is its own hung line behind a blank one, led by
+    // the block's hang column in literal spaces so all of it sits in the
+    // description column: 2ch under a run-in label, 11ch under a padded one.
+    expect(shape).toEqual([
+      'overlay-line||A sphere of crystal, carried in place of a shield.',
+      'overlay-line|| ',
+      "overlay-line overlay-line--hang|2ch|'Of mesmerism': When you are struck in melee, it briefly dazes all nearby "
+        + 'enemies, then must recharge by standing still for a while.',
+      'overlay-line|| ',
+      'overlay-line overlay-line--hang|2ch|  It goes briefly dormant whenever you enter a different floor.',
+      'overlay-line|| ',
+      'overlay-line overlay-line--hang|11ch|Mesmerism: When you are struck in melee, it briefly dazes all nearby '
+        + 'enemies, then must recharge by standing still for a while.',
+      'overlay-line|| ',
+      'overlay-line overlay-line--hang|11ch|           It goes briefly dormant whenever you enter a different floor.',
+      'overlay-line|| ',
+      'overlay-line||Mesmerism radius: 2 (max 4)',
+    ])
+    // A pad-only line with no continuation after it is not a paragraph
+    // break — the block ends and the line passes through as it came.
+    expect(unwrapHangingIndents("'Of X': a b\n        c\n        \nplain")).toBe("\u0001'Of X': a b c\n        \nplain")
   })
 
   it('unwraps a zero-padded brand block whose label exactly fills the 11 column', () => {
@@ -711,6 +1264,177 @@ describe('ui-push / ui-pop overlay stack', () => {
     expect(hangEls.map(el => el.style.getPropertyValue('--hang-col'))).toEqual(['11ch', '11ch'])
     // A single "Word:text" line with no continuation is left as prose.
     expect(unwrapHangingIndents('Note:this is prose\nnext line')).toBe('Note:this is prose\nnext line')
+  })
+
+  it('unwraps a label carrying the Ctrl-F search highlight (golden 22 wire)', () => {
+    const h = setup()
+    h.dispatch(stashSearchGolden.messages.find(m => m.msg === 'ui-push'))
+    const hangEls = [...overlay(h).querySelectorAll<HTMLElement>('.overlay-line--hang')]
+    expect(hangEls.map(el => el.textContent)).toEqual([
+      'Death:     It empowers your Necromancy spells and improves their success rate. '
+        + 'When you cast a Necromancy spell, it may drain the life force of '
+        + 'susceptible adjacent enemies to heal you; the chance and power of '
+        + "this effect depend on the spell's level.",
+      'Harm:      It increases damage dealt and taken.',
+      'rC+:       It protects you from cold.',
+      'Will+:     It increases your willpower.',
+    ])
+    expect(hangEls.map(el => el.style.getPropertyValue('--hang-col'))).toEqual(['11ch', '11ch', '11ch', '11ch'])
+    // The highlight itself still renders.
+    expect(hangEls[0].querySelector('span')?.textContent).toBe('Death')
+    const nowrap = [...overlay(h).querySelectorAll('.overlay-line--nowrap')]
+    expect(nowrap.some(el => el.textContent?.includes('Necromancy'))).toBe(false)
+  })
+
+  it('keeps a stat header as chips, highlight intact, when the search match lands on it (golden 23 wire)', () => {
+    const h = setup()
+    h.dispatch(searchPlacementsGolden.messages.find(m => m.msg === 'ui-push'))
+    const row = overlay(h).querySelector<HTMLElement>('.overlay-stat-row')!
+    expect([...row.querySelectorAll('.overlay-stat')].map(el => el.textContent))
+      .toEqual(['Base armour rating: 2', 'Encumbrance rating: 0'])
+    expect(row.querySelector('.overlay-stat span')?.textContent).toBe('armour')
+  })
+
+  it('a search highlight anywhere within a line leaves the item body layout unchanged (goldens 22, 23)', () => {
+    const h = setup()
+    const layout = () => [...overlay(h).querySelectorAll<HTMLElement>('.overlay-body > *')]
+      .map(el => `${el.className}|${el.style.getPropertyValue('--hang-col')}|${el.textContent}`)
+    // annotate_string + to_colour_string: open lightcyan, then switch back to
+    // the colour active at the match's end.
+    const highlightAt = (body: string, s: number, e: number) => {
+      const active = [...body.slice(0, s).matchAll(/<([a-z]+)>/g)].at(-1)?.[1] ?? 'lightgrey'
+      return `${body.slice(0, s)}<lightcyan>${body.slice(s, e)}<${active}>${body.slice(e)}`
+    }
+    const pushes = [...stashSearchGolden.messages, ...searchPlacementsGolden.messages]
+      .filter((m): m is typeof m & { body: string } => m.msg === 'ui-push')
+    let placements = 0
+    for (const push of pushes) {
+      const plain = push.body.replace(/<lightcyan>([^<]*)<lightgrey>/g, '$1')
+      const render = (body: string) => {
+        h.dispatch({ ...push, body })
+        const got = layout()
+        h.dispatch({ msg: 'ui-pop' })
+        return got
+      }
+      const base = render(plain)
+      // Every visible word, and every two-word span within one line (the
+      // default plain-text search can't match across a line break).
+      const words = [...plain.matchAll(/<[a-z]+>|[^\s<]+/g)].filter(w => !w[0].startsWith('<'))
+      for (let i = 0; i < words.length; i++) {
+        for (const j of [i, i + 1]) {
+          if (j >= words.length) continue
+          const s = words[i].index!, e = words[j].index! + words[j][0].length
+          if (plain.slice(s, e).includes('\n')) continue
+          placements++
+          expect(render(highlightAt(plain, s, e)), JSON.stringify(plain.slice(s, e))).toEqual(base)
+        }
+      }
+    }
+    expect(placements).toBeGreaterThan(500)
+  })
+
+  it('lifts the search highlight for label matching in describe-item bodies only', () => {
+    const rows = [
+      'r<lightcyan>Poi<lightgrey>s:     It protects you from poison.',
+      '<lightcyan>Harm<lightgrey>:      It increases damage dealt and taken.',
+    ].join('\n')
+    expect(unwrapHangingIndents(rows, true)).toBe(rows.split('\n').map(l => '\u0001' + l).join('\n'))
+    expect(unwrapHangingIndents(rows)).toBe(rows)
+    // The help screen's books row: lifted, its 4-space continuation would
+    // validate as a label column. Outside describe-item it must stay put.
+    const books = '<lightcyan>+<lightgrey> : books (<white>M<lightgrey>emorise,\n    pick up to add to spell library)'
+    expect(unwrapHangingIndents(books)).toBe(books)
+  })
+
+  it('moves describe-god power costs onto an indented line under the description', () => {
+    const h = setup()
+    // Server row shape: cost right-aligned to col 80 (describe-god.cc:981);
+    // an over-long row keeps a gap and runs past 80 (negative printf width).
+    const row = (colour: string, desc: string, cost: string, gap = 0) =>
+      `<${colour}>${desc}${' '.repeat(gap || Math.max(80 - desc.length - cost.length, 0))}${cost}`
+    const overlong = 'You can surround yourself with impenetrable night, twice.'
+    const powers_list = [
+      '<lightgrey><lightgrey>', '', 'Granted powers:' + ' '.repeat(59) + '(Cost)',
+      '<yellow>Your life essence is reduced. (-10% HP)',
+      row('yellow', 'You can recall your ancestor.', '(2 MP, Piety-)'),
+      row('darkgrey', 'You can stack five cards from your decks.', '(A Card (12 in deck))'),
+      row('yellow', overlong, '(8 MP, Piety----, Exhaustion, Drain)', 6),
+      '<yellow>You can perform airborne attacks.',
+      '',
+    ].join('\n')
+    h.dispatch({ msg: 'ui-push', type: 'describe-god', name: 'Hepliaklqana', powers_list })
+    const lines = [...overlay(h).querySelectorAll<HTMLElement>('.overlay-line')]
+    const texts = lines.map(el => el.textContent)
+    const at = (t: string) => texts.indexOf(t)
+    // Each cost follows its description on its own 4-space line; nested
+    // parens stay in one group; short rows (incl. a mid-line paren) are kept.
+    expect(texts.slice(at('Powers:'), at('You can perform airborne attacks.') + 1)).toEqual([
+      'Powers:',
+      'Your life essence is reduced. (-10% HP)',
+      'You can recall your ancestor.',
+      '    (2 MP, Piety-)',
+      'You can stack five cards from your decks.',
+      '    (A Card (12 in deck))',
+      overlong,
+      '    (8 MP, Piety----, Exhaustion, Drain)',
+      'You can perform airborne attacks.',
+    ])
+    // Nothing in the list pans offscreen any more.
+    expect(overlay(h).querySelectorAll('.overlay-line--nowrap')).toHaveLength(0)
+    // The cost keeps its row's colour, and god-coloured costs hang at 4ch.
+    const desc = lines[at('You can recall your ancestor.')]
+    const cost = lines[at('    (2 MP, Piety-)')]
+    expect(desc.querySelector('span')?.getAttribute('style')).toMatch(/color/)
+    expect(cost.querySelector('span')?.getAttribute('style'))
+      .toBe(desc.querySelector('span')?.getAttribute('style'))
+    expect(cost.style.getPropertyValue('--hang-col')).toBe('4ch')
+    const card = lines[at('    (A Card (12 in deck))')]
+    expect(card.querySelector('span')?.getAttribute('style'))
+      .toBe(lines[at('You can stack five cards from your decks.')].querySelector('span')?.getAttribute('style'))
+  })
+
+  it('pulls the right-aligned mutation Category line back to the left edge', () => {
+    const h = setup()
+    // mutation.cc get_mutation_desc: tags right-aligned to col 80.
+    const tags = 'Category: [<darkgrey>Anatomy</darkgrey>, <red>Blood</red>]'
+    const body = [
+      'You have horns on your head.',
+      '',
+      'Trigger chance:  35%',
+      ' '.repeat(80 - 'Category: [Anatomy, Blood]'.length) + tags,
+    ].join('\n')
+    h.dispatch({ msg: 'ui-push', type: 'describe-generic', title: 'Horns', body })
+    const line = [...overlay(h).querySelectorAll<HTMLElement>('.overlay-line')]
+      .find(el => el.textContent?.includes('Category:'))
+    expect(line?.textContent).toBe('Category: [Anatomy, Blood]')
+    expect(line?.classList.contains('overlay-line--nowrap')).toBe(false)
+    expect(line?.querySelector('span')?.getAttribute('style')).toMatch(/color/)
+  })
+
+  it('renders the dungeon overview sections as cell grids', () => {
+    const h = setup()
+    // Opens-only scroller text (scroller.cc:122), trimmed from a real frame.
+    const text = [
+      '<lightgrey>                    <white>Dungeon Overview and Level Annotations<lightgrey>',
+      '',
+      '<green>Branches:<lightgrey> (press <white>G<lightgrey> to reach them)',
+      '<yellow>Dungeon<lightgrey> <darkgrey>(9/15)<lightgrey>            <yellow> Temple<lightgrey> <darkgrey>(1/1)<lightgrey> D:6        <yellow>   Lair<lightgrey> <darkgrey>(2/5)<lightgrey> D:8',
+      '',
+      '<green>Altars:<lightgrey> (press <white>_<lightgrey> to reach them)',
+      '<darkgrey>Ashenzari<lightgrey>          <white>Cheibriados<lightgrey>            <darkgrey>Dithmenos<lightgrey>           <yellow>Trog<lightgrey>',
+      '<darkgrey>Zin<lightgrey>                <darkgrey>The Shining One<lightgrey>        ',
+    ].join('\n')
+    h.dispatch({ msg: 'ui-push', type: 'formatted-scroller', text })
+    const grids = [...overlay(h).querySelectorAll<HTMLElement>('.overlay-cells--grid')]
+    expect(grids.map(g => [...g.children].map(c => c.textContent))).toEqual([
+      ['Dungeon (9/15)', 'Temple (1/1) D:6', 'Lair (2/5) D:8'],
+      ['Ashenzari', 'Cheibriados', 'Dithmenos', 'Trog', 'Zin', 'The Shining One'],
+    ])
+    // Tracks are sized to the widest cell.
+    expect(grids[1].style.getPropertyValue('--cell-ch')).toBe('15ch')
+    // Cells keep their own colour; nothing in the overview pans sideways.
+    expect(grids[1].children[3].querySelector('span')?.getAttribute('style')).toMatch(/color/)
+    expect(overlay(h).querySelectorAll('.overlay-line--nowrap')).toHaveLength(0)
   })
 
   it('routes the other server table shapes correctly (no hanging-indent marks)', () => {
@@ -873,7 +1597,7 @@ describe('ui-push / ui-pop overlay stack', () => {
   })
 
   it('ui-stack re-dispatches each nested item back through the handler (spectator join)', () => {
-    const h = setup()
+    const h = setup({ username: 'bob' })
     h.dispatch({ msg: 'ui-stack', items: [{ msg: 'ui-push', type: 'describe-item', title: 'SNAP', body: 'b' }] })
     expect(isHidden(overlay(h))).toBe(false)
     expect(overlay(h).querySelector('.overlay-title span')?.textContent).toBe('SNAP')
@@ -884,18 +1608,87 @@ describe('ui-push / ui-pop overlay stack', () => {
     // while the newgame screen is already up live: the snapshot re-sends the
     // same push. Appending would leave a phantom copy that one ui-pop later
     // uncovers (species screen stuck over the running game).
-    const h = setup()
+    const h = setupOffline(async () => null)
     h.dispatch({ msg: 'ui-push', type: 'newgame-choice', title: 'SPECIES' })
     h.dispatch({ msg: 'ui-stack', items: [{ msg: 'ui-push', type: 'newgame-choice', title: 'SPECIES' }] })
     h.dispatch({ msg: 'ui-pop' })
     expect(isHidden(overlay(h))).toBe(true)
   })
 
-  it('an empty ui-stack snapshot clears a stale overlay', () => {
-    const h = setup()
+  it('an empty ui-stack snapshot clears a stale overlay (offline)', () => {
+    const h = setupOffline(async () => null)
     h.dispatch({ msg: 'ui-push', type: 'describe-item', title: 'STALE', body: 'b' })
     h.dispatch({ msg: 'ui-stack', items: [] })
     expect(isHidden(overlay(h))).toBe(true)
+  })
+
+  it('a player online ignores ui-stack: a live menu is not doubled', () => {
+    // Every spectator join sends the player the snapshot of the stack it
+    // already holds. Taken, the menu landed on menuStack twice, and the
+    // menu's own close_menu then uncovered the phantom copy.
+    const h = setup()
+    const inv = {
+      msg: 'menu', tag: 'inventory', title: { text: 'Inventory' },
+      items: [{ level: 2, text: 'a - a +0 dagger', hotkeys: [97] }],
+    }
+    h.dispatch(inv)
+    h.dispatch({ msg: 'ui-stack', items: [inv] })
+    h.dispatch({ msg: 'close_menu' })
+    expect(isHidden(overlay(h))).toBe(true)
+  })
+
+  it('a player online keeps a translated creation push over a later raw ui-stack snapshot', () => {
+    const h = setup()
+    h.dispatch({ msg: 'ui-push', type: 'newgame-choice', title: 'TRANSLATED' })
+    h.dispatch({
+      msg: 'ui-stack',
+      items: [{ msg: 'ui-push', type: 'newgame-choice', title: 'RAW SERVER TEXT' }],
+    })
+    expect(overlay(h).textContent).toContain('TRANSLATED')
+    expect(overlay(h).textContent).not.toContain('RAW SERVER TEXT')
+  })
+
+  it('a spectator takes only the first ui-stack', () => {
+    const h = setup({ username: 'bob' })
+    h.dispatch({ msg: 'ui-stack', items: [{ msg: 'ui-push', type: 'describe-item', title: 'SNAP', body: 'b' }] })
+    // Another spectator's join: the reference ignores every snapshot after
+    // the first (ui_stack_handled).
+    h.dispatch({ msg: 'ui-stack', items: [] })
+    expect(isHidden(overlay(h))).toBe(false)
+  })
+})
+
+// The save is deleted before the end screens (end.cc end_game), so a resume's
+// replayed `play` for a game that ended while we were away gets character
+// creation. A resume must never start a game.
+describe('resume that lands in character creation', () => {
+  it.each(['newgame-choice', 'seed-selection', 'newgame-random-combo'])(
+    'a resumed view answers %s with go_lobby and shows nothing', (type) => {
+      const h = setup(undefined, 'dcss-git', true)
+      h.dispatch({ msg: 'ui-push', type, title: 'SPECIES' })
+      expect(h.send).toHaveBeenCalledWith({ msg: 'go_lobby' })
+      expect(isHidden(overlay(h))).toBe(true)
+      // Until the lobby takes over, the rest of creation is dropped.
+      h.dispatch({ msg: 'ui-pop' })
+      h.dispatch({ msg: 'ui-push', type: 'newgame-choice', title: 'JOB' })
+      expect(isHidden(overlay(h))).toBe(true)
+      expect(h.send).toHaveBeenCalledTimes(1)
+      h.dispatch({ msg: 'go_lobby' })
+      expect(h.onLobby).toHaveBeenCalledTimes(1)
+    })
+
+  it('a fresh Play still shows character creation', () => {
+    const h = setup(undefined, 'dcss-git')
+    h.dispatch({ msg: 'ui-push', type: 'newgame-choice', title: 'SPECIES' })
+    expect(h.send).not.toHaveBeenCalledWith({ msg: 'go_lobby' })
+    expect(isHidden(overlay(h))).toBe(false)
+  })
+
+  it('a resumed spectator still sees the watched player creating a character', () => {
+    const h = setup({ username: 'bob' }, '', true)
+    h.dispatch({ msg: 'ui-push', type: 'newgame-choice', title: 'SPECIES' })
+    expect(h.send).not.toHaveBeenCalledWith({ msg: 'go_lobby' })
+    expect(isHidden(overlay(h))).toBe(false)
   })
 })
 
@@ -936,6 +1729,56 @@ describe('menu handler', () => {
     expect(labels(h)).toEqual(['⎋', '!'])
     bar(h).querySelectorAll<HTMLElement>('.menu-ctrl-btn')[1].click()
     expect(sent(h).at(-1)).toEqual({ msg: 'input', text: '!' })
+    h.dispatch({ msg: 'close_menu' })
+
+    // M (SpellLibraryMenu) shares the tag and adds MF_ALLOW_FILTER (0x100):
+    // its Ctrl-F search and ? help get buttons, and the filter prompt opens
+    // on reply.
+    h.dispatch({ msg: 'menu', tag: 'spell', flags: 0xc0342, title: { text: 'Memorise' },
+      items: [{ level: 2, text: 'a - Magic Dart', hotkeys: [97] }] })
+    expect(labels(h)).toEqual(['⎋', '!', '⌃F', '?'])
+    bar(h).querySelectorAll<HTMLElement>('.menu-ctrl-btn')[3].click()
+    expect(sent(h).at(-1)).toEqual({ msg: 'input', text: '?' })
+    bar(h).querySelectorAll<HTMLElement>('.menu-ctrl-btn')[2].click()
+    expect(sent(h).at(-1)).toEqual({ msg: 'key', keycode: 6 })
+    h.dispatch({ msg: 'title_prompt', prompt: 'Search for what? (regex) ' })
+    expect(overlay(h).querySelector('.menu-filter-input')).not.toBeNull()
+  })
+
+  it('lays a spell menu out in columns and follows the ! toggle', () => {
+    const pad = (s: string, n: number) => s.padEnd(n)
+    const title = (cols: string) => ({ text: `<lightgrey> <white>${pad('Your spells (describe)', 25)}           ${cols}` })
+    const base = { level: 2, hotkeys: [97], tiles: [{ t: 1, tex: 0 }],
+      text: ` a - <lightgrey>${pad('Magic Dart', 32)}${pad('Conjuration', 26)}<lightgrey>1%</lightgrey>       1      </lightgrey>` }
+    const stats = { ...base,
+      text: ` a - <lightgrey>${pad('Magic Dart', 32)}${pad('100%', 10)}${pad('3d3', 10)}${pad('5', 8)}${pad('Almost silent', 14)}</lightgrey>` }
+    const titleText = (h: Harness) => overlay(h).querySelector('.overlay-title')?.textContent
+    const heads = (h: Harness) => overlay(h).querySelector('.menu-colhdr')?.textContent?.trim().split(/\s+/)
+    const h = setup()
+    h.dispatch({ msg: 'menu', tag: 'spell', title: title('Type                      Failure  Level  '), items: [base] })
+    expect(titleText(h)).toBe('Your spells (describe)')
+    expect(heads(h)).toEqual(['Type', 'Failure', 'Level'])
+    expect(overlay(h).querySelector('.overlay-item')?.classList.contains('mcol-row')).toBe(true)
+    // A `!` toggle: the toggled rows, then the title (menu-view's update_menu
+    // handler has the engine ordering). Between the two the rows match
+    // neither shape and paint verbatim under the old title.
+    h.dispatch({ msg: 'update_menu_items', chunk_start: 0, items: [stats] })
+    expect(overlay(h).querySelector('.menu-colhdr')).toBeNull()
+    expect(titleText(h)).toMatch(/Type +Failure +Level/)
+    h.dispatch({ msg: 'update_menu', title: title('Power     Damage    Range   Noise         ') })
+    expect(titleText(h)).toBe('Your spells (describe)')
+    expect(heads(h)).toEqual(['Power', 'Damage', 'Range', 'Noise'])
+    expect(overlay(h).querySelector('.overlay-item .mcol-grid')?.textContent?.replace(/\s+/g, ' ').trim()).toBe('100% 3d3 5 Almost silent')
+    // The tap still sends the row's hotkey path (MF_ARROWS_SELECT absent here).
+    overlay(h).querySelector<HTMLElement>('.overlay-item')!.click()
+    expect(sent(h)).toContainEqual({ msg: 'key', keycode: 97 })
+    h.dispatch({ msg: 'close_menu' })
+
+    // Rows off the columns render verbatim, under the server's whole title.
+    h.dispatch({ msg: 'menu', tag: 'spell', title: title('Type                      Failure  Level  '),
+      items: [{ level: 2, hotkeys: [97], text: ' a - Magic Dart Conjuration 1% 1' }] })
+    expect(overlay(h).querySelector('.menu-colhdr')).toBeNull()
+    expect(titleText(h)).toMatch(/^ Your spells \(describe\) +Type +Failure +Level/)
   })
 
   it('renders a type:crt menu as a CRT display and paints txt lines into it', () => {
@@ -945,6 +1788,51 @@ describe('menu handler', () => {
     expect(overlay(h).querySelector('#crt-display')).toBeTruthy()
     h.dispatch({ msg: 'txt', id: 1, lines: { '0': 'Skill screen' } })
     expect(overlay(h).querySelector('.crt-line')?.textContent).toBe('Skill screen')
+  })
+
+  it('a keys-only CRT keeps the touch strip; the skills CRT swaps in its bar', () => {
+    const strip = (h: Harness) => h.view.querySelector<HTMLElement>('#touch-controls')!
+    const menuBar = (h: Harness) => h.view.querySelector<HTMLElement>('#menu-controls')!
+    const stripOnly = (h: Harness) => !isHidden(strip(h)) && isHidden(menuBar(h))
+    const barOnly = (h: Harness) => isHidden(strip(h)) && !isHidden(menuBar(h))
+    const describeAndPop = (h: Harness) => {
+      h.dispatch({ msg: 'ui-push', type: 'describe-generic', title: 'x', body: 'y' })
+      h.dispatch({ msg: 'ui-pop' })
+    }
+    // Pre-0.24 species choice arrives as a tag-less CRT (CAO 0.23): the strip
+    // (d-pad, ⏎/⎋, abc▴) is its only input — on open and on resurfacing.
+    const h = setup()
+    h.dispatch({ msg: 'menu', type: 'crt', tag: '' })
+    expect(stripOnly(h)).toBe(true)
+    describeAndPop(h)
+    expect(stripOnly(h)).toBe(true)
+    // A prompt menu over it, closed: the CRT resurfaces with the strip.
+    h.dispatch({ msg: 'menu', tag: 'prompt', items: [] })
+    h.dispatch({ msg: 'close_menu' })
+    expect(stripOnly(h)).toBe(true)
+
+    const s = setup()
+    s.dispatch({ msg: 'menu', type: 'crt', tag: 'skills' })
+    expect(barOnly(s)).toBe(true)
+    describeAndPop(s)
+    expect(barOnly(s)).toBe(true)
+
+    // A bar-tag menu's bar doesn't survive a keys-only CRT pushed over it.
+    const m = setup()
+    m.dispatch({ msg: 'menu', tag: 'ability', items: [] })
+    m.dispatch({ msg: 'menu', type: 'crt', tag: '' })
+    expect(stripOnly(m)).toBe(true)
+  })
+
+  it('a clear:true txt blanks the rows it omits; a plain delta keeps them', () => {
+    const h = setup()
+    h.dispatch({ msg: 'menu', type: 'crt' })
+    h.dispatch({ msg: 'txt', id: 'crt', lines: { '0': 'one', '1': 'two', '2': 'three' } })
+    h.dispatch({ msg: 'txt', id: 'crt', lines: { '1': 'TWO' } })
+    const rows = () => [...overlay(h).querySelectorAll('.crt-line')].map(el => el.textContent)
+    expect(rows()).toEqual(['one', 'TWO', 'three'])
+    h.dispatch({ msg: 'txt', id: 'crt', clear: true, lines: { '1': 'redrawn' } })
+    expect(rows()).toEqual(['', 'redrawn', ''])
   })
 
   it('close_menu pops the menu stack and hides the overlay when empty', () => {
@@ -975,7 +1863,7 @@ describe('menu handler', () => {
 
   // The reference client keeps a covered menu's DOM (and thus its scroll)
   // alive in its popup stack; our single overlay frame rebuilds the list, so
-  // showMenu saves/restores the offset explicitly (menuScrollTops).
+  // MenuView saves/restores the offset explicitly (scrollTops).
   it('restores the inventory scroll position after a describe ui-push/ui-pop round trip', () => {
     const h = setup()
     h.dispatch({ msg: 'menu', tag: 'inventory', title: { text: 'Inventory' }, items: [
@@ -1003,6 +1891,23 @@ describe('menu handler', () => {
     expect(overlay(h).querySelector<HTMLElement>('.overlay-list')!.scrollTop).toBe(0)
     h.dispatch({ msg: 'close_menu' })
     expect(overlay(h).querySelector<HTMLElement>('.overlay-list')!.scrollTop).toBe(77)
+  })
+
+  it('a menu closing above a layout leaves the menu under the layout at its scroll', () => {
+    const h = setup()
+    h.dispatch({ msg: 'menu', tag: 'inventory', title: { text: 'Inventory' }, items: [
+      { level: 2, text: 'a - a +0 short sword', hotkeys: [97] },
+    ] })
+    overlay(h).querySelector<HTMLElement>('.overlay-list')!.scrollTop = 120
+    h.dispatch({ msg: 'ui-push', type: 'describe-item', title: 'a buckler', body: 'A small shield.' })
+    h.dispatch({ msg: 'menu', tag: 'macro_mapping', title: { text: 'Which one?' }, items: [
+      { level: 2, text: 'x - this one', hotkeys: [120] },
+    ] })
+    // The repaint of the describe layout must not save this menu's offset
+    // under the inventory.
+    h.dispatch({ msg: 'close_menu' })
+    h.dispatch({ msg: 'ui-pop' })
+    expect(overlay(h).querySelector<HTMLElement>('.overlay-list')!.scrollTop).toBe(120)
   })
 
   it('update_menu_items patches the chunk in place, leaving items outside it intact', () => {
@@ -1149,7 +2054,7 @@ describe('non-prompt menu hover seeding', () => {
 
   // A yesno popup stacked over a menu (e.g. the shopping list's "cannot
   // afford; travel there anyway?" — shopping.cc, a non-null-prompt yesno
-  // while ui::has_layout()) seeds hoveredMenuIdx with no user action. When
+  // while ui::has_layout()) seeds the hover with no user action. When
   // it closes, the restored parent must get a fresh-look reset, not inherit
   // the prompt's hover as an index into the wrong menu's item space.
   it('does not leak a stacked prompt\'s seeded hover into the restored parent menu', () => {
@@ -1435,11 +2340,37 @@ describe('show_dialog / hide_dialog', () => {
     expect(isHidden(overlay(h))).toBe(true)
   })
 
-  it('layer:game resets overlay/dialog state and hides the overlay', () => {
+  // The reference's do_set_layer only swaps page sections; it never
+  // touches menus or layouts.
+  it('layer messages leave the overlay alone', () => {
     const h = setup()
     h.dispatch({ msg: 'ui-push', type: 'describe-item', title: 'A', body: 'a' })
     h.dispatch({ msg: 'layer', layer: 'game' })
-    expect(isHidden(overlay(h))).toBe(true)
+    h.dispatch({ msg: 'layer', layer: 'crt' })
+    expect(isHidden(overlay(h))).toBe(false)
+  })
+})
+
+// from_webtiles marks the player's own edit/scroll coming back. Reference:
+// ui.js:483 and ui-layouts.js:808 skip it only when not watching.
+describe('from_webtiles echoes: the player skips them, spectators follow', () => {
+  const push = { msg: 'ui-push', type: 'msgwin-get-line', prompt: 'Describe what? ', generation_id: 3 }
+  const echo = { msg: 'ui-state-sync', widget_id: 'input', text: 'orc', from_webtiles: true, generation_id: 3 }
+  const field = (h: Harness) => overlay(h).querySelector<HTMLInputElement>('.input-dialog-field')!
+
+  it('player: an echoed edit leaves the field alone', () => {
+    const h = setup()
+    h.dispatch(push)
+    field(h).value = 'or'
+    h.dispatch(echo)
+    expect(field(h).value).toBe('or')
+  })
+
+  it('spectator: an echoed edit fills the field', () => {
+    const h = setup({ username: 'someone' })
+    h.dispatch(push)
+    h.dispatch(echo)
+    expect(field(h).value).toBe('orc')
   })
 })
 
@@ -1518,6 +2449,7 @@ describe('lobby transitions', () => {
 //   2. the close-swallow latch must not leak past the harvest and eat a later
 //      real menu's close_menu, and a teardown mid-harvest must reset cleanly.
 describe('spell harvest (silent I → Esc) + preface parsing', () => {
+  const setup = setupAtCommand
   type CachedSpell = {
     letter: string; title: string; schools?: string; fail?: string; level?: number
   }
@@ -1612,7 +2544,6 @@ describe('spell harvest (silent I → Esc) + preface parsing', () => {
   // if the prior phase was cleared (harvestSpells() bails while non-idle).
   for (const { name, reset } of [
     { name: 'close_all_menus', reset: { msg: 'close_all_menus' } },
-    { name: 'layer:game', reset: { msg: 'layer', layer: 'game' } },
     { name: 'go_lobby', reset: { msg: 'go_lobby' } },
   ]) {
     it(`${name} aborts an in-flight harvest so a new harvest can start`, () => {
@@ -1728,6 +2659,57 @@ describe('spell harvest (silent I → Esc) + preface parsing', () => {
       expect(sentInputI(h)).toHaveLength(3)
     })
 
+    // After a give-up the probe's one retry fires only on an input_mode 0→1
+    // transition (SpellHarvester.retryOnCommandEntry).
+    describe('retry after a give-up', () => {
+      const giveUp = (h: Harness) => {
+        startHarvest()
+        vi.advanceTimersByTime(1500 + 8500)
+        expect(cache()).toHaveLength(0)
+      }
+
+      it("retries once the player's next command returns to COMMAND", () => {
+        vi.useFakeTimers()
+        const h = setup()
+        giveUp(h)
+        h.dispatch({ msg: 'input_mode', mode: 0 })
+        expect(sentInputI(h)).toHaveLength(1)
+        h.dispatch({ msg: 'input_mode', mode: 1 })
+        h.dispatch({ msg: 'msgs', messages: [{ text: 'You hit the rat. The rat dies.' }] })
+        expect(sentInputI(h)).toHaveLength(2)
+        feedBase(h)
+        expect(cache()).toHaveLength(2)
+      })
+
+      it('ignores the COMMAND repeat a spectator join sends', () => {
+        vi.useFakeTimers()
+        const h = setup()
+        giveUp(h)
+        h.dispatch({ msg: 'input_mode', mode: 1 })  // tileweb.cc _send_everything
+        h.dispatch({ msg: 'msgs', messages: [{ text: 'bob joined.' }] })
+        expect(sentInputI(h)).toHaveLength(1)
+        h.dispatch({ msg: 'input_mode', mode: 0 })
+        h.dispatch({ msg: 'input_mode', mode: 1 })
+        expect(sentInputI(h)).toHaveLength(2)
+        feedBase(h)
+      })
+
+      it('a reply later than the give-up renders, and the retry waits for its close', () => {
+        vi.useFakeTimers()
+        const h = setup()
+        giveUp(h)
+        h.dispatch({ msg: 'input_mode', mode: 0 })  // the engine read our `I`
+        h.dispatch({ msg: 'menu', tag: 'spell', title: { text: 'Your spells (describe)' }, items: BASE })
+        expect(isHidden(overlay(h))).toBe(false)
+        h.dispatch({ msg: 'msgs', messages: [{ text: 'x' }] })
+        expect(sentInputI(h)).toHaveLength(1)
+        h.dispatch({ msg: 'close_menu' })
+        h.dispatch({ msg: 'input_mode', mode: 1 })
+        expect(sentInputI(h)).toHaveLength(2)
+        feedBase(h)
+      })
+    })
+
     it('still terminates on the no-spells line during the late window', () => {
       vi.useFakeTimers()
       const h = setup()
@@ -1814,8 +2796,9 @@ describe('spell harvest (silent I → Esc) + preface parsing', () => {
       // The REAL wire form: DCSS joins the two same-turn mprs ("You finish
       // memorising." + "Spell assigned to 'b'.") onto one line, so the match
       // must be a substring — an anchored `$` (the original bug) misses this.
-      // Memorise completes inside command mode (no input_mode transition fires),
-      // so the msgs handler itself must fire the refresh.
+      // The line lands after that turn's input_mode 1 (game-view's msgs
+      // handler has the ordering), so the msgs handler itself must fire the
+      // refresh.
       h.dispatch({ msg: 'msgs', messages: [{ text: "You finish memorising. Spell assigned to 'b'." }] })
       expect(sentInputI(h)).toHaveLength(2)
       feedBase(h)
@@ -1849,20 +2832,29 @@ describe('spell harvest (silent I → Esc) + preface parsing', () => {
       expect(sentInputI(h)).toHaveLength(1)
     })
 
-    it('re-harvests after a `=` letter reassign, once back at the command prompt', () => {
+    // The `=` spells flow (adjust.cc _adjust_spell), in wire order: the key
+    // read leaves COMMAND, the "(adjust)" list picks the spell and closes,
+    // then a bare get_ch() asks "Adjust to which letter?". That prompt
+    // carries no hotkey hint, so the log gives it no buttons and no live
+    // prompt — only input_mode says the engine isn't at a command read.
+    it('re-harvests after a `=` letter reassign, never into its letter prompt', () => {
       const h = setup()
-      // Spend the once-per-game auto-harvest first, so the resolving input_mode→1
-      // can't be mistaken for it.
-      h.dispatch({ msg: 'input_mode', mode: 1 })
-      feedBase(h)
+      fullHarvest(h)
       expect(sentInputI(h)).toHaveLength(1)
-      // `=` opens the spell list titled "(adjust)" — all spell lists share
-      // tag:"spell", so the title is the discriminator. Flags dirty but does not
-      // harvest while the menu is up (the guard bails on the active menu).
+      h.dispatch({ msg: 'input_mode', mode: 0 })
+      h.dispatch({ msg: 'msgs', messages: [{ text: '<cyan>Adjust (g)ear, (s)pells, (a)bilities, (p)otions, sc(r)olls or e(v)ocables? <lightgrey>', channel: 2 }] })
+      h.dispatch({ msg: 'msgs', messages: [{ text: '<cyan>Adjust which spell? <lightgrey>', channel: 2 }] })
+      // All spell lists share tag:"spell", so the "(adjust)" title is the
+      // discriminator. It flags dirty; the open menu blocks the harvest.
       h.dispatch({ msg: 'menu', tag: 'spell', title: { text: 'Your spells (adjust)' }, items: BASE })
-      expect(sentInputI(h)).toHaveLength(1)
-      // Reassign done → menu closes → command mode resumes → re-harvest fires.
       h.dispatch({ msg: 'close_menu' })
+      h.dispatch({ msg: 'msgs', messages: [
+        { text: '<lightgrey>a - Freeze', channel: 0 },
+        { text: '<cyan>Adjust to which letter? <lightgrey>', channel: 2 },
+      ] })
+      // An `I` here would be read as the target letter.
+      expect(sentInputI(h)).toHaveLength(1)
+      // Reassign done → command mode resumes → re-harvest fires.
       h.dispatch({ msg: 'input_mode', mode: 1 })
       expect(sentInputI(h)).toHaveLength(2)
       feedBase(h)
@@ -1870,8 +2862,7 @@ describe('spell harvest (silent I → Esc) + preface parsing', () => {
 
     it('does NOT re-harvest when the player merely views the spell list (I/describe)', () => {
       const h = setup()
-      h.dispatch({ msg: 'input_mode', mode: 1 })
-      feedBase(h)
+      fullHarvest(h)
       expect(sentInputI(h)).toHaveLength(1)
       // Same tag, but a "(describe)" title — viewing changes no letters.
       h.dispatch({ msg: 'menu', tag: 'spell', title: { text: 'Your spells (describe)' }, items: BASE })
@@ -1901,8 +2892,7 @@ describe('spell harvest (silent I → Esc) + preface parsing', () => {
 
     it('casts the tapped spell (z + letter, one atomic input message) from the grid', () => {
       const h = setup()
-      h.dispatch({ msg: 'input_mode', mode: 1 }) // command mode (+ the once-per-game auto-harvest)
-      feedBase(h)                                 // complete that harvest → cache populated, idle
+      fullHarvest(h)
       spellTab(h)!.click()
       gridBtn(h, 'a').click()
       // Single message: the server pty-writes a message's text in one write,
@@ -1951,8 +2941,8 @@ describe('spell harvest (silent I → Esc) + preface parsing', () => {
   })
 
   // Spell-rail tap handling: a quick-cast button fires on `click`, cancelled
-  // if the finger drifted off first (see makeSpellButton). The pending-cast
-  // queue and the synthetic-click gate were removed (see game-view.ts) — a
+  // if the finger drifted off first (see bindSpellTap). The pending-cast
+  // queue and the synthetic-click gate were removed (see spell-rail.ts) — a
   // clean tap casts, a drag-off is cancelled, and a tap that hits the
   // command-channel guard is simply dropped.
   describe('quick-cast rail tap handling', () => {
@@ -1961,9 +2951,8 @@ describe('spell harvest (silent I → Esc) + preface parsing', () => {
         .find(b => b.querySelector('.spell-letter')?.textContent === `z${letter}`)!
     const castsSent = (h: Harness) =>
       sent(h).filter(m => m.msg === 'input' && (m as { text?: string }).text === 'za').length
-    // Enter command mode and settle the auto-harvest it kicks off, so the
-    // rail is populated and the command channel is idle.
-    const ready = (h: Harness) => { h.dispatch({ msg: 'input_mode', mode: 1 }); feedBase(h) }
+    // Populate the rail and leave the command channel idle.
+    const ready = fullHarvest
     // Synthetic touch with a contact point (happy-dom has no TouchEvent ctor;
     // the handlers only read touches[0].clientX/Y).
     const touch = (el: HTMLElement, type: string, x = 0, y = 0) => {
@@ -2021,6 +3010,50 @@ describe('spell harvest (silent I → Esc) + preface parsing', () => {
       h.dispatch({ msg: 'input_mode', mode: 1 }) // …and not revived when it reopens
       expect(castsSent(h)).toBe(0)
     })
+
+    // The rail's spell-list button sends `I` (the game's live spell list)
+    // through the cast guard.
+    const bookBtn = (h: Harness) => h.view.querySelector<HTMLElement>('#spell-rail .spell-rail-book .spell-rail-btn')!
+    const lastSent = (h: Harness) => sent(h).at(-1)
+
+    it('the spell-list button sends I when the command channel is idle', () => {
+      const h = setup()
+      ready(h)
+      bookBtn(h).click()
+      expect(lastSent(h)).toEqual({ msg: 'input', text: 'I' })
+    })
+
+    it('the spell-list button is inert while the channel is busy', () => {
+      const h = setup()
+      ready(h)
+      h.dispatch({ msg: 'input_mode', mode: 7 })
+      h.send.mockClear()
+      bookBtn(h).click()
+      expect(sent(h)).toEqual([])
+    })
+
+    // The monster panel is client-only (no input_mode change), so the guard
+    // gates it itself — in landscape the rail stays tappable beside it.
+    it('spell casts and the spell-list button are inert while the monster panel is open', () => {
+      const h = setup()
+      ready(h)
+      h.dispatch({ msg: 'map', cells: [{ x: 5, y: 5, g: 'o', col: 7, mon: { id: 1, name: 'orc', att: 1, type: 1 } }] })
+      h.view.querySelector<HTMLElement>('#monster-list')!.click()
+      expect(h.view.querySelector('.mp-row')).not.toBeNull()
+      h.send.mockClear()
+      railBtn(h, 'a').click()
+      bookBtn(h).click()
+      expect(sent(h)).toEqual([])
+    })
+
+    it('the spell list it opens renders instead of being harvested', () => {
+      const h = setup()
+      ready(h)
+      bookBtn(h).click()
+      h.dispatch({ msg: 'input_mode', mode: 0 })
+      h.dispatch({ msg: 'menu', tag: 'spell', title: { text: 'Your spells (describe)' }, items: BASE })
+      expect(isHidden(overlay(h))).toBe(false)
+    })
   })
 })
 
@@ -2035,7 +3068,7 @@ describe('monster panel → server selection menu hand-off', () => {
   const escKeydown = () => document.dispatchEvent(
     new KeyboardEvent('keydown', { key: 'Escape', code: 'Escape', keyCode: 27, bubbles: true } as KeyboardEventInit))
   // Multi-occupant examine menu: no arrow-select flags, so it routes through
-  // showMenu and the Esc guard rather than menu-nav.
+  // the plain menu path and the Esc guard rather than menu-nav.
   const examineMenu = {
     msg: 'menu', title: { text: 'Examine which?' },
     items: [{ text: 'an orc', hotkeys: [97] }, { text: 'a stone wall', hotkeys: [98] }],
@@ -2085,6 +3118,19 @@ describe('monster panel → server selection menu hand-off', () => {
 // While spectating the panel is tap-anywhere-to-close (see openMonsterPanel):
 // a watcher has no touch-⎋/back affordance on iOS, so a full-screen list had
 // no dismiss target, and a watcher's click_cell is dropped server-side anyway.
+describe('spectator floating prompt', () => {
+  it('a backdrop tap stays in the game (the server drops the Esc)', () => {
+    const h = setup({ username: 'someone' })
+    h.dispatch({ msg: 'menu', tag: 'prompt', title: { text: 'Save game and exit?' }, items: [] })
+    const ov = overlay(h)
+    expect(ov.classList.contains('overlay-float')).toBe(true)
+    ov.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true }))
+    ov.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+    expect(h.onLobby).not.toHaveBeenCalled()
+    expect(sent(h)).not.toContainEqual({ msg: 'go_lobby' })
+  })
+})
+
 describe('monster panel while spectating', () => {
   const openPanel = (h: Harness) => {
     h.dispatch({ msg: 'map', cells: [{ x: 5, y: 5, g: 'o', col: 7, mon: { id: 1, name: 'orc', att: 1, type: 1 } }] })
@@ -2213,7 +3259,7 @@ describe('minimap lens suspend/restore while spectating', () => {
 
 // The creation counter keys on crawl's game-start welcome line (" back" =
 // a restored save), parsed once name and species are known — see
-// tryResolveBackground in game-view.ts. Neither the creation screens nor
+// welcomeLine in character-record.ts. Neither the creation screens nor
 // the first map frame are signals: an RC-preset combo shows no screens, and
 // a spectator joining mid-creation makes crawl broadcast a cell-less map.
 describe('newchar counting', () => {
@@ -2310,7 +3356,6 @@ describe('game_ending: the offline flush-time outcome', () => {
   let beacons: string[]
 
   beforeEach(() => {
-    vi.stubGlobal('localStorage', fakeStorage())
     beacons = []
     import.meta.env.DEV = false
     Object.defineProperty(navigator, 'sendBeacon', {
@@ -2321,7 +3366,6 @@ describe('game_ending: the offline flush-time outcome', () => {
 
   afterEach(() => {
     import.meta.env.DEV = realDev
-    vi.unstubAllGlobals()
   })
 
   // The slot's live entry, as a map capture would have left it.
@@ -2362,5 +3406,106 @@ describe('game_ending: the offline flush-time outcome', () => {
     h.dispatch(ending)
     expect(listAllAvatars()[0]!.outcome).toBeUndefined()
     expect(deadEach()).toHaveLength(0)
+  })
+})
+
+// The handler table's module-owned entries that no golden capture carries:
+// each must reach its view through the whole game view.
+describe('messages routed to the views that own them', () => {
+  it('chat, update_spectators and super_hide_chat reach the chat view', () => {
+    const h = setup()
+    h.dispatch({ msg: 'update_spectators', count: 1, names: 'spec_one' })
+    expect(h.view.querySelector('.chat-names')?.textContent).toBe('◉ spec_one')
+    h.dispatch({ msg: 'chat', content: "<span class='chat_sender'>spec_one</span>: <span class='chat_msg'>hello</span>" })
+    expect(h.view.querySelector('.chat-history')?.textContent).toContain('hello')
+    h.dispatch({ msg: 'super_hide_chat' })
+    expect(isHidden(h.view.querySelector<HTMLElement>('#chat-chip')!)).toBe(true)
+  })
+
+  it('options reach the stats view (stat_colour thresholds)', () => {
+    const h = setup()
+    h.dispatch({ msg: 'player', str: 8, str_max: 8, int: 8, int_max: 8, dex: 8, dex_max: 8 })
+    const str = () => h.view.querySelector<HTMLElement>('#hud-str')!
+    expect(str().style.color).toBe('')
+    h.dispatch({ msg: 'options', options: { stat_colour: [{ value: 10, colour: 'red' }] } })
+    expect(str().style.color).not.toBe('')
+  })
+
+  it('ui-scroller-scroll reaches the layout view', () => {
+    const h = setup()
+    h.dispatch({ msg: 'ui-push', type: 'describe-item', title: 'a wand of flame', body: 'A magical device.' })
+    const body = overlay(h).querySelector<HTMLElement>('.overlay-body')!
+    Object.defineProperty(body, 'scrollHeight', { value: 500 })
+    h.dispatch({ msg: 'ui-scroller-scroll', scroll: 2147483647 })
+    expect(body.scrollTop).toBe(500)
+  })
+})
+
+// The stand-in prime on a strip Ctrl-F: game-view's touchTargets.
+describe('strip Ctrl-F primes the system keyboard', () => {
+  const standInFocused = () => (document.activeElement as HTMLElement | null)?.className === 'keyboard-stand-in'
+  const tapCtrlF = (h: Harness) => {
+    h.view.querySelector<HTMLElement>('.tc-tab[data-tab="macro"]')!.click()
+    const btn = [...h.view.querySelectorAll<HTMLButtonElement>('#touch-controls .tc-btn')]
+      .find(b => b.textContent === '^F')!
+    btn.click()
+  }
+  const sentCtrlF = (h: Harness) => sent(h).some(m => m.msg === 'key' && m.keycode === 6)
+  const startHarvest = () => (window as unknown as { __dcssHarvestSpells: () => void }).__dcssHarvestSpells()
+  afterEach(() => { vi.useRealTimers() })
+
+  it('at the command prompt', () => {
+    const h = setupAtCommand()
+    tapCtrlF(h)
+    expect(sentCtrlF(h)).toBe(true)
+    expect(standInFocused()).toBe(true)
+  })
+
+  it('with the minimap lens open (keys pass through the lens)', () => {
+    const h = setupAtCommand()
+    h.dispatch({ msg: 'player', hp: 10, hp_max: 10, place: 'Dungeon', depth: 3 })
+    h.view.querySelector<HTMLElement>('.hud-place-chip')!.click()
+    expect(h.view.querySelector('.minimap-lens')).not.toBeNull()
+    tapCtrlF(h)
+    expect(sentCtrlF(h)).toBe(true)
+    expect(standInFocused()).toBe(true)
+  })
+
+  it("not in a harvest's late-base window: the key passes, but may land in the still-open probe menu", () => {
+    vi.useFakeTimers()
+    const h = setupAtCommand()
+    startHarvest()
+    vi.advanceTimersByTime(1500)
+    tapCtrlF(h)
+    expect(sentCtrlF(h)).toBe(true)
+    expect(standInFocused()).toBe(false)
+  })
+
+  it('not while a harvest owns the channel (the router swallows the key)', () => {
+    const h = setupAtCommand()
+    startHarvest()
+    tapCtrlF(h)
+    expect(sentCtrlF(h)).toBe(false)
+    expect(standInFocused()).toBe(false)
+  })
+
+  it('not under the monster panel (the router swallows the key)', () => {
+    const h = setupAtCommand()
+    h.dispatch({ msg: 'map', cells: [{ x: 5, y: 5, g: 'o', col: 7, mon: { id: 1, name: 'orc', att: 1, type: 1 } }] })
+    h.view.querySelector<HTMLElement>('#monster-list')!.click()
+    expect(overlay(h).querySelector('.mp-list')).not.toBeNull()
+    tapCtrlF(h)
+    expect(sentCtrlF(h)).toBe(false)
+    expect(standInFocused()).toBe(false)
+  })
+
+  it('not while the search field is already open (the strip drops the key)', () => {
+    const h = setupAtCommand()
+    h.dispatch({ msg: 'input_mode', mode: 0 })
+    h.dispatch({ msg: 'init_input', type: 'messages', prefill: '', maxlen: 80 })
+    expect(msgLog(h).querySelector('.game-text-input')).not.toBeNull()
+    tapCtrlF(h)
+    expect(sentCtrlF(h)).toBe(false)
+    expect(standInFocused()).toBe(false)
   })
 })

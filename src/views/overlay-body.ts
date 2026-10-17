@@ -3,8 +3,8 @@
 // 80-column terminal; these helpers undo just enough of that (hanging-indent
 // unwrap, stat-chip rows, per-line color balancing) to reflow prose at phone
 // width while leaving genuinely tabular lines column-aligned. Pure string/DOM
-// builders with no game-view state — game-view.ts calls them from
-// showUiPush/showMenu, and the sweep tests exercise the exported parsers
+// builders with no game-view state — layout-view.ts (LayoutView.show) and
+// menu-view.ts call them, and the sweep tests exercise the exported parsers
 // directly.
 import { dcssToHtml, uiColor, stripDcss, DCSS_COLOR_MAP } from '../game/dcss-colors'
 import { TEX, type TileLoader } from '../game/tiles/tile-loader'
@@ -136,6 +136,57 @@ export function propagateDarkgreyColor(body: string): string {
   return result
 }
 
+// describe-god `powers_list` rows are single 80-column terminal lines: the
+// description, then the cost right-aligned to column 80 via
+// `cprintf("%s%*s%s\n", buf, 80 - desc_len - cost_len, "", cost)`
+// (describe-god.cc:981, trunk and 0.34.1 alike). At phone width the padding
+// trips isTabularLine into nowrap and the cost pans offscreen. Move each cost
+// onto its own 4-space-indented line, which renderBodyLines hangs as a
+// sub-item. The signature is visible width ≥ 80 plus a balanced trailing
+// `(…)` group: a row too long for its padding still reaches col 80 (a
+// negative printf width left-justifies, so the gap survives and the row runs
+// wider), and costs nest parens (Nemelex "A Card (12 in deck)", Ashenzari
+// "(Boost: …)" — ability.cc make_cost_description). Costless rows, passives
+// and the Makhleb/Jiyva/Hepliaklqana specials are shorter and pass through.
+// The server sets the colour before every row (describe-god.cc:927) and
+// opens-only lines each render with a fresh colour stack, so the cost line
+// repeats its row's leading tags.
+export function splitGodPowerCosts(lines: string[]): string[] {
+  const out: string[] = []
+  for (const line of lines) {
+    const raw = line.trimEnd()
+    const split = raw.endsWith(')') && raw.replace(/<[^<>]*>/g, '').length >= 80
+      ? trailingGroupStart(raw) : -1
+    const desc = split > 0 ? raw.slice(0, split).trimEnd() : ''
+    if (!desc.replace(/<[^<>]*>/g, '').trim()) { out.push(line); continue }
+    const lead = /^(?:<[^<>]+>)*/.exec(raw)![0]
+    out.push(desc, `${lead}    ${raw.slice(split)}`)
+  }
+  return out
+}
+
+// A mutation description ends with its tag line right-aligned to column 80:
+// `"\n" + string(80 - width, ' ') + "Category: [<darkgrey>Anatomy</darkgrey>]"`
+// (mutation.cc get_mutation_desc, trunk and 0.34.1 alike; ability
+// descriptions embed it too, ability.cc:1624). The ~60-space pad trips
+// isTabularLine's right-column rule into nowrap, parking the line offscreen
+// at phone width. Keyed on the literal label, not on "ends at col 80":
+// column_composer right-column continuations (keyhelp) are also deeply
+// indented and can end at 80 by chance.
+export function unpadMutationCategory(body: string): string {
+  return body.replace(/^ {20,}(Category: \[)/gm, '$1')
+}
+
+// Index of the `(` that balances a string's final `)`, or -1.
+function trailingGroupStart(s: string): number {
+  let depth = 0
+  for (let i = s.length - 1; i >= 0; i--) {
+    if (s[i] === ')') depth++
+    else if (s[i] === '(' && --depth === 0) return i
+  }
+  return -1
+}
+
 // Ego/artprop descriptions arrive pre-formatted by the server's
 // _format_prop_desc (describe.cc): a `Label: ` prefix, the description
 // hard-wrapped at 80 columns, and every continuation line padded with
@@ -152,6 +203,21 @@ export function propagateDarkgreyColor(body: string): string {
 // key-help rows) are skipped by the [^<] guard.
 export const HANG_MARK = '\u0001'
 
+// A line `GRID_MARK + kind + (CELL_SEP + cell)*` renders as one block of
+// cells instead of a text line: 'grid' = equal columns sized to the widest
+// cell, as many as fit; 'flow' = cells wrapping inline. Each cell is
+// self-contained wire text. Built by overview-reflow.ts.
+export const GRID_MARK = '\u0002'
+export const CELL_SEP = '\u0003'
+
+function renderCellBlock(line: string, highlight: string): string {
+  const [kind, ...cells] = line.slice(GRID_MARK.length).split(CELL_SEP)
+  const widest = Math.max(...cells.map(c => stripDcss(c).length))
+  const style = kind === 'grid' ? ` style="--cell-ch:${widest}ch"` : ''
+  const spans = cells.map(c => `<span>${applyHighlight(dcssToHtml(c), highlight)}</span>`).join('')
+  return `<div class="overlay-line overlay-cells overlay-cells--${kind}"${style}>${spans}</div>`
+}
+
 // The `label:` + padding prefix of a formatter row: m[1] the label, m[2] the
 // padding, m[0].length the description column. The formatter's `%-*s` pad
 // (MAX_ARTP_NAME_LEN + 1 = 11) pads but never separates, so a label that
@@ -167,7 +233,44 @@ function matchLabel(line: string): RegExpMatchArray | null {
     ?? line.match(/^([^\s<][^<]{0,17}?:)()(?=[^\s<])/)
 }
 
-export function unwrapHangingIndents(body: string): string {
+// The deepest column text hangs at, in ch: the widest real DBRAND label
+// ("Manifold Assault:" — art-data.txt) fills it. Beyond it a label row
+// hangs compactly and an indented line wraps flush, so one cap serves
+// both — a block's later paragraphs are indented by the label row's hang
+// column and must hang the same way.
+const MAX_HANG_COL = 18
+
+// The column a marked label row's wrapped text hangs at: the description
+// column itself up to MAX_HANG_COL, else a compact 2ch. The mundane-ego
+// run-in form `'Of X': ` always takes the compact hang — its column is its
+// full natural width, too deep on a phone. The quote prefix is what marks
+// the run-in form, not the padding-space count: a column-aligned artprop
+// label whose name exactly fills the column has only ONE trailing space
+// (e.g. `Corpsefed: `, padded to 11) and must still hang at its column,
+// level with its 2+-space siblings (`rMiasma:`, `^Drain:`).
+function hangColumn(shape: string): number {
+  const pm = matchLabel(shape)
+  return pm && pm[0].length <= MAX_HANG_COL && !shape.startsWith("'") ? pm[0].length : 2
+}
+
+// An item examined from Ctrl-F search results has the search's first match
+// recoloured in its description (stash.cc StashSearchMenu::examine_index →
+// annotate_string("lightcyan"), trunk and 0.34.1 alike), sent through
+// to_colour_string as a switch back to the label's colour:
+// `<lightcyan>Death<lightgrey>:     It …` (wire captured in golden 22).
+// Label matching reads the line with that highlight lifted; the text keeps
+// it. Never widen this to other markup: tags before the colon are what keep
+// key-help rows (`<white>Tab<lightgrey>    : …`) and the help screen's
+// books row (command.cc `<lightcyan>+</lightcyan> : books (…`), whose
+// 4-space continuation would validate as a column, out of the label match.
+function liftSearchHighlight(line: string): string {
+  return line.replace(/<lightcyan>([^<]*)<lightgrey>/g, '$1')
+}
+
+// `searchHighlight`: the body may carry the search highlight above — only
+// describe-item bodies can (annotate_string's one caller is that
+// describe_item filter).
+export function unwrapHangingIndents(body: string, searchHighlight = false): string {
   const lines = body.split('\n')
   const out: string[] = []
   // Active opens-only color carried across lines. Quote blocks arrive as
@@ -186,18 +289,35 @@ export function unwrapHangingIndents(body: string): string {
     const line = lines[i]
     const shielded = activeColor === 'darkgrey'
     trackTags(line)
-    const m = shielded ? null : matchLabel(line)
+    const shape = searchHighlight ? liftSearchHighlight(line) : line
+    const m = shielded ? null : matchLabel(shape)
     if (m) {
       const col = m[1].length + m[2].length
-      const contRe = new RegExp(`^ {${col}}(?=\\S)`)
+      // _format_prop_desc pads EVERY newline of the description, so the
+      // block is every following line that carries the column: text after
+      // it, or nothing at all — a blank line between paragraphs arrives as
+      // exactly `col` spaces (trunk egos.txt "mesmerism" is the first armour
+      // ego with two paragraphs; 0.34.1 has none). A pad-only line that no
+      // continuation follows is not part of the block.
+      const pad = ' '.repeat(col)
+      const contRe = new RegExp(`^ {${col}}(?=\\S|$)`)
       let j = i + 1
       while (j < lines.length && contRe.test(lines[j])) j++
+      while (j > i + 1 && lines[j - 1] === pad) j--
       if (j > i + 1) {
-        // Keep line 1 verbatim (label + original padding) — renderBodyLines
-        // re-derives the description column from it to set the hang width,
-        // so wrapped text aligns under the description column.
-        const joined = [line, ...lines.slice(i + 1, j).map(l => l.slice(col))].join(' ')
-        out.push(HANG_MARK + joined)
+        // Strip the padding and the description is back as the formatter
+        // received it: paragraphs separated by a blank line. Keep line 1
+        // verbatim (label + original padding) — renderBodyLines re-derives
+        // the description column from it to set the hang width, so wrapped
+        // text aligns under the description column. Later paragraphs have
+        // no label: they go out unmarked behind a blank line, indented by
+        // the block's hang column, and renderBodyLines' indented-prose rule
+        // hangs them at that depth — so every line of them sits in the
+        // description column, as the server lays them out.
+        const paras = [line, ...lines.slice(i + 1, j).map(l => l.slice(col))]
+          .join('\n').split(/\n{2,}/).map(p => p.replace(/\n/g, ' '))
+        out.push(HANG_MARK + paras[0])
+        for (const para of paras.slice(1)) out.push('', ' '.repeat(hangColumn(shape)) + para)
         for (let k = i + 1; k < j; k++) trackTags(lines[k])
         i = j - 1
         continue
@@ -211,11 +331,11 @@ export function unwrapHangingIndents(body: string): string {
       // description column like the joined blocks; rows that fit render
       // pixel-identical to the nowrap form. Guards: padding ≥2 spaces (a
       // single space is ordinary prose, e.g. "Mesmerism radius: 2"), short
-      // label, description column ≤18 (the widest real formatter column —
+      // label, description column ≤MAX_HANG_COL (the widest real formatter column —
       // excludes right-aligned-to-col-80 layouts like the god-powers
       // "Granted powers:        (Cost)" header), and no multi-space runs in
       // the remainder (multi-column rows keep their alignment).
-      if (m[2].length >= 2 && m[1].length <= 16 && col <= 18 && !/ {3,}/.test(line.slice(col))) {
+      if (m[2].length >= 2 && m[1].length <= 16 && col <= MAX_HANG_COL && !/ {3,}/.test(shape.slice(col))) {
         out.push(HANG_MARK + line)
         continue
       }
@@ -258,37 +378,35 @@ export function joinIndentedRuns(text: string): string {
 // and the stat-row/per-line-tabular reformatting is skipped, so the caller can
 // scale the whole block to fit (see fitTerminalBody). Used for the game-over
 // screen; the describe-* panels keep the per-line heuristic (terminal=false).
-export function renderBodyLines(rawBody: string, highlight: string, terminal = false): string {
+// `searchHighlight` as for unwrapHangingIndents.
+export function renderBodyLines(rawBody: string, highlight: string, terminal = false, searchHighlight = false): string {
   return balanceColorTagsAcrossLines(rawBody).split('\n').map(line => {
+    // propagateDarkgreyColor may prepend tags, as for HANG_MARK below.
+    const cellsAt = line.indexOf(GRID_MARK)
+    if (cellsAt >= 0 && /^(?:<[^<>]+>)*$/.test(line.slice(0, cellsAt))) {
+      return renderCellBlock(line.slice(cellsAt), highlight)
+    }
     // Lines marked by unwrapHangingIndents wrap with a hanging indent.
     // propagateDarkgreyColor may have prepended tags, so the mark isn't
     // necessarily at index 0. The marked line keeps its original
     // `label + padding` prefix; re-derive the description column from it so
     // wrapped text aligns under the column (the body is monospace, so Nch
-    // matches N wire characters exactly). Padded columns are honored up to
-    // 18ch (the widest real DBRAND label, "Manifold Assault:") — beyond
-    // that, and for single-space run-in labels like `'Of mesmerism': `,
-    // fall back to a compact 2ch hang.
+    // matches N wire characters exactly; hangColumn has the rules).
     const hang = line.includes(HANG_MARK)
     let hangStyle = ''
     if (hang) {
       line = line.replace(HANG_MARK, '')
-      const pm = matchLabel(line)
-      const col = pm ? pm[0].length : 0
-      // Hang wrapped text at the description column so the block stays aligned.
-      // Exception: the mundane-ego run-in form `'Of X': ` hangs at a compact
-      // 2ch default (its column is its full natural width, too deep on a
-      // phone). Don't gate on the padding-space count — a column-aligned
-      // artprop label whose name exactly fills the column has only ONE trailing
-      // space (e.g. `Corpsefed: `, padded to 11), and must still hang at its
-      // column to line up with its 2+-space siblings (`rMiasma:`, `^Drain:`).
-      // The quote prefix is what marks the run-in form, not the space count.
-      if (pm && col <= 18 && !line.startsWith("'")) hangStyle = ` style="--hang-col:${col}ch"`
+      hangStyle = ` style="--hang-col:${hangColumn(searchHighlight ? liftSearchHighlight(line) : line)}ch"`
     }
     if (!terminal && !hang) {
       const stat = tryStatRow(line)
       if (stat) return stat
-      const plain = plainStatSegments(line)
+      // A search highlight on the stat header (`Base <lightcyan>armour<lightgrey>
+      // rating: 2 …`, golden 23) must not cost the row its chips. The shape is
+      // judged with it lifted; the chips split the wire line so it keeps its
+      // colour — the tags hold no spaces, so both split at the same gaps.
+      const shape = searchHighlight ? liftSearchHighlight(line) : line
+      const plain = plainStatSegments(shape) && line.trim().split(/ {2,}/)
       if (plain) {
         const chips = plain.map(s => `<span class="overlay-stat">${dcssToHtml(s)}</span>`).join('')
         return `<div class="overlay-line overlay-stat-row">${chips}</div>`
@@ -306,7 +424,7 @@ export function renderBodyLines(rawBody: string, highlight: string, terminal = f
     // continuations stay aligned under the sub-item instead of falling
     // flush-left. The leading spaces render on line 1 as-is; the negative
     // text-indent/padding pair only moves the wrapped lines. Deeply indented
-    // lines (>18) are left alone. Skip past any leading colour-markup tags:
+    // lines (>MAX_HANG_COL) are left alone. Skip past any leading colour-markup tags:
     // opens-only bodies (formatted_string::to_colour_string, e.g. msg.status)
     // get reopened tags prepended at each line start by
     // balanceColorTagsAcrossLines, so the indent no longer sits at column 0 —
@@ -320,7 +438,7 @@ export function renderBodyLines(rawBody: string, highlight: string, terminal = f
       const m = /^((?:<[^>]+>)*)( {2,})(.*)$/.exec(line)
       const hasText = !!m && m[3].replace(/<[^>]+>/g, '').trim() !== ''
       const ind = m && hasText && !/<\/?darkgrey>/.test(m[1]) ? m[2].length : 0
-      if (ind > 0 && ind <= 18) {
+      if (ind > 0 && ind <= MAX_HANG_COL) {
         cls += ' overlay-line--hang'
         hangStyle = ` style="--hang-col:${ind}ch"`
       }

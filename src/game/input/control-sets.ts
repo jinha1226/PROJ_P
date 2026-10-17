@@ -244,16 +244,37 @@ function builtinStandard(): ControlSet {
     id: STANDARD_ID,
     name: 'Standard',
     builtin: true,
+    // Revised 2026-09-22 (a silent swap for everyone on Standard; custom
+    // sets are frozen copies and unaffected). @ is the fight tab: f aims,
+    // p fires at the nearest (the ranged Tab), v is the primary attack.
+    // Never trade v for V: v is the only way to aim a polearm's reach attack
+    // (CMD_PRIMARY_ATTACK → melee_action, quiver.cc:451; Tab reaches only the
+    // nearest target, Ctrl+d-pad hits adjacent only), while wands quiver onto f/p (wand_action,
+    // quiver.cc:1651) and Shift+v sends V for the rest. Q picks what f/p
+    // fire. Mind what a mistap next to , and o (the most-tapped) costs: p is
+    // accepted there (with nothing in view it only prints a message), but
+    // ' left the set over it — it spends a turn, and with no weapon in a/b
+    // it unwields yours (auto_wield, item-use.cc:1841). The virtual keyboard
+    // still sends it. x moved to >
+    // (examine, beside X: a tapped cell + Enter travels there, directn.cc
+    // do_look_around). > is items + finding your way: e/c are
+    // the unified equip/unequip (0.30+, cmd-keys.h at 0.30-b1; 0.26–0.29
+    // answer "Unknown command", and on 0.24/0.25 e eats and c butchers —
+    // CMD_EAT/CMD_BUTCHER, butchery starting unprompted on a lone corpse.
+    // w/P/R/W/T were five keys for what these two do, and a custom set
+    // restores them), ^F ^O G ! mark and find, X x < > go.
+    // The X level map's own keys (exclusions, [ ]) live in x-mode-keys.ts,
+    // never here.
     tabs: [
       { name: '@', cols: 4, slots: [
         k('Tab'), t('5'), t('i'), t('o'),
-        t('q'), t('r'), t('f'), t('v'),
-        t('a'), t("'"), t('x'), t(','),
+        t('q'), t('r'), t('f'), t('p'),
+        t('a'), t('Q'), t('v'), t(','),
       ] },
       { name: '>', cols: 4, slots: [
-        t('w'), t('R'), t('t'), t('P'),
-        t('d'), k('^F'), t('G'), k('^O'),
-        t('X'), t('e'), t('<'), t('>'),
+        t('e'), t('d'), t('c'), t('t'),
+        k('^F'), t('G'), k('^O'), t('!'),
+        t('X'), t('x'), t('<'), t('>'),
       ] },
       { name: '?', cols: 4, slots: INFO_SLOTS() },
     ],

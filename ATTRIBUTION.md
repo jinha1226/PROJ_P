@@ -48,8 +48,8 @@ requirement. The colour palette is the standard Tango-derived terminal set:
 | `src/game/map/cell-flags.ts` | `webserver/game_data/static/enums.js` | Tile fg/bg flag bit masks |
 | `src/game/dcss-colors.ts` | DCSS WebTiles colour palette | Named colour → hex map |
 
-The 16-entry base palette in `src/game/map/colors.ts` is the standard
-IBM CGA/VGA color set and is not specific to DCSS.
+The map's 16-entry base palette (`src/game/map/colors.ts`) is the same
+Tango-derived set, taken from `src/game/dcss-colors.ts`.
 
 ## Derived from the DCSS WebTiles client
 
@@ -60,6 +60,7 @@ to TypeScript, following its structure and draw order:
 |------|------------------------------|------|
 | `src/game/map/tile-map-view.ts` | `cell_renderer.js` — `do_render_cell`, `draw_background`, `draw_foreground` | Tile cell composition and draw order |
 | `src/game/tiles/tile-view.ts` | `cell_renderer.js` — `draw_dolls` | Player-doll layer composition |
+| `src/game/tiles/tile-anim.ts` | `dungeon_renderer.js` — `cell_is_animated`, `animate_cell` | Which dungeon tiles animate, and their next frame |
 | `src/game/hud/monster-style.ts` | `cell_renderer.js` — `draw_background` (attitude-halo slice), `draw_foreground` (status-icon order + `status_shift`) | Monster-panel background tile; shared status-overlay decision |
 | `src/game/hud/monster-style.ts` | `monster_list.js` — `monster_sort`, `is_excluded` | Monster ordering and display-exclusion predicate |
 | `src/game/map/icon-sizes.ts` | `rltiles/icon-sizes.txt` (input to `util/status-icon-sizes-gen.py` → `status_icon_size`) | Per-status-icon width table for `cell.icons` stacking |
@@ -68,12 +69,13 @@ to TypeScript, following its structure and draw order:
 
 ## Derived from the DCSS engine and server
 
-Offline support ports a few small pieces of DCSS itself (the C++ engine and
-the Python WebTiles server), where the client must reproduce their behavior
-exactly:
+A few small pieces of DCSS itself (the C++ engine and the Python WebTiles
+server) are ported where the client must reproduce their behavior or
+wording exactly:
 
 | File | Ported from (DCSS) | What |
 |------|--------------------|------|
+| `src/game/hud/monster-status.ts` | `mon-info-flag-name.h` — `monster_info_flag_names`; `tilepick.cc` — `monster_status_icons` | Monster status words, their display order, and the icon each is sent as |
 | `src/offline/mini-server.ts` | `webserver/process_handler.py` — `handle_input` | Input routing (pty text vs control-socket keycodes) |
 | `src/offline/offline-state.ts` | `stringutil.cc` — `strip_filename_unsafe_chars` | Save-slot filename stem |
 | `src/offline/offline-state.ts` | `ng-input.cc` — `validate_player_name` | Character-name validation |

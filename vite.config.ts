@@ -5,6 +5,8 @@ import { readFileSync, writeFileSync } from 'node:fs'
 import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { PRECACHE_EXTRAS } from './src/sw/classify.js'
+import { bakeCryptStrip } from './src/build/crypt-strip.js'
+import { STRIP } from './src/views/crypt-room-layout'
 
 const projectRoot = dirname(fileURLToPath(import.meta.url))
 const appBase = '/pocketzot-dwem/'
@@ -121,9 +123,47 @@ function serveRecordings(): Plugin {
   }
 }
 
+// `virtual:crypt-strip`: the URL of the crypt room's tile strip
+// (crypt-room.ts), baked here from the offline pack in public/gamedata/local/
+// (src/build/crypt-strip.js), or null when this checkout has no pack — the
+// crypt then ships plain, with a build warning. In a build it is a
+// content-hashed asset under assets/: the SW precaches it with the shell,
+// it re-downloads only when the tiles change, and build:deploy's pack strip
+// leaves it alone. In dev, a data URL; Vite restarts on edits to
+// crypt-room-layout.ts (a config dependency), so the strip follows STRIP —
+// but a pack (re)installed mid-session needs a manual restart.
+// Under vitest, null without touching the pack (tests vi.mock the module).
+function cryptStrip(): Plugin {
+  const id = 'virtual:crypt-strip'
+  let build = false
+  return {
+    name: 'pz-crypt-strip',
+    configResolved(config) {
+      build = config.command === 'build'
+    },
+    resolveId(source) {
+      return source === id ? `\0${id}` : undefined
+    },
+    load(resolved) {
+      if (resolved !== `\0${id}`) return
+      if (process.env.VITEST) return 'export default null'
+      let png: Buffer
+      try {
+        png = bakeCryptStrip(resolve(projectRoot, 'public/gamedata/local'), STRIP)
+      } catch (e) {
+        this.warn(`crypt strip not baked, the crypt ships undecorated: ${(e as Error).message}`)
+        return 'export default null'
+      }
+      if (!build) return `export default ${JSON.stringify(`data:image/png;base64,${png.toString('base64')}`)}`
+      const ref = this.emitFile({ type: 'asset', name: 'crypt-strip.png', source: png })
+      return `export default import.meta.ROLLUP_FILE_URL_${ref}`
+    },
+  }
+}
+
 export default defineConfig({
   base: appBase,
-  plugins: [swPrecache(), serveRecordings()],
+  plugins: [swPrecache(), serveRecordings(), cryptStrip()],
   build: {
     sourcemap: false,
   },
@@ -134,13 +174,18 @@ export default defineConfig({
           // The tile path (exercised by monster-list.test.ts) lazily appends
           // <script src=…/tileinfo-*.js> to load AMD tileinfo modules. happy-dom
           // can't execute external scripts and otherwise logs a noisy
-          // DOMException per attempt. Treat the disabled load as a silent no-op
-          // (fires a 'load' event instead of console.error'ing): the tile
-          // painters already no-op without real atlas/module loads, and those
-          // tests only assert DOM row structure.
+          // DOMException per attempt. Treat the disabled load as a 'load'
+          // event instead: the tile painters no-op without real atlas/module
+          // loads, and those tests only assert DOM row structure.
           handleDisabledFileLoadingAsSuccess: true,
         },
       },
     },
+    // That fake 'load' never reaches define(), so tile-loader's loadModule
+    // rejects it ("… loaded without defining a module") and each caller's
+    // fallback warns with a stack (~70 per screen-trace run). No script ever
+    // executes here, so the message is always this artifact: drop it, let
+    // every other log through.
+    onConsoleLog: (log) => !log.includes('loaded without defining a module'),
   },
 })

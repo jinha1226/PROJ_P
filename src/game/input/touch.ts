@@ -6,16 +6,18 @@ import {
   CK_SHIFT_HOME, CK_SHIFT_END, CK_SHIFT_PGUP, CK_SHIFT_PGDN,
   CK_CTRL_UP, CK_CTRL_DOWN, CK_CTRL_LEFT, CK_CTRL_RIGHT,
   CK_CTRL_HOME, CK_CTRL_END, CK_CTRL_PGUP, CK_CTRL_PGDN,
-  CK_CTRL_BKSP, CAPTURED_CTRL, ctrlKeycode,
+  typedCharToMsg,
 } from './keyboard'
-import { createShiftToggle } from './shift-state'
+import { createModifiers, createShiftToggle } from './shift-state'
+import { activeTextInput, buildKeyboardOverlay, dispatchSpecialToInput } from './virtual-keyboard'
 import { LONG_PRESS_MS } from './map-tap'
 import {
   CONTROLS_CHANGED_EVENT, GRID_ROWS, getActiveControlSet, slotLabel, slotTitle,
 } from './control-sets'
 import type { ControlSet, ControlTabDef, SlotDef } from './control-sets'
+import { X_MODE_COLS, X_MODE_KEYS } from './x-mode-keys'
 
-type SendFn = (msg: ClientMsg) => void
+export type SendFn = (msg: ClientMsg) => void
 // The three control tabs keep stable positional ids (micro/macro/info =
 // tabs[0..2] of the active control set); their visible labels come from the
 // set and are user-renameable.
@@ -33,12 +35,13 @@ type DpadDef =
   | { label: string; plain: number; shifted: number; ctrled: number }
   | { label: string; text: string }
 
-// Binds one control's engagement (see bindTap in buildTouchControls).
-// `repeat` opts a control into hold-to-repeat on the touch path. `onHold`
-// runs once at the hold threshold, before any repeat starts: returning true
-// claims the hold (no repeat interval follows), false falls through to
-// `repeat`. The d-pad's run-on-hold lives behind it.
-type BindTap = (
+// Binds one control's engagement (see bindTap in buildTouchControls; the
+// on-screen keyboard takes it too). `repeat` opts a control into
+// hold-to-repeat on the touch path. `onHold` runs once at the hold
+// threshold, before any repeat starts: returning true claims the hold (no
+// repeat interval follows), false falls through to `repeat`. The d-pad's
+// run-on-hold lives behind it.
+export type BindTap = (
   btn: HTMLElement, fire: () => void, opts?: { repeat?: boolean; onHold?: () => boolean },
 ) => void
 
@@ -48,7 +51,7 @@ type BindTap = (
 // touchstart shuts down — so Android showed no highlight at all (reported
 // 2026-08-28) while iOS did. Toggle a `pressed` class off the same events
 // instead; the selectors pair it with :active for the mouse path.
-export const PRESSED_CLASS = 'pressed'
+const PRESSED_CLASS = 'pressed'
 export function bindPressedClass(btn: HTMLElement): void {
   btn.addEventListener('touchstart', () => btn.classList.add(PRESSED_CLASS), { passive: true })
   const release = (): void => btn.classList.remove(PRESSED_CLASS)
@@ -64,9 +67,8 @@ export const REPEAT_INTERVAL_MS = 85
 // on such a control starts here too rather than at REPEAT_DELAY_MS.
 export const HOLD_MS = LONG_PRESS_MS
 
-// game-view owns the spell data (and the tile loader / cast logic), so it
-// supplies the grid DOM for the z tab; touch.ts just hosts it in the panel's
-// content area and manages tab switching.
+// The spell rail (views/spell-rail) supplies the z tab's grid DOM; touch.ts
+// just hosts it in the panel's content area and manages tab switching.
 export interface SpellTabConfig {
   render: () => HTMLElement | null  // grid for the current spells, or null if none
   hasSpells: () => boolean          // cheap visibility probe — no DOM built
@@ -76,6 +78,13 @@ export interface TouchControls {
   element: HTMLElement
   enterXMode(): void
   exitXMode(): void
+  // Label for the X-mode header: the compact place of the level being VIEWED
+  // (wire facts at setXModePlace in buildTouchControls). Cheap; call on
+  // every player place/depth change.
+  setXModePlace(label: string): void
+  // The d-pad's slot while the X level map is up; game-view mounts the
+  // minimap in it.
+  readonly xModeSlot: HTMLElement
   // Tracks "steering a cursor" state (root class `cursor-mode`) for the
   // non-X server cursors (x examine, targeting); X mode's own class covers
   // the level-map cursor. Deliberately unstyled (the map cursor is its own
@@ -83,11 +92,13 @@ export interface TouchControls {
   // dev-material/cursor-mode-reticle.md.
   setCursorMode(on: boolean): void
   // Tracks "a server overlay is up" (root class `overlay-mode`), set from
-  // game-view's single overlay entry/exit (enterOverlayLayout /
-  // hideOverlay). Read by the d-pad hold (see buildDpad).
+  // game-view's applyLayout. Read by the d-pad hold (see buildDpad).
   setOverlayMode(on: boolean): void
-  openKbd(): void
+  // `auto`: raised for a text prompt (the custom-seed field); closeAutoKbd
+  // takes down only such a kbd.
+  openKbd(opts?: { auto?: boolean }): void
   closeKbd(): void
+  closeAutoKbd(): void
   isKbdOpen(): boolean     // for the Android back handler: back dismisses the kbd first
   refreshSpellTab(): void  // re-render the z tab if it is the active tab
   // Whether the d-pad Shift toggle is engaged, consuming a one-shot (lock
@@ -99,8 +110,9 @@ export interface TouchControls {
 
 // Arrow + numpad keycodes; shift = run-variant; ctrl = open-door / attack-stationary.
 // Center is the wait/confirm slot; sends '.' as text so it both waits one turn in
-// normal play and accepts the cursor target in X mode. Exported so the settings
-// d-pad specimen renders the same faces as the live pad.
+// normal play, accepts the target while aiming, and travels to the cursor in
+// the X level map (CMD_MAP_GOTO_TARGET). Exported so the settings d-pad
+// specimen renders the same faces as the live pad.
 export const DPAD_LAYOUT: DpadDef[][] = [
   [
     { label: '↖', plain: CK_HOME,  shifted: CK_SHIFT_HOME,  ctrled: CK_CTRL_HOME  },
@@ -123,287 +135,6 @@ export const DPAD_LAYOUT: DpadDef[][] = [
 // the built-in Standard set reproduces the original hard-coded grids, and
 // custom sets swap in user-defined keys, grid widths, and tab labels.
 
-// Virtual QWERTY keyboard overlay. Letter and symbol layers, sticky Shift
-// (tap = once, double-tap = locked, tap from lock = off) and one-shot Ctrl,
-// [123]/[ABC] toggle. Replaces the touch-controls strip while open.
-function buildKeyboardOverlay(
-  send: SendFn,
-  bindTap: BindTap,
-): { element: HTMLElement; open: () => void; close: () => void } {
-  type Layer = 'letters' | 'symbols'
-  let layer: Layer = 'letters'
-  let ctrlActive = false
-
-  const overlay = document.createElement('div')
-  overlay.id = 'kbd-overlay'
-  overlay.style.display = 'none'
-
-  const layerEl = document.createElement('div')
-  layerEl.className = 'kbd-layer'
-  overlay.appendChild(layerEl)
-
-  const shiftBtns: HTMLButtonElement[] = []
-  const ctrlBtns: HTMLButtonElement[] = []
-
-  const shift = createShiftToggle({ onChange: refreshMods })
-
-  function refreshMods(): void {
-    for (const b of shiftBtns) {
-      b.classList.toggle('active', shift.state === 'once')
-      b.classList.toggle('locked', shift.state === 'lock')
-    }
-    for (const b of ctrlBtns) b.classList.toggle('active', ctrlActive)
-    overlay.classList.toggle('shift-on', shift.isOn)
-    overlay.classList.toggle('ctrl-on', ctrlActive)
-  }
-
-  // Called after each key dispatch. Keeps lock engaged across taps; clears
-  // one-shot shift and ctrl.
-  function clearOneshot(): void {
-    shift.consume()
-    if (ctrlActive) {
-      ctrlActive = false
-      refreshMods()
-    }
-  }
-
-  function clearAllMods(): void {
-    shift.reset()
-    if (ctrlActive) {
-      ctrlActive = false
-      refreshMods()
-    }
-  }
-
-  // Shift and Ctrl are mutually exclusive on the kbd: arming one disarms the
-  // other so a double-mod combo doesn't leave both lit.
-  function toggleShift(): void {
-    const wasOff = shift.state === 'off'
-    shift.tap()
-    if (wasOff && ctrlActive) {
-      ctrlActive = false
-      refreshMods()
-    }
-  }
-
-  function toggleCtrl(): void {
-    ctrlActive = !ctrlActive
-    if (ctrlActive) shift.reset()
-    refreshMods()
-  }
-
-  function activeTextInput(): HTMLInputElement | null {
-    return document.querySelector<HTMLInputElement>('.game-text-input, .input-dialog-field')
-  }
-
-  // Programmatic value changes don't fire native `input` events, so dispatch
-  // one manually — that's how msgwin-get-line gets its ui_state_sync echo.
-  function typeIntoInput(input: HTMLInputElement, ch: string): void {
-    const value = input.value
-    const start = input.selectionStart ?? value.length
-    const end = input.selectionEnd ?? value.length
-    input.value = value.slice(0, start) + ch + value.slice(end)
-    const caret = start + ch.length
-    input.setSelectionRange(caret, caret)
-    input.focus({ preventScroll: true })
-    input.dispatchEvent(new Event('input', { bubbles: true }))
-  }
-
-  function backspaceInput(input: HTMLInputElement): void {
-    const value = input.value
-    const start = input.selectionStart ?? value.length
-    const end = input.selectionEnd ?? value.length
-    if (start !== end) {
-      input.value = value.slice(0, start) + value.slice(end)
-      input.setSelectionRange(start, start)
-    } else if (start > 0) {
-      input.value = value.slice(0, start - 1) + value.slice(end)
-      input.setSelectionRange(start - 1, start - 1)
-    }
-    input.focus({ preventScroll: true })
-    input.dispatchEvent(new Event('input', { bubbles: true }))
-  }
-
-  function dispatchSpecialToInput(input: HTMLInputElement, key: 'Enter' | 'Escape'): void {
-    input.dispatchEvent(new KeyboardEvent('keydown', { key, bubbles: true, cancelable: true }))
-  }
-
-  function dispatchChar(ch: string, shifted?: string): void {
-    const shiftOn = shift.isOn
-    const input = activeTextInput()
-    if (input && !ctrlActive) {
-      const out = shiftOn ? (shifted !== undefined ? shifted : ch.toUpperCase()) : ch
-      typeIntoInput(input, out)
-      clearOneshot()
-      return
-    }
-    if (shiftOn) {
-      const out = shifted !== undefined ? shifted : ch.toUpperCase()
-      send({ msg: 'input', text: out })
-    } else if (ctrlActive) {
-      const upper = ch.toUpperCase()
-      if (CAPTURED_CTRL.has(upper)) {
-        send({ msg: 'key', keycode: ctrlKeycode(upper) })
-      } else {
-        send({ msg: 'input', text: ch })
-      }
-    } else {
-      send({ msg: 'input', text: ch })
-    }
-    clearOneshot()
-  }
-
-  function dispatchKey(keycode: number, ctrlKeycode?: number): void {
-    const input = activeTextInput()
-    if (input) {
-      if (keycode === 8) backspaceInput(input)
-      else if (keycode === 13) dispatchSpecialToInput(input, 'Enter')
-      else if (keycode === 27) dispatchSpecialToInput(input, 'Escape')
-      clearOneshot()
-      return
-    }
-    const code = ctrlActive && ctrlKeycode !== undefined ? ctrlKeycode : keycode
-    send({ msg: 'key', keycode: code })
-    clearOneshot()
-  }
-
-  function setLayer(next: Layer): void {
-    layer = next
-    rebuild()
-  }
-
-  function close(): void {
-    overlay.style.display = 'none'
-    clearAllMods()
-  }
-
-  function makeBtn(
-    label: string, classes: string, onTap: () => void, opts?: { repeat?: boolean },
-  ): HTMLButtonElement {
-    const b = document.createElement('button')
-    b.className = 'kbd-key' + (classes ? ' ' + classes : '')
-    b.textContent = label
-    bindTap(b, onTap, opts)
-    return b
-  }
-
-  // Character keys and backspace hold-to-repeat like hardware keys; control
-  // keys (Esc/Enter/Tab, mods, layer switch, close) stay single-fire.
-  function makeCharBtn(label: string, ch: string, shifted?: string): HTMLButtonElement {
-    return makeBtn(label, '', () => dispatchChar(ch, shifted), { repeat: true })
-  }
-
-  function makeLetterBtn(ch: string): HTMLButtonElement {
-    return makeBtn(ch, 'letter', () => dispatchChar(ch), { repeat: true })
-  }
-
-  function makeLetterBtnWithCorner(ch: string, corner: string): HTMLButtonElement {
-    const b = document.createElement('button')
-    b.className = 'kbd-key letter with-corner'
-    const sup = document.createElement('span')
-    sup.className = 'kbd-corner'
-    sup.textContent = corner
-    const main = document.createElement('span')
-    main.className = 'kbd-main'
-    main.textContent = ch
-    b.appendChild(sup)
-    b.appendChild(main)
-    bindTap(b, () => dispatchChar(ch), { repeat: true })
-    return b
-  }
-
-  function makeShiftedCharBtn(ch: string, shifted: string): HTMLButtonElement {
-    const b = document.createElement('button')
-    b.className = 'kbd-key with-shifted'
-    const sup = document.createElement('span')
-    sup.className = 'kbd-shifted'
-    sup.textContent = shifted
-    const main = document.createElement('span')
-    main.className = 'kbd-main'
-    main.textContent = ch
-    b.appendChild(sup)
-    b.appendChild(main)
-    bindTap(b, () => dispatchChar(ch, shifted), { repeat: true })
-    return b
-  }
-
-  function addRow(btns: HTMLButtonElement[]): void {
-    const r = document.createElement('div')
-    r.className = 'kbd-row'
-    for (const b of btns) r.appendChild(b)
-    layerEl.appendChild(r)
-  }
-
-  const LETTER_ROW_1 = ['q','w','e','r','t','y','u','i','o','p']
-  const LETTER_ROW_2 = ['a','s','d','f','g','h','j','k','l']
-  const LETTER_ROW_3 = ['z','x','c','v','b','n','m']
-
-  const LETTER_DIRS: Record<string, string> = {
-    y: '↖', u: '↗', h: '←', j: '↓', k: '↑', l: '→', b: '↙', n: '↘',
-  }
-
-  const SYMBOL_ROW_1 = ['~','!','@','#','$','%','^','&','*','(',')','_','+']
-  const SYMBOL_ROW_2 = ['`','1','2','3','4','5','6','7','8','9','0','-','=']
-  const SYMBOL_ROW_3: Array<[string, string]> = [
-    ['[', '{'], [']', '}'], ['\\', '|'], [';', ':'],
-    ["'", '"'], [',', '<'], ['.', '>'], ['/', '?'],
-  ]
-
-  function buildBottomRow(switchLabel: string, nextLayer: Layer): HTMLButtonElement[] {
-    const btns: HTMLButtonElement[] = []
-    btns.push(makeBtn('⎋', 'wide flex glyph', () => dispatchKey(27)))
-    const cb = makeBtn('⌃', 'mod wide flex glyph', toggleCtrl)
-    ctrlBtns.push(cb)
-    btns.push(cb)
-    btns.push(makeBtn(switchLabel, 'wide flex', () => setLayer(nextLayer)))
-    // Tab repeats; the other control keys stay single-fire.
-    btns.push(makeBtn('⇥', 'wide flex glyph', () => dispatchKey(9), { repeat: true }))
-    btns.push(makeBtn('⏎', 'wide flex glyph', () => dispatchKey(13)))
-    btns.push(makeBtn('abc▾', 'wide flex', close))
-    return btns
-  }
-
-  function rebuild(): void {
-    layerEl.innerHTML = ''
-    shiftBtns.length = 0
-    ctrlBtns.length = 0
-
-    if (layer === 'letters') {
-      addRow(LETTER_ROW_1.map(c => LETTER_DIRS[c] ? makeLetterBtnWithCorner(c, LETTER_DIRS[c]) : makeLetterBtn(c)))
-      addRow(LETTER_ROW_2.map(c => LETTER_DIRS[c] ? makeLetterBtnWithCorner(c, LETTER_DIRS[c]) : makeLetterBtn(c)))
-      const r3: HTMLButtonElement[] = []
-      const sb = makeBtn('⇧', 'mod wide flex glyph', toggleShift)
-      shiftBtns.push(sb); r3.push(sb)
-      for (const c of LETTER_ROW_3) r3.push(LETTER_DIRS[c] ? makeLetterBtnWithCorner(c, LETTER_DIRS[c]) : makeLetterBtn(c))
-      r3.push(makeBtn('⌫', 'wide flex glyph', () => dispatchKey(8, CK_CTRL_BKSP), { repeat: true }))
-      addRow(r3)
-      addRow(buildBottomRow('123', 'symbols'))
-    } else {
-      addRow(SYMBOL_ROW_1.map(c => makeCharBtn(c, c)))
-      addRow(SYMBOL_ROW_2.map(c => makeCharBtn(c, c)))
-      const r3: HTMLButtonElement[] = []
-      const sb = makeBtn('⇧', 'mod wide flex glyph', toggleShift)
-      shiftBtns.push(sb); r3.push(sb)
-      for (const [ch, sh] of SYMBOL_ROW_3) r3.push(makeShiftedCharBtn(ch, sh))
-      r3.push(makeBtn('⌫', 'wide flex glyph', () => dispatchKey(8, CK_CTRL_BKSP), { repeat: true }))
-      addRow(r3)
-      addRow(buildBottomRow('ABC', 'letters'))
-    }
-    refreshMods()
-  }
-
-  function open(): void {
-    layer = 'letters'
-    clearAllMods()
-    rebuild()
-    overlay.style.display = 'flex'
-  }
-
-  rebuild()
-
-  return { element: overlay, open, close }
-}
-
 export interface TouchControlsOpts {
   spellTab?: SpellTabConfig
   // Fires whenever the d-pad Shift toggle engages/clears (including via
@@ -412,10 +143,29 @@ export interface TouchControlsOpts {
   onShiftChange?: (on: boolean) => void
 }
 
-export function buildTouchControls(send: SendFn, opts: TouchControlsOpts = {}): TouchControls {
-  let ctrlActive = false
+export function buildTouchControls(wireSend: SendFn, opts: TouchControlsOpts = {}): TouchControls {
+  // The in-log line input and the menu filter hold their text locally
+  // until Enter, so a strip key sent while one shows would land in the
+  // server's line buffer out of sight: game keys stay off the wire then.
+  // (The msgwin-get-line field is server-synced; the server's editor takes
+  // its keys.) The header's ⎋/⏎ go to the field instead (stripSpecial).
+  const send: SendFn = (msg) => {
+    const field = activeTextInput()
+    if (field && field.matches('.game-text-input, .menu-filter-input')) return
+    wireSend(msg)
+  }
+  function stripSpecial(keycode: 13 | 27): void {
+    const field = activeTextInput()
+    if (field) dispatchSpecialToInput(field, keycode === 13 ? 'Enter' : 'Escape')
+    else send({ msg: 'key', keycode })
+    mods.consume()
+  }
   let activeTab: TabKey = 'micro'
   let controlSet!: ControlSet  // assigned by applyControlSet() before first read
+  // While the X level map is up the panel shows its own key grid
+  // (renderXModeContent) in place of the active tab's; activeTab is
+  // untouched, so exit restores the tab the player left.
+  let inXMode = false
 
   // Forward declarations — assigned during DOM construction below
   let shiftBtn!: HTMLButtonElement
@@ -428,6 +178,7 @@ export function buildTouchControls(send: SendFn, opts: TouchControlsOpts = {}): 
     refreshMods()
     opts.onShiftChange?.(shift.isOn)
   } })
+  const mods = createModifiers(shift, refreshMods)
 
   // Single owner of the z-tab reveal rule, used by the tab strip and
   // refreshSpellTab alike. ENABLE_SPELL_TAB gates only visibility — the grid
@@ -461,9 +212,9 @@ export function buildTouchControls(send: SendFn, opts: TouchControlsOpts = {}): 
   // alone fixed the observed bug. Don't re-add one without an observed
   // adjustment-path phantom.
   //
-  // The menu-ctrl bar, numpad, and prompt-row buttons (game-view.ts) share
-  // the raw touchstart+click pattern and the same scrollable-content-above-
-  // buttons geometry, but are deliberately unguarded: no phantom has been
+  // The menu-ctrl bar and numpad buttons (menu-bar.ts, numpad-input.ts)
+  // share the raw touchstart+click pattern and the same scrollable-content-
+  // above-buttons geometry, but are deliberately unguarded: no phantom has been
   // observed there, and the guard is a behavior change we don't apply on
   // speculation. If one shows up, lift this into a shared module — those call
   // sites need an onMouseClick hook for their mouse-only focusView().
@@ -539,45 +290,24 @@ export function buildTouchControls(send: SendFn, opts: TouchControlsOpts = {}): 
   function refreshMods(): void {
     shiftBtn.classList.toggle('active', shift.state === 'once')
     shiftBtn.classList.toggle('locked', shift.state === 'lock')
-    ctrlBtn.classList.toggle('active', ctrlActive)
+    ctrlBtn.classList.toggle('active', mods.ctrl)
   }
 
-  // Called after each key dispatch. Keeps shift lock engaged so the next d-pad
-  // tap is still shifted (e.g. running across the level in X mode); clears
-  // one-shot shift and ctrl.
-  function clearOneshot(): void {
-    shift.consume()
-    if (ctrlActive) {
-      ctrlActive = false
-      refreshMods()
-    }
-  }
-
-  function clearAllMods(): void {
-    shift.reset()
-    if (ctrlActive) {
-      ctrlActive = false
-      refreshMods()
-    }
-  }
-
+  // Each key dispatch ends in mods.consume(): a Shift lock stays engaged so
+  // the next d-pad tap is still shifted (e.g. running across the level in X
+  // mode).
   function sendTabKey(def: SlotDef): void {
     if (def.text !== undefined) {
       let text = def.text
       if (shift.isOn && text.length === 1) text = text.toUpperCase()
-      if (ctrlActive && text.length === 1) {
-        const upper = text.toUpperCase()
-        if (CAPTURED_CTRL.has(upper)) {
-          send({ msg: 'key', keycode: ctrlKeycode(upper) })
-          clearOneshot()
-          return
-        }
-      }
-      send({ msg: 'input', text })
+      // Modifiers apply to a single key; a multi-character slot is a macro
+      // sent as typed.
+      const msg: ClientMsg | null = text.length === 1 ? typedCharToMsg(text, mods.ctrl) : { msg: 'input', text }
+      if (msg) send(msg)
     } else if (def.key !== undefined) {
       send({ msg: 'key', keycode: def.key })
     }
-    clearOneshot()
+    mods.consume()
   }
 
   // Returns whether the direction went out unmodified — the d-pad hold path
@@ -587,11 +317,11 @@ export function buildTouchControls(send: SendFn, opts: TouchControlsOpts = {}): 
     if ('text' in def) {
       send({ msg: 'input', text: def.text })
     } else {
-      const code = ctrlActive ? def.ctrled : shift.isOn ? def.shifted : def.plain
+      const code = mods.ctrl ? def.ctrled : shift.isOn ? def.shifted : def.plain
       plain = code === def.plain
       send({ msg: 'key', keycode: code })
     }
-    clearOneshot()
+    mods.consume()
     return plain
   }
 
@@ -601,14 +331,40 @@ export function buildTouchControls(send: SendFn, opts: TouchControlsOpts = {}): 
   root.id = 'touch-controls'
 
   // Keyboard overlay (fixed position, renders above everything)
-  const { element: kbdEl, open: openKbd, close: closeKbd } = buildKeyboardOverlay(send, bindTap)
+  const kbd = buildKeyboardOverlay(send, bindTap)
+  const kbdEl = kbd.element
   root.appendChild(kbdEl)
+  // Whether the open kbd is one openKbd({auto}) raised. An auto open over
+  // a kbd the user already had up doesn't claim it. The kbd's own abc▾
+  // closes it without coming through here, so closeAutoKbd checks it's
+  // still showing and every manual open clears the claim.
+  let kbdAuto = false
+  const kbdShowing = (): boolean => kbdEl.style.display !== 'none'
+  function openKbd(opts?: { auto?: boolean }): void {
+    kbdAuto = !!opts?.auto && (kbdAuto || !kbdShowing())
+    kbd.open()
+  }
+  function closeKbd(): void {
+    kbdAuto = false
+    kbd.close()
+  }
+  function closeAutoKbd(): void {
+    const ours = kbdAuto
+    kbdAuto = false
+    if (ours && kbdShowing()) kbd.close()
+  }
 
   // --- D-pad ---
 
   dpadEl = document.createElement('div')
   dpadEl.className = 'tc-dpad'
   root.appendChild(dpadEl)
+
+  // The d-pad's slot in the X level map (style.css shows one or the other):
+  // MinimapHosts (views/minimap-hosts) mounts the minimap here.
+  const xSlotEl = document.createElement('div')
+  xSlotEl.className = 'tc-xslot'
+  root.appendChild(xSlotEl)
 
   // --- Right panel ---
 
@@ -625,7 +381,7 @@ export function buildTouchControls(send: SendFn, opts: TouchControlsOpts = {}): 
   escBtn.className = 'tc-esc'
   escBtn.textContent = '⎋'
   escBtn.title = 'Escape'
-  bindTap(escBtn, () => { send({ msg: 'key', keycode: 27 }); clearOneshot() })
+  bindTap(escBtn, () => stripSpecial(27))
   headerEl.appendChild(escBtn)
 
   tabsEl = document.createElement('div')
@@ -662,11 +418,18 @@ export function buildTouchControls(send: SendFn, opts: TouchControlsOpts = {}): 
     }
   }
 
+  // X level map: the viewed level's name stands in the tabs' place (style.css
+  // shows one or the other). A label, not a key — the grid's G is the key.
+  // Fed by setXModePlace.
+  const xPlaceEl = document.createElement('div')
+  xPlaceEl.className = 'tc-xplace'
+  headerEl.appendChild(xPlaceEl)
+
   const enterBtn = document.createElement('button')
   enterBtn.className = 'tc-enter'
   enterBtn.textContent = '⏎'
   enterBtn.title = 'Enter'
-  bindTap(enterBtn, () => { send({ msg: 'key', keycode: 13 }); clearOneshot() })
+  bindTap(enterBtn, () => stripSpecial(13))
   headerEl.appendChild(enterBtn)
 
   // Content area — replaced on tab switch or mode change
@@ -683,34 +446,21 @@ export function buildTouchControls(send: SendFn, opts: TouchControlsOpts = {}): 
   shiftBtn.className = 'tc-shift'
   shiftBtn.textContent = '⇧'
   shiftBtn.title = 'Shift modifier (tap = next key, double-tap = lock)'
-  function tapShift(): void {
-    const wasOff = shift.state === 'off'
-    shift.tap()
-    if (wasOff && ctrlActive) {
-      ctrlActive = false
-      refreshMods()
-    }
-  }
-  bindTap(shiftBtn, tapShift)
+  bindTap(shiftBtn, mods.tapShift)
   footerEl.appendChild(shiftBtn)
 
   ctrlBtn = document.createElement('button')
   ctrlBtn.className = 'tc-ctrl'
   ctrlBtn.textContent = '⌃'
   ctrlBtn.title = 'Ctrl modifier (next key only)'
-  function toggleCtrlMod() {
-    ctrlActive = !ctrlActive
-    if (ctrlActive) shift.reset()
-    refreshMods()
-  }
-  bindTap(ctrlBtn, toggleCtrlMod)
+  bindTap(ctrlBtn, mods.tapCtrl)
   footerEl.appendChild(ctrlBtn)
 
   const kbdBtn = document.createElement('button')
   kbdBtn.className = 'tc-kbd'
   kbdBtn.textContent = 'abc▴'
   kbdBtn.title = 'Open keyboard input'
-  bindTap(kbdBtn, openKbd)
+  bindTap(kbdBtn, () => openKbd())
   footerEl.appendChild(kbdBtn)
 
   // --- Render helpers ---
@@ -757,7 +507,7 @@ export function buildTouchControls(send: SendFn, opts: TouchControlsOpts = {}): 
             }
             if (downPlain) {
               send({ msg: 'key', keycode: def.shifted })
-              clearOneshot()  // a Shift tapped mid-hold must not arm a second run
+              mods.consume()  // a Shift tapped mid-hold must not arm a second run
             }
             return true
           }
@@ -792,10 +542,38 @@ export function buildTouchControls(send: SendFn, opts: TouchControlsOpts = {}): 
     // the spells tab is the one on screen (render() per harvest was otherwise
     // constructed and immediately discarded).
     tab.style.display = spellTabVisible() ? '' : 'none'
-    if (activeTab !== 'spells') return
+    if (activeTab !== 'spells' || inXMode) return  // X's key set owns the content area
     const grid = opts.spellTab?.hasSpells() ? opts.spellTab.render() : null
     if (grid) { contentEl.innerHTML = ''; contentEl.appendChild(grid) }
     else renderTab('micro')
+  }
+
+  // The X level map's fixed key grid (x-mode-keys.ts), in the tab grid's
+  // place. Keys go through sendTabKey, so the footer modifiers apply exactly
+  // as on a tab grid (style.css hides ⇧ ⌃ in X mode). The header keeps its
+  // normal Esc / Enter.
+  function renderXModeContent(): void {
+    contentEl.innerHTML = ''
+    for (let r = 0; r < GRID_ROWS; r++) {
+      const rowEl = document.createElement('div')
+      rowEl.className = 'tc-row'
+      for (const k of X_MODE_KEYS.slice(r * X_MODE_COLS, (r + 1) * X_MODE_COLS)) {
+        const btn = document.createElement('button')
+        btn.className = 'tc-btn'
+        btn.textContent = k.label
+        btn.title = k.title
+        btn.setAttribute('aria-label', k.title)
+        bindTap(btn, () => sendTabKey(k.slot))
+        rowEl.appendChild(btn)
+      }
+      contentEl.appendChild(rowEl)
+    }
+  }
+
+  // The panel body for the current mode: the X key set, else the active tab.
+  function renderPanel(): void {
+    if (inXMode) renderXModeContent()
+    else renderTab(activeTab)
   }
 
   function renderContent(tabDef: ControlTabDef): void {
@@ -830,27 +608,17 @@ export function buildTouchControls(send: SendFn, opts: TouchControlsOpts = {}): 
 
   // Sync the panel to the active control set: used for the initial render
   // and for live-apply when settings changes (activating, editing, or
-  // deleting the active set) fire CONTROLS_CHANGED_EVENT. game-view calls
-  // destroy() on the way back to the lobby; the isConnected self-unhook is
-  // the backstop for exits that skip that path (socket loss), so a dead
-  // panel is never re-rendered.
+  // deleting the active set) fire CONTROLS_CHANGED_EVENT. The owner's
+  // destroy() releases the listener (game-view's dispose).
   function applyControlSet(): void {
     controlSet = getActiveControlSet()
     rebuildTabs()
-    renderTab(activeTab)
+    renderPanel()
   }
-
-  function onControlsChanged(): void {
-    if (!root.isConnected) {
-      destroy()
-      return
-    }
-    applyControlSet()
-  }
-  window.addEventListener(CONTROLS_CHANGED_EVENT, onControlsChanged)
+  window.addEventListener(CONTROLS_CHANGED_EVENT, applyControlSet)
 
   function destroy(): void {
-    window.removeEventListener(CONTROLS_CHANGED_EVENT, onControlsChanged)
+    window.removeEventListener(CONTROLS_CHANGED_EVENT, applyControlSet)
     for (const type of ['touchstart', 'touchend', 'touchcancel'] as const) {
       document.removeEventListener(type, onDocTouch, { capture: true })
     }
@@ -861,13 +629,24 @@ export function buildTouchControls(send: SendFn, opts: TouchControlsOpts = {}): 
   }
 
   function enterXMode(): void {
+    inXMode = true
     root.classList.add('x-mode')
-    clearAllMods()
+    mods.reset()
+    renderPanel()
   }
 
   function exitXMode(): void {
+    inXMode = false
     root.classList.remove('x-mode')
-    clearAllMods()
+    mods.reset()
+    renderPanel()
+  }
+
+  // The engine re-sends player place/depth for the VIEWED level on every
+  // level change (traced 2026-09-21: `[` → player{depth} → map{clear,
+  // player_on_level:false}), so this tracks `[` / `]` / `G`.
+  function setXModePlace(label: string): void {
+    xPlaceEl.textContent = label
   }
 
   function setCursorMode(on: boolean): void {
@@ -891,5 +670,5 @@ export function buildTouchControls(send: SendFn, opts: TouchControlsOpts = {}): 
   // isKbdOpen also demands rendered geometry: overlay layouts can hide the
   // whole controls root while a manually-opened kbd stays display:flex —
   // an invisible kbd must not swallow the back gesture's dismissal.
-  return { element: root, enterXMode, exitXMode, setCursorMode, setOverlayMode, openKbd, closeKbd, isKbdOpen: () => kbdEl.style.display !== 'none' && kbdEl.getClientRects().length > 0, refreshSpellTab, consumeShift, destroy }
+  return { element: root, enterXMode, exitXMode, setXModePlace, xModeSlot: xSlotEl, setCursorMode, setOverlayMode, openKbd, closeKbd, closeAutoKbd, isKbdOpen: () => kbdShowing() && kbdEl.getClientRects().length > 0, refreshSpellTab, consumeShift, destroy }
 }

@@ -38,13 +38,19 @@ Obligatory virtual keyboard also available.
 - Swipe floating monster list to the other side, or drag it to peek behind
 - Tap place name in HUD (e.g. @D:1) to toggle minimap
 - Long press on map cell to see what's there
+- Long press a spell, then drag to rearrange the spell rail
 - Tap or drag on map while targeting or examining (`x`) to move the cursor
-- Drag level map (`X`) to pan it
-- Tap level map (`X`) to place the cursor
+- Drag map to open level map (`X`)
 - Double tap on map to toggle zoom level
 - Two-finger long press on map to toggle ASCII/tiles
 - Hold a d-pad direction to shift-move
 - Double tap Shift to lock it
+
+### Level map (`X`)
+
+- Drag to pan
+- Tap or drag the minimap to pan
+- Tap to place the cursor
 
 ## Offline play
 

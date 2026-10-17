@@ -1,4 +1,5 @@
 import type { ClientMsg, ServerMsg } from '../ws/types'
+import { MessageHold } from '../ws/message-hold'
 import { saveSession } from './session'
 
 export interface PasswordLoginConn {
@@ -19,21 +20,16 @@ export interface PasswordLoginCallbacks {
 }
 
 export function passwordLogin(conn: PasswordLoginConn, req: PasswordLoginRequest, cb: PasswordLoginCallbacks): void {
-  const buffered: ServerMsg[] = []
-  const flush = (): void => {
-    if (conn.onMessage === pump) return
-    for (let i = 0; i < buffered.length; i++) conn.onMessage(buffered[i]!)
-    buffered.length = 0
-  }
+  const held = new MessageHold()
   const pump = (msg: ServerMsg): void => {
     if (msg.msg === 'login_success') {
       conn.onLoginCookie = (cookie, days) => saveSession(req.wsUrl, msg.username, cookie, days)
       conn.send({ msg: 'set_login_cookie' })
-      cb.onSuccess(msg.username, flush)
+      cb.onSuccess(msg.username, () => held.replay(conn, pump))
     } else if (msg.msg === 'login_fail') {
-      cb.onFail(msg.message || 'Login failed.')
+      cb.onFail(msg.reason || 'Incorrect username or password.')
     } else {
-      buffered.push(msg)
+      held.hold(msg)
     }
   }
   conn.onMessage = pump

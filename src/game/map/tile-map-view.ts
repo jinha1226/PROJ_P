@@ -9,8 +9,12 @@ import type { Cell, MapStore } from './map-store'
 import type { CellHitTester } from '../input/map-tap'
 import { parseCellKey } from './map-store'
 import { decodeColor, DEFAULT_FG, flashColor } from './colors'
+import { DCSS_COLOR_MAP } from '../dcss-colors'
 import { TEX, type TileLoader, type TileSprite } from '../tiles/tile-loader'
 import { WATER_LINE } from '../tiles/tile-view'
+import {
+  animatedBase, cellIsAnimated, stepFrame, type AnimOptions, type AnimTiles, type Frame,
+} from '../tiles/tile-anim'
 import { fgFlags, bgFlags } from './flag-decode'
 import { viewFloorDiameter, type SightFacts } from './los'
 import { getStatusIconSizer, type StatusIconSizer } from './icon-sizes'
@@ -55,6 +59,14 @@ function pinAxis(center: number, cell: number, totalLen: number, minCells: numbe
 // dispatch — the low 15–16 bits are the tile id either way at the scale we
 // care about. Stay conservative.
 const TILE_ID_MASK = 0xffff
+
+// Numeric cell key for the view's animation state — no string per lookup.
+// Map-frame coords are offsets from an origin inside the level (GXM × GYM =
+// 80 × 70, defines.h), and in-view cells past the level edge overhang by at
+// most a viewport, so |y| stays far below the 2048 a 4096 stride needs.
+function frameKey(x: number, y: number): number {
+  return x * 4096 + y
+}
 
 // Textures we preload before flipping `ready` on. Player atlas is needed for
 // doll/mcache (humanoid composition + player avatar).
@@ -156,6 +168,20 @@ export class TileMapView {
   // Per-tile-run variant count from tileinfo-dngn. Used to pick an animation
   // frame for blood/mold/liquefaction via `cell.flv.s % tileCount(id)`.
   private tileCount: ((id: number) => number) | null = null
+  // Animated-tile state (see animate()). animTiles is null until preload
+  // resolves (or when tileinfo-dngn lacks basetile/tile_count). animCells
+  // holds painted cells whose bg can animate under some option, keyed by
+  // frameKey, with the base recorded at paint time: drawCell records or
+  // drops each cell it paints, and animate drops entries out of view. Never
+  // move the origin or change an in-view cell's bg without painting it
+  // through drawCell — animate steps with the recorded base, so a skipped
+  // paint animates a cell as the tile it used to be. animFrames maps a cell
+  // to the frame it shows (stepFrame owns the reset rule) — the reference
+  // mutates its map_knowledge in place instead.
+  private animTiles: AnimTiles | null = null
+  private animCells = new Map<number, { x: number; y: number; base: number }>()
+  private animFrames = new Map<number, Frame>()
+  private animCounter = 0
   // Range thresholds from tileinfo-dngn / tileinfo-main. ov[] entries route
   // by id-range (floor underlays, dngn overlays, main-atlas zaps). bg.value
   // thresholds also gate blood-on-walls vs blood-on-floor.
@@ -191,8 +217,10 @@ export class TileMapView {
   // Public so game-view can call once it holds this game's loader (from the
   // game_client handler, or the spectator handoff) — the TileMapView is
   // constructed before that's known when the user has tile mode persisted.
-  async preloadAtlases(loader: TileLoader): Promise<void> {
-    if (this.loader === loader && this.preloadStarted) return
+  // Resolves true only for the call that made the view ready; the caller
+  // then owns the fit and full paint (game-view preloadTiles).
+  async preloadAtlases(loader: TileLoader): Promise<boolean> {
+    if (this.loader === loader && this.preloadStarted) return false
     this.loader = loader
     this.preloadStarted = true
     this.ready = false
@@ -209,7 +237,7 @@ export class TileMapView {
       ])
       // A newer preload (different loader) superseded us while we awaited —
       // don't clobber its state or flip ready over the wrong version.
-      if (this.loader !== loader) return
+      if (this.loader !== loader) return false
       for (const [k, v] of Object.entries(dngnMod as Record<string, unknown>)) {
         if (typeof v === 'number') this.dngn[k] = v
       }
@@ -226,23 +254,15 @@ export class TileMapView {
       this.featMax = this.dngn.FEAT_MAX ?? 0
       this.dngnMax = this.dngn.DNGN_MAX ?? 0
       this.mainMax = ((mainMod as Record<string, unknown>).MAIN_MAX as number) ?? 0
+      const bt = (dngnMod as Record<string, unknown>).basetile
+      this.animTiles = typeof bt === 'function' && this.tileCount
+        ? { dngn: this.dngn, basetile: bt as (id: number) => number, tileCount: this.tileCount }
+        : null
       this.ready = true
-      // Schedule a fit+paint on the next frame rather than painting now.
-      // Two races make a direct fullRender unsafe on first load:
-      //   (a) preload can resolve before the initial ResizeObserver callback
-      //       fires (possible when atlases come from HTTP cache on a warm
-      //       reload), leaving cellPx/viewportW/H at their constructor
-      //       defaults and the canvas at its default 300×150 backing-store;
-      //       a fullRender at that point clips off most of the map.
-      //   (b) the `map` messages that arrive during preload all hit ASCII
-      //       fallback and the next non-clear/non-vgrdc map is render(dirty),
-      //       which never repaints the cells that were drawn as fallback.
-      // rAF guarantees layout has settled and gives fitToContainer a real
-      // container size; the explicit fullRender afterwards covers the case
-      // where the size didn't change and setViewportSize early-exited.
-      requestAnimationFrame(() => { this.fitToContainer(); this.fullRender() })
+      return true
     } catch (err) {
       console.warn('TileMapView atlas preload failed:', err)
+      return false
     }
   }
 
@@ -442,6 +462,103 @@ export class TileMapView {
     }
   }
 
+  // One animation step over the recorded animatable cells —
+  // dungeon_renderer.js `animate`, which sweeps the whole viewport; walking
+  // animCells instead costs only the animatable cells in view (including
+  // water/lava whose option is off: kept, filtered here). Frames for cells
+  // outside the viewport are dropped, so the map stays viewport-sized; such a
+  // cell comes back showing the server's variant, indistinguishable from a
+  // step.
+  animate(o: AnimOptions): void {
+    const t = this.animTiles
+    if (!this.ready || !t || this.animCells.size === 0) return
+    if (!o.misc && !o.water) return
+    this.animCounter = (this.animCounter + 1) % 65536
+    const offX = this.offX
+    const offY = this.offY
+    const w = this.viewportW
+    const frames = new Map<number, Frame>()
+    const changed: number[] = []  // screen tags
+    for (const [key, { x, y, base }] of this.animCells) {
+      const col = x - offX
+      const row = y - offY
+      if (!this.inView(col, row)) {
+        this.animCells.delete(key)
+        continue
+      }
+      if (!cellIsAnimated(base, t.dngn, o)) continue
+      const cell = this.store.get(x, y)
+      if (!cell) continue
+      const bg = bgFlags(cell.t_bg)
+      const { cur, id } = stepFrame(bg.value, base, !bg.UNSEEN && !bg.MM_UNSEEN,
+        this.animFrames.get(key), t, this.animCounter, Math.random)
+      if (id !== bg.value) frames.set(key, { from: bg.value, id })
+      if (id !== cur) changed.push(row * w + col)
+    }
+    this.animFrames = frames
+    if (changed.length) this.repaintBgFrames(changed)
+  }
+
+  // drawCell's half of animCells: record or drop the cell it is painting.
+  private trackAnimCell(mx: number, my: number, bgId: number): void {
+    const base = this.animTiles ? animatedBase(bgId, this.animTiles) : null
+    if (base === null) {
+      if (this.animCells.size) this.animCells.delete(frameKey(mx, my))
+      return
+    }
+    const key = frameKey(mx, my)
+    if (this.animCells.get(key)?.base !== base) this.animCells.set(key, { x: mx, y: my, base })
+  }
+
+  // Repaint cells whose bg frame alone changed, clipped to their own boxes.
+  // Every animated dngn variant fits its 32×32 box (checked against the
+  // bundled tileinfo-dngn, 2026-10-03), so no pixel outside them changes. The
+  // halo repaint (addDirtyTags) would clear the neighbours' boxes and drop
+  // spill from two cells out — a tall monster two rows below an altar lost
+  // its head on every re-roll. Inside the clip, each box gets its own clear
+  // and draw, then its right/down/down-right neighbours' up/left spill, in
+  // sweep order; earlier neighbours' spill into it is what its own clear
+  // overdraws in a full sweep. Past panRender's threshold, fullRender is
+  // cheaper and sweep-equivalent by definition.
+  private repaintBgFrames(changed: number[]): void {
+    const w = this.viewportW
+    const h = this.viewportH
+    const tags = new Set<number>()
+    for (const tag of changed) {
+      const col = tag % w
+      const row = (tag - col) / w
+      tags.add(tag)
+      if (col + 1 < w) tags.add(tag + 1)
+      if (row + 1 < h) {
+        tags.add(tag + w)
+        if (col + 1 < w) tags.add(tag + w + 1)
+      }
+    }
+    if (tags.size * 10 >= w * h * 7) {
+      this.fullRender()
+      return
+    }
+    this.ctx.save()
+    try {
+      this.ctx.beginPath()
+      for (const tag of changed) {
+        const col = tag % w
+        this.ctx.rect(col * ATLAS_CELL, (tag - col) / w * ATLAS_CELL, ATLAS_CELL, ATLAS_CELL)
+      }
+      this.ctx.clip()
+      this.paintTags(tags)
+    } finally {
+      this.ctx.restore()
+    }
+  }
+
+  // The bg id to draw for a cell: its animation frame when it has one.
+  private shownBg(mx: number, my: number, id: number): number {
+    if (this.animFrames.size === 0) return id
+    const f = this.animFrames.get(frameKey(mx, my))
+    return f && f.from === id ? f.id : id
+  }
+
   // Collect the changed cells PLUS a one-cell halo around each, as screen
   // tags (row*W+col). Sprites routinely paint outside their own 32×32 cell —
   // tall monster tiles spill upward, status/MDAM marks and icons sit at the
@@ -542,15 +659,15 @@ export class TileMapView {
       const pct = Math.max(0, Math.min(1, this.mp / this.mpMax))
       ctx.fillStyle = '#000000'        // magic_spend
       ctx.fillRect(px, py + ATLAS_CELL - barH, ATLAS_CELL, barH)
-      ctx.fillStyle = '#5e78ff'        // magic (DCSS lightblue)
+      ctx.fillStyle = DCSS_COLOR_MAP.lightblue   // magic
       ctx.fillRect(px, py + ATLAS_CELL - barH, ATLAS_CELL * pct, barH)
       hpOffset += barH
     }
     if (showHp) {
       const pct = Math.max(0, Math.min(1, this.hp / this.hpMax))
-      ctx.fillStyle = '#b30009'        // hp_spend (DCSS red)
+      ctx.fillStyle = DCSS_COLOR_MAP.red         // hp_spend
       ctx.fillRect(px, py + ATLAS_CELL - hpOffset, ATLAS_CELL, barH)
-      ctx.fillStyle = '#8ae234'        // healthy (DCSS lightgreen)
+      ctx.fillStyle = DCSS_COLOR_MAP.lightgreen  // healthy
       ctx.fillRect(px, py + ATLAS_CELL - hpOffset, ATLAS_CELL * pct, barH)
     }
   }
@@ -704,7 +821,10 @@ export class TileMapView {
     this.ctx.fillRect(px, py, ATLAS_CELL, ATLAS_CELL)
 
     const cell = this.store.get(mx, my)
-    if (!cell) return
+    if (!cell) {
+      this.trackAnimCell(mx, my, 0)
+      return
+    }
 
     if (!this.ready) {
       this.drawAsciiFallback(cell, px, py)
@@ -714,11 +834,14 @@ export class TileMapView {
     const fg = fgFlags(cell.fg)
     const bg = bgFlags(cell.t_bg)
     const inWater = !!bg.WATER && !fg.FLYING
+    this.trackAnimCell(mx, my, bg.value)
 
     // Resolve the background sprite once (tex dispatch + atlas lookup) and reuse
     // it for both the safety net below and the actual bg paint further down, so
     // the per-cell dngn dispatch runs once per redraw rather than twice.
-    const bgSprite = bg.value > 0 ? this.dngnSprite(bg.value) : null
+    // Only the sprite takes the animation frame: frames stay within one
+    // base tile's run, so the range tests on bg.value below are unaffected.
+    const bgSprite = bg.value > 0 ? this.dngnSprite(this.shownBg(mx, my, bg.value)) : null
 
     // Safety net: an *explored* cell (bg past DNGN_UNSEEN) whose background
     // tile id doesn't resolve in this loader's atlas would otherwise paint
@@ -1233,7 +1356,7 @@ export class TileMapView {
     }
     this.ctx.save()
     try {
-      this.ctx.strokeStyle = '#fce94f' // --map-cursor in style.css (canvas can't read CSS vars cheaply)
+      this.ctx.strokeStyle = DCSS_COLOR_MAP.yellow // --map-cursor in style.css (canvas can't read CSS vars cheaply)
       this.ctx.lineWidth = 2
       this.ctx.strokeRect(px + 1, py + 1, ATLAS_CELL - 2, ATLAS_CELL - 2)
     } finally {
