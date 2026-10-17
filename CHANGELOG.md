@@ -7,6 +7,11 @@ formatting and HTML chrome differ. Drift is a bug.
 
 # What's new
 
+## 2026-10-16
+
+- Changed the key layout for the 'm' menu.
+- Improved handling for when the system keyboard is shown.
+
 ## 2026-10-08
 
 - *Your surroundings seem slightly different.*
