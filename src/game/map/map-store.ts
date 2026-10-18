@@ -6,8 +6,10 @@ import type { Box } from '../input/map-jump'
 export interface Cell {
   g: string   // glyph
   col: number // packed color byte
+  // Canonical dungeon_feature_type, including terrain hidden by an actor.
+  f?: number
   // Minimap feature category (map-feature.h `map_feature` value): wall /
-  // floor / stair / hostile-monster / … . Consumed only by MinimapView.
+  // floor / stair / hostile-monster / … .
   mf?: number
   // tile background; the MM_UNSEEN / UNSEEN flags indicate out-of-FOV. Same
   // [lo, hi] encoding as `fg`; stored raw and decoded by name at read time
@@ -154,6 +156,7 @@ export class MapStore {
       const cell: Cell = {
         g: u.g ?? existing?.g ?? ' ',
         col: u.col ?? existing?.col ?? 7,
+        f: u.f ?? existing?.f,
         mf: u.mf ?? existing?.mf,
         flc: u.flc ?? existing?.flc,
         fla: u.fla ?? existing?.fla,

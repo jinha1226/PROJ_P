@@ -1,6 +1,6 @@
 // One-finger gesture recognition shared by Touch and Keypad movement.
-// game-view owns the policy: Touch taps travel/fire, Keypad drags open X,
-// and both modes support hover and hold-to-describe. In the X level map,
+// game-view owns the policy: Touch taps travel/fire and drags pan, Keypad
+// drags open X, and both modes support hold-to-describe. In the X level map,
 // dragging pans locally and tapping walks the cursor (map-jump.ts).
 
 // Hold duration. Under the platform long-press defaults (iOS 500,
@@ -10,14 +10,14 @@
 // drifting ones.
 export const LONG_PRESS_MS = 300
 // Finger drift allowed before a press stops counting as "still". Beyond it
-// the gesture is a drag: the long-press timer is cancelled and (while
-// targeting) the hover stream follows the finger instead.
+// the gesture is a drag: the long-press timer is cancelled, leaving the
+// caller's pan/hover behavior to follow the finger instead.
 export const SLOP_PX = 12
 // Drag distance before onDrag fires. Deliberately well past SLOP_PX: a
 // hold that drifts 12 px before the long-press lands is cancelled silently
-// today, and must stay that way — converting it would trade a missed
-// describe for a full-screen mode switch. Between the two radii nothing
-// happens. The felt distance is this plus one round trip of finger travel
+// in Keypad, and must stay that way — converting it would trade a missed
+// describe for a full-screen mode switch. Between the two radii only local
+// panning (Touch/X) happens. The felt distance is this plus one round trip of finger travel
 // (nothing moves until X mode arrives — game-view onDrag), so keep the
 // margin over SLOP_PX modest.
 export const DRAG_PX = 24
@@ -68,9 +68,8 @@ export interface MapGestureOpts {
   // the anchor back under the finger (anchor − cell now under it). The
   // caller applies it to its view center and repaints; the hit tester reads
   // offsets live, so the next event sees the anchor under the finger again
-  // and reports nothing until the finger crosses another cell. Optional —
-  // the X level map pans locally on it (map-pan.ts); in TARGET modes the
-  // drag is the hover stream and the caller ignores this.
+  // and reports nothing until the finger crosses another cell. Touch and
+  // the X level map pan locally on it; Keypad targeting uses hover instead.
   onPan?(delta: { x: number; y: number }): void
   // Once per gesture, when the finger first passes DRAG_PX from touch-down:
   // the drag is now deliberate. Optional — game-view opens the `X` level
@@ -172,8 +171,8 @@ export function attachMapGestures(el: HTMLElement, opts: MapGestureOpts): MapGes
     const cell = hit?.(startX, startY) ?? null
     pressCell = cell
     anchor = opts.onPan ? cell : null
-    // Hover fires immediately on touch — instant aim feedback, and a
-    // harmless prefix to a long-press (the reference's hover-precedes-click).
+    // Keypad hover fires immediately for aim feedback. Touch ignores it:
+    // a gesture that becomes a pan or pinch must not change the target.
     hoverCell(cell)
     timer = window.setTimeout(() => {
       timer = null

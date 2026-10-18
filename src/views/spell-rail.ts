@@ -39,6 +39,10 @@ export interface SpellRailDeps {
   inXMode(): boolean
   // A spell button may send its keystrokes now (casts and the spell list).
   tapIdle(): boolean
+  // Touch targeting: confirm the current aim instead of starting a new cast.
+  // Returns true when it sent the confirmation; the spell-list button never
+  // takes this path.
+  confirmTarget?(): boolean
   // The d-pad Shift toggle, one-shot: true turns a cast into a force-cast.
   consumeShift(): boolean
 }
@@ -214,8 +218,9 @@ export class SpellRail {
   // Cast a memorised spell from normal play: `z` opens the cast prompt and the
   // spell's letter selects it (≡ typing `z<letter>`). Targeted spells drop the
   // server into targeting, handled by the existing cursor/d-pad UI; self/instant
-  // spells just fire. Guarded to a clean command-mode state — the rail is always
-  // visible, so a stray tap during a menu/X-mode/overlay must be a no-op.
+  // spells just fire. Touch can confirm an existing target instead. Otherwise
+  // guarded to a clean command-mode state — a tap during a menu/X-mode/overlay
+  // must be a no-op even when the rail remains visible.
   //
   // Simplified from 88c8379/b23b85b after device testing: a tap fires via
   // bindSpellTap (which explains why there's no click gate) and WITHOUT the
@@ -224,6 +229,7 @@ export class SpellRail {
   // guard below is simply dropped. Git holds the fuller versions (click gate
   // at 88c8379, pending-cast queue at b23b85b) if needed.
   private castSpellLetter(letter: string): void {
+    if (this.d.confirmTarget?.()) { this.d.consumeShift(); return }
     if (!this.d.tapIdle()) return
     // With the d-pad Shift toggle engaged, force-cast (`Z`, CMD_FORCE_CAST_SPELL:
     // casts even with no target in view) instead of plain `z`.

@@ -47,6 +47,18 @@ describe('MapStore.merge — coordinate delta encoding', () => {
 })
 
 describe('MapStore.merge — partial field preservation', () => {
+  it('retains terrain under actors across deltas and clears it with the map', () => {
+    const store = new MapStore()
+    store.merge([{ x: 1, y: 1, g: '>', f: 42 }])
+    store.merge([{ x: 1, y: 1, g: '@', col: 15 }])
+    expect(store.get(1, 1)).toMatchObject({ g: '@', f: 42 })
+    store.merge([{ x: 1, y: 1, f: 0 }])
+    expect(store.get(1, 1)?.f).toBe(0)
+    store.clear()
+    store.merge([{ x: 1, y: 1, g: '@' }])
+    expect(store.get(1, 1)?.f).toBeUndefined()
+  })
+
   it('absent g keeps prior glyph; absent col keeps prior col', () => {
     const store = new MapStore()
     store.merge([{ x: 1, y: 1, g: '@', col: 9 }])

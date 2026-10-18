@@ -12,6 +12,8 @@ import { getPref, setPref } from '../prefs'
 import { MapView } from '../game/map/map-view'
 import { TileMapView } from '../game/map/tile-map-view'
 import { LONG_PRESS_MS } from '../game/input/map-tap'
+import { FG_S_UNDER } from '../game/map/cell-flags'
+import { builtinSets, cloneSet, saveControlSet } from '../game/input/control-sets'
 import { fakeStorage } from '../test/fake-storage'
 import { listAllAvatars, saveAvatar } from '../avatars'
 import stashSearchGolden from '../golden/22-stash-search-describe-highlight.golden.json'
@@ -144,7 +146,12 @@ describe('initial render mode', () => {
 describe('map movement modes', () => {
   beforeEach(() => {
     vi.useFakeTimers()
-    vi.spyOn(MapView.prototype, 'hitTester').mockReturnValue((x, y) => ({ x: Math.floor(x / 10), y: Math.floor(y / 10) }))
+    vi.spyOn(MapView.prototype, 'hitTester').mockImplementation(function (this: MapView) {
+      return (x, y) => {
+        const c = this.getViewCenter()
+        return { x: c.x + Math.floor(x / 10), y: c.y + Math.floor(y / 10) }
+      }
+    })
   })
   afterEach(() => {
     vi.restoreAllMocks()
@@ -171,6 +178,13 @@ describe('map movement modes', () => {
   function touchGame(spectating?: SpectateTarget): Harness {
     setPref('movementMode', 'touch')
     return setupAtCommand(spectating)
+  }
+  const map = () => (window as unknown as { __dcssMapView: MapView }).__dcssMapView
+  const center = () => map().getViewCenter()
+  function drag(h: Harness): void {
+    pointer(h, 'pointerdown')
+    pointer(h, 'pointermove', 85, 35)
+    pointer(h, 'pointerup', 85, 35)
   }
 
   it('leaves Keypad taps inert and opens X on a drag as before', () => {
@@ -207,13 +221,18 @@ describe('map movement modes', () => {
     ])
   })
 
-  it('moves only the local cursor when a Touch finger sweeps the map', () => {
+  it('grabs and pans the map without moving any cursor or sending input', () => {
     const h = touchGame()
     const cursor = vi.spyOn(MapView.prototype, 'setCursor')
+    const pan = vi.spyOn(MapView.prototype, 'panRender')
     pointer(h, 'pointerdown')
     pointer(h, 'pointermove', 85, 35)
-    pointer(h, 'pointerup', 85, 35)
-    expect(cursor).toHaveBeenLastCalledWith({ x: 8, y: 3 })
+    expect(center()).toEqual({ x: -6, y: 0 })
+    pointer(h, 'pointermove', 115, 35)
+    expect(center()).toEqual({ x: -9, y: 0 })
+    pointer(h, 'pointerup', 115, 35)
+    expect(pan).toHaveBeenCalledTimes(2)
+    expect(cursor).not.toHaveBeenCalled()
     expect(h.send).not.toHaveBeenCalled()
     expect(h.view.classList.contains('x-mode')).toBe(false)
   })
@@ -222,23 +241,123 @@ describe('map movement modes', () => {
     const h = touchGame()
     h.dispatch({ msg: 'input_mode', mode })
     pointer(h, 'pointerdown')
+    expect(h.send).not.toHaveBeenCalled()
+    pointer(h, 'pointerup')
+    expect(sent(h)).toEqual([{ msg: 'click_cell', x: 2, y: 3, button: 1 }])
+  })
+
+  it.each([2, 3, 4])('pans while targeting in mode %s without re-aiming or firing', mode => {
+    const h = touchGame()
+    h.dispatch({ msg: 'input_mode', mode })
+    h.dispatch({ msg: 'cursor', id: 0, loc: { x: 8, y: 3 } })
+    const cursor = vi.spyOn(MapView.prototype, 'setCursor')
+    drag(h)
+    expect(center()).toEqual({ x: -6, y: 0 })
+    expect(cursor).not.toHaveBeenCalled()
+    expect(h.send).not.toHaveBeenCalled()
+  })
+
+  it('hits the visible cell for taps and holds after panning', () => {
+    const h = touchGame()
+    drag(h)
+    pointer(h, 'pointerdown')
+    pointer(h, 'pointerup')
+    pointer(h, 'pointerdown')
+    vi.advanceTimersByTime(LONG_PRESS_MS)
     pointer(h, 'pointerup')
     expect(sent(h)).toEqual([
-      { msg: 'target_cursor', x: 2, y: 3 },
-      { msg: 'click_cell', x: 2, y: 3, button: 1 },
+      { msg: 'click_cell', x: -4, y: 3, button: 1 },
+      { msg: 'click_cell', x: -4, y: 3, button: 3 },
     ])
   })
 
-  it('aims a targeting drag without firing on release', () => {
+  it('keeps a pan across identical redraws, then follows actual server movement', () => {
     const h = touchGame()
-    h.dispatch({ msg: 'input_mode', mode: 2 })
+    h.dispatch({ msg: 'map', vgrdc: { x: 10, y: 20 } })
+    drag(h)
+    expect(center()).toEqual({ x: 4, y: 20 })
+    h.dispatch({ msg: 'map', vgrdc: { x: 10, y: 20 } })
+    expect(center()).toEqual({ x: 4, y: 20 })
+    h.dispatch({ msg: 'map', vgrdc: { x: 11, y: 20 } })
+    expect(center()).toEqual({ x: 11, y: 20 })
+    drag(h)
+    h.dispatch({ msg: 'map', clear: true, vgrdc: { x: 11, y: 20 } })
+    expect(center()).toEqual({ x: 11, y: 20 })
+    expect(h.send).not.toHaveBeenCalled()
+  })
+
+  it('clamps a pan to the known map bounds', () => {
+    const h = touchGame()
+    h.dispatch({ msg: 'map', cells: [
+      { x: -2, y: -2, g: '.', mf: 1 }, { x: 2, y: 2, g: '.', mf: 1 },
+    ] })
+    drag(h)
+    expect(center()).toEqual({ x: -2, y: 0 })
+  })
+
+  it('restores the server center on a Keypad switch or entry to the X map', () => {
+    const h = touchGame()
+    h.dispatch({ msg: 'map', vgrdc: { x: 10, y: 20 } })
+    drag(h)
+    setPref('movementMode', 'keypad')
+    expect(center()).toEqual({ x: 10, y: 20 })
+    setPref('movementMode', 'touch')
+    drag(h)
+    h.dispatch({ msg: 'cursor', id: 2, loc: { x: 10, y: 20 } })
+    expect(center()).toEqual({ x: 10, y: 20 })
+  })
+
+  it.each([
+    { f: 46, key: '<' }, { f: 42, key: '>' }, { f: 103, key: '>' },
+    { f: 40, key: '>' }, { f: 33, key: ',' }, { f: 122, key: ',' },
+  ])('self tap on f=$f sends only $key, terrain before items', ({ f, key }) => {
+    const h = touchGame()
+    h.dispatch({ msg: 'player', pos: { x: 2, y: 3 } })
+    h.dispatch({ msg: 'map', cells: [{ x: 2, y: 3, f, g: '@', mf: f === 33 ? 6 : 15, t: { fg: 531768 } }] })
     pointer(h, 'pointerdown')
-    pointer(h, 'pointermove', 85, 35)
-    pointer(h, 'pointerup', 85, 35)
-    expect(sent(h)).toEqual([
-      { msg: 'target_cursor', x: 2, y: 3 },
-      { msg: 'target_cursor', x: 8, y: 3 },
-    ])
+    expect(h.send).not.toHaveBeenCalled()
+    pointer(h, 'pointerup')
+    expect(sent(h)).toEqual([{ msg: 'input', text: key }])
+  })
+
+  it('does not interact with a terrain or item unless the player is on that cell', () => {
+    const h = touchGame()
+    h.dispatch({ msg: 'map', cells: [{ x: 2, y: 3, f: 40, t: { fg: FG_S_UNDER } }] })
+    pointer(h, 'pointerdown')
+    pointer(h, 'pointerup')
+    expect(sent(h)).toEqual([{ msg: 'click_cell', x: 2, y: 3, button: 1 }])
+  })
+
+  it.each([2, 3, 4])('keeps self-targeting in mode %s instead of using terrain or items', mode => {
+    const h = touchGame()
+    h.dispatch({ msg: 'player', pos: { x: 2, y: 3 } })
+    h.dispatch({ msg: 'map', cells: [{ x: 2, y: 3, f: 40, t: { fg: FG_S_UNDER } }] })
+    h.dispatch({ msg: 'input_mode', mode })
+    pointer(h, 'pointerdown')
+    pointer(h, 'pointerup')
+    expect(sent(h)).toEqual([{ msg: 'click_cell', x: 2, y: 3, button: 1 }])
+  })
+
+  it('does not use terrain or items on a hold or drag from the player', () => {
+    const h = touchGame()
+    h.dispatch({ msg: 'player', pos: { x: 2, y: 3 } })
+    h.dispatch({ msg: 'map', cells: [{ x: 2, y: 3, f: 40, t: { fg: FG_S_UNDER } }] })
+    pointer(h, 'pointerdown')
+    vi.advanceTimersByTime(LONG_PRESS_MS)
+    pointer(h, 'pointerup')
+    expect(sent(h)).toEqual([{ msg: 'click_cell', x: 2, y: 3, button: 3 }])
+    h.send.mockClear()
+    drag(h)
+    expect(h.send).not.toHaveBeenCalled()
+  })
+
+  it('leaves a Keypad self tap inert on interactive terrain', () => {
+    const h = setupAtCommand()
+    h.dispatch({ msg: 'map', cells: [{ x: 2, y: 3, f: 40, t: { fg: FG_S_UNDER } }] })
+    h.dispatch({ msg: 'player', pos: { x: 2, y: 3 } })
+    pointer(h, 'pointerdown')
+    pointer(h, 'pointerup')
+    expect(h.send).not.toHaveBeenCalled()
   })
 
   it('describes on hold, without moving or casting on release', () => {
@@ -257,6 +376,8 @@ describe('map movement modes', () => {
     pointer(h, 'pointerdown')
     vi.advanceTimersByTime(LONG_PRESS_MS)
     pointer(h, 'pointerup')
+    drag(h)
+    expect(center()).toEqual({ x: 0, y: 0 })
     expect(h.send).not.toHaveBeenCalled()
   })
 
@@ -278,6 +399,8 @@ describe('map movement modes', () => {
     pointer(h, 'pointerdown')
     vi.advanceTimersByTime(LONG_PRESS_MS)
     pointer(h, 'pointerup')
+    drag(h)
+    expect(center()).toEqual({ x: 0, y: 0 })
     expect(h.send).not.toHaveBeenCalled()
   })
 
@@ -339,6 +462,78 @@ describe('map movement modes', () => {
     expect(getPref('mapRenderMode')).toBe('tiles')
     expect(h.view.classList.contains('tiles-mode')).toBe(true)
     expect(h.send).not.toHaveBeenCalled()
+  })
+})
+
+describe('Touch quick-action target confirmation', () => {
+  function slotGame(text: string, movement: 'touch' | 'keypad' = 'touch'): Harness {
+    const set = cloneSet(builtinSets()[0], 'test-cast', 'Cast')
+    set.tabs[0].slots[0] = { text }
+    saveControlSet(set)
+    setPref('controlSetId', set.id)
+    setPref('movementMode', movement)
+    return setupAtCommand()
+  }
+  const btn = (h: Harness) => h.view.querySelector<HTMLButtonElement>('.tc-content button.tc-btn')!
+
+  it.each(['za', 'zZ', 'Za', 'aa', 'aA', 'za.', 'aA.'])(
+    'sends only . for the %s slot in an active target loop', text => {
+      const h = slotGame(text)
+      btn(h).click()
+      expect(sent(h)).toEqual([{ msg: 'input', text }])
+      h.send.mockClear()
+      h.dispatch({ msg: 'input_mode', mode: 4 })
+      h.dispatch({ msg: 'cursor', id: 0, loc: { x: 7, y: 3 } })
+      btn(h).click()
+      expect(sent(h)).toEqual([{ msg: 'input', text: '.' }])
+    },
+  )
+
+  it.each([2, 3, 4])('accepts the existing aim in targeting mode %s', mode => {
+    const h = slotGame('aa')
+    h.dispatch({ msg: 'input_mode', mode })
+    btn(h).click()
+    expect(sent(h)).toEqual([{ msg: 'input', text: '.' }])
+  })
+
+  it.each([0, 1, 5, 6, 7, 8])('does not rewrite the slot at a non-target prompt (%s)', mode => {
+    const h = slotGame('aa')
+    h.dispatch({ msg: 'input_mode', mode })
+    btn(h).click()
+    expect(sent(h)).toEqual([{ msg: 'input', text: 'aa' }])
+  })
+
+  it.each(['a', 'z', 'Z', 'a?', 'za!', 'abc', 'o'])('does not rewrite other keys or macros (%s)', text => {
+    const h = slotGame(text)
+    h.dispatch({ msg: 'input_mode', mode: 4 })
+    btn(h).click()
+    expect(sent(h)).toEqual([{ msg: 'input', text }])
+  })
+
+  it('leaves Keypad slots unchanged and applies Touch changes live', () => {
+    const h = slotGame('za', 'keypad')
+    h.dispatch({ msg: 'input_mode', mode: 4 })
+    btn(h).click()
+    expect(sent(h)).toEqual([{ msg: 'input', text: 'za' }])
+    h.send.mockClear()
+    setPref('movementMode', 'touch')
+    btn(h).click()
+    expect(sent(h)).toEqual([{ msg: 'input', text: '.' }])
+  })
+
+  it('leaves physical keyboard input unchanged in Touch targeting', () => {
+    const h = slotGame('za')
+    h.dispatch({ msg: 'input_mode', mode: 4 })
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'a', bubbles: true }))
+    expect(sent(h)).toEqual([{ msg: 'input', text: 'a' }])
+  })
+
+  it('does not confirm a target behind a server overlay', () => {
+    const h = slotGame('aa')
+    h.dispatch({ msg: 'input_mode', mode: 4 })
+    h.dispatch({ msg: 'ui-push', type: 'describe-item', title: 'Item', body: 'Description' })
+    btn(h).click()
+    expect(sent(h)).not.toContainEqual({ msg: 'input', text: '.' })
   })
 })
 
@@ -3240,6 +3435,66 @@ describe('spell harvest (silent I → Esc) + preface parsing', () => {
       expect(castsSent(h)).toBe(0)
     })
 
+    it.each([2, 3, 4])('confirms the current target from the rail in Touch mode %s', mode => {
+      setPref('movementMode', 'touch')
+      const h = setup()
+      ready(h)
+      h.send.mockClear()
+      h.dispatch({ msg: 'input_mode', mode })
+      h.dispatch({ msg: 'cursor', id: 0, loc: { x: 7, y: 3 } })
+      // The targeting prompt is live, but is not a menu or a confirmation.
+      h.dispatch({ msg: 'msgs', messages: [{ text: 'Press: . - fire', channel: 2 }] })
+      railBtn(h, 'a').click()
+      expect(sent(h)).toEqual([{ msg: 'input', text: '.' }])
+    })
+
+    it('uses the same target-confirmation behavior in the z-tab grid', () => {
+      setPref('movementMode', 'touch')
+      const h = setup()
+      ready(h)
+      h.view.querySelector<HTMLElement>('.tc-tab[data-tab="spells"]')!.click()
+      h.send.mockClear()
+      h.dispatch({ msg: 'input_mode', mode: 4 })
+      h.view.querySelector<HTMLButtonElement>('.tc-spell-btn')!.click()
+      expect(sent(h)).toEqual([{ msg: 'input', text: '.' }])
+    })
+
+    it('keeps rail taps inert in Keypad targeting and after a Touch drag-off', () => {
+      const h = setup()
+      ready(h)
+      h.send.mockClear()
+      h.dispatch({ msg: 'input_mode', mode: 4 })
+      railBtn(h, 'a').click()
+      expect(sent(h)).toEqual([])
+      setPref('movementMode', 'touch')
+      const b = railBtn(h, 'a')
+      touch(b, 'touchstart')
+      touch(b, 'touchmove', 0, 40)
+      b.click()
+      expect(sent(h)).toEqual([])
+    })
+
+    it.each([0, 5, 6, 7, 8])('does not confirm or cast through a Touch prompt (%s)', mode => {
+      setPref('movementMode', 'touch')
+      const h = setup()
+      ready(h)
+      h.send.mockClear()
+      h.dispatch({ msg: 'input_mode', mode })
+      railBtn(h, 'a').click()
+      expect(sent(h)).toEqual([])
+    })
+
+    it('does not confirm through a server overlay even if the target mode is stale', () => {
+      setPref('movementMode', 'touch')
+      const h = setup()
+      ready(h)
+      h.send.mockClear()
+      h.dispatch({ msg: 'input_mode', mode: 4 })
+      h.dispatch({ msg: 'ui-push', type: 'describe-item', title: 'Item', body: 'Description' })
+      railBtn(h, 'a').click()
+      expect(sent(h)).toEqual([])
+    })
+
     // The rail's spell-list button sends `I` (the game's live spell list)
     // through the cast guard.
     const bookBtn = (h: Harness) => h.view.querySelector<HTMLElement>('#spell-rail .spell-rail-book .spell-rail-btn')!
@@ -3257,6 +3512,16 @@ describe('spell harvest (silent I → Esc) + preface parsing', () => {
       ready(h)
       h.dispatch({ msg: 'input_mode', mode: 7 })
       h.send.mockClear()
+      bookBtn(h).click()
+      expect(sent(h)).toEqual([])
+    })
+
+    it('does not turn the spell-list button into a target confirmation', () => {
+      setPref('movementMode', 'touch')
+      const h = setup()
+      ready(h)
+      h.send.mockClear()
+      h.dispatch({ msg: 'input_mode', mode: 4 })
       bookBtn(h).click()
       expect(sent(h)).toEqual([])
     })

@@ -39,6 +39,7 @@ import { keyInput, routeInput, touchInput, type RouterTargets } from '../game/in
 import { createShiftToggle } from '../game/input/shift-state'
 import { attachMapGestures, canDescribe, canHover, canOpenLevelMap } from '../game/input/map-tap'
 import { attachMapPinch } from '../game/input/map-pinch'
+import { selfTapKey } from '../game/input/map-self-tap'
 import { attachCornerSwipe } from '../game/input/corner-swipe'
 import { MapJumper, clampToBox } from '../game/input/map-jump'
 import { cursorInView, keepLocalCenter } from '../game/input/map-pan'
@@ -440,9 +441,9 @@ export function buildGameView(opts: GameViewOptions): HTMLElement {
 
   let inXMode = false
   let exitedXModeForInput = false
-  // The server's last vgrdc. In X mode the view center may deliberately
-  // differ from it (local drag-pan, map-pan.ts); exitXMode restores it.
+  // The server's last vgrdc, separate from the locally drag-panned center.
   let serverCenter: { x: number; y: number } | null = null
+  let touchPanned = false
   // One loc per server cursor id (cursor-type.h: 0 the direction chooser's
   // target, 1 tutorial, 2 the X level map), as the reference keeps
   // view_data.cursor_locs. Never collapse them into one slot: a spectator
@@ -451,9 +452,7 @@ export function buildGameView(opts: GameViewOptions): HTMLElement {
   // resend clear the aiming reticle and bounce X mode. Also re-applied to
   // the new view on an ASCII↔tiles swap (each view keeps its own cursor).
   const cursors: Array<{ x: number; y: number } | undefined> = [undefined, undefined, undefined]
-  // Server targeting takes precedence over Touch's local hover cursor.
-  let touchCursor: { x: number; y: number } | null = null
-  const shownCursor = () => cursors[2] ?? cursors[0] ?? touchCursor ?? cursors[1]
+  const shownCursor = () => cursors[2] ?? cursors[0] ?? cursors[1]
   // X-map tap-to-jump: walks the level-map cursor with synthesized vi-keys
   // in one atomic `input` message (see map-jump.ts). Fed every id-2 cursor
   // loc below.
@@ -488,9 +487,10 @@ export function buildGameView(opts: GameViewOptions): HTMLElement {
     loader: () => loader,
     spectating: !!spectating,
     inXMode: () => inXMode,
-    // harvester.channelIdle includes input_mode COMMAND (see uiQuiet), so an
-    // active target loop rejects the tap — `z<letter>` there would land
-    // mid-targeting, not cast. The monster panel is a client-only overlay
+    // Casting a new spell needs COMMAND. Touch can instead confirm an
+    // active target loop, without injecting another `z<letter>` into it.
+    confirmTarget: confirmTouchTarget,
+    // The monster panel is a client-only overlay
     // that doesn't change input mode, so it needs its own gate: in landscape
     // the rail stays visible in the sidebar beside the panel, and a tap there
     // bypasses the router's monster-panel layer (the rail sends via
@@ -578,14 +578,24 @@ export function buildGameView(opts: GameViewOptions): HTMLElement {
     lastTap = { t: now, x: e.clientX, y: e.clientY }
   })
 
-  // X level map local pan: wire-silent, so spectators too. The center is
+  // Local map pan, shared by Touch and the X level map. The center is
   // clamped to the known-cell box so the map can't be moved out of sight;
   // the map handler decides whether the pan survives the server's
   // re-centering (map-pan.ts).
-  function panXMapTo(center: { x: number; y: number }): void {
-    if (!mapView.setViewCenter(clampToBox(center, store.mfBounds()))) return
+  function panMapTo(center: { x: number; y: number }): boolean {
+    if (!mapView.setViewCenter(clampToBox(center, store.mfBounds()))) return false
     mapView.panRender()
     minimaps.scheduleRepaint()
+    return true
+  }
+
+  function resetTouchPan(): void {
+    if (!touchPanned) return
+    touchPanned = false
+    if (serverCenter && mapView.setViewCenter(serverCenter)) {
+      mapView.panRender()
+      minimaps.scheduleRepaint()
+    }
   }
 
   const touchMapAvailable = (): boolean => !spectating && !isOverlayOpen()
@@ -597,18 +607,11 @@ export function buildGameView(opts: GameViewOptions): HTMLElement {
   const mapGestures = attachMapGestures(mapWrap, {
     hitTester: () => mapView.hitTester(),
     onHover: (cell) => {
-      if (movementMode === 'touch') {
-        if (!touchMapAvailable()) return
-        if (currentInputMode === 1 && !inXMode) {
-          touchCursor = cell
-          mapView.setCursor(shownCursor())
-          return
-        }
-      }
+      // Touch may still become a pan or pinch; don't re-aim at touch-down.
+      if (movementMode === 'touch') return
       if (spectating || !canHover(currentInputMode)) return
-      // Keypad reserves the player's tile for double-tap zoom. Touch uses
-      // pinch instead and lets the engine validate self-targeting.
-      if (movementMode === 'keypad' && cell.x === store.playerPos.x && cell.y === store.playerPos.y) return
+      // Keypad reserves the player's tile for double-tap zoom.
+      if (cell.x === store.playerPos.x && cell.y === store.playerPos.y) return
       conn.send({ msg: 'target_cursor', x: cell.x, y: cell.y })
     },
     onLongPress: (cell) => {
@@ -623,8 +626,11 @@ export function buildGameView(opts: GameViewOptions): HTMLElement {
     onTap: (cell) => {
       if (movementMode === 'touch' && !inXMode) {
         if (!touchMapAvailable() || !canDescribe(currentInputMode, false)) return
-        touchCursor = null
-        mapView.setCursor(shownCursor())
+        if (currentInputMode === 1 && store.playerOnLevel
+          && cell.x === store.playerPos.x && cell.y === store.playerPos.y) {
+          const key = selfTapKey(store.get(cell.x, cell.y))
+          if (key) { send({ msg: 'input', text: key }); return }
+        }
         conn.send({ msg: 'click_cell', x: cell.x, y: cell.y, button: 1 })
         return
       }
@@ -639,13 +645,14 @@ export function buildGameView(opts: GameViewOptions): HTMLElement {
         minimaps.scheduleRepaint()
       }
     },
-    // X level map only: drag pans the view locally (panXMapTo).
+    // Dragging changes only the viewport, never the character or target.
     onPan: (delta) => {
-      if (!inXMode) return
+      if (!inXMode && (movementMode !== 'touch' || !touchMapAvailable()
+        || !canDescribe(currentInputMode, false))) return
       const c = mapView.getViewCenter()
-      panXMapTo({ x: c.x + delta.x, y: c.y + delta.y })
+      if (panMapTo({ x: c.x + delta.x, y: c.y + delta.y }) && !inXMode) touchPanned = true
     },
-    // Normal play: a drag has no wire meaning (hover is gated off above),
+    // Keypad normal play: a drag has no wire meaning (hover is gated off above),
     // so it opens the `X` level map, where the same drag pans. The pan
     // resumes when the engine's cursor arrives (enterXMode regrabs the
     // finger after the rescale); moves until then are lost, which is one
@@ -801,7 +808,18 @@ export function buildGameView(opts: GameViewOptions): HTMLElement {
   // The touch strip's and the Android back gesture's way in: an injected Esc
   // means exactly what a tapped one does.
   function dispatchTouchInput(msg: ClientMsg): void {
+    // Custom quick-cast/ability slots (za, Za, aa, aa., ...), not individual
+    // keyboard keys or arbitrary macros. Keep the target the server chose.
+    if (msg.msg === 'input' && /^[zZa][a-zA-Z]\.?$/.test(msg.text) && confirmTouchTarget()) return
     routeInput(touchInput(msg), touchTargets)
+  }
+
+  function confirmTouchTarget(): boolean {
+    if (movementMode !== 'touch' || !canHover(currentInputMode) || inXMode
+      || !touchMapAvailable() || !popups.empty || dialogActive || menus.active
+      || messageLog.moreActive) return false
+    send({ msg: 'input', text: '.' })
+    return true
   }
 
   // A touch Ctrl-F the router hands to the engine at the command prompt
@@ -851,7 +869,7 @@ export function buildGameView(opts: GameViewOptions): HTMLElement {
     // Same refusal set as the monster panel: don't cover a server prompt.
     lensAllowed: () => !serverPromptActive() && !monsterPanelOpen,
     focusView,
-    panTo: panXMapTo,
+    panTo: panMapTo,
   })
 
   const menuBar = new MenuBar({
@@ -1160,8 +1178,7 @@ export function buildGameView(opts: GameViewOptions): HTMLElement {
     mapPinch.cancel()
     cancelTileGesture()
     lastTap = { t: 0, x: 0, y: 0 }
-    touchCursor = null
-    mapView.setCursor(shownCursor())
+    resetTouchPan()
     mapView.setUserZoom(movementMode === 'touch' ? touchZoom : 1)
     scheduleFit()
   }
@@ -1520,6 +1537,7 @@ export function buildGameView(opts: GameViewOptions): HTMLElement {
     advisory.onMap()
     if (msg.clear) {
       store.clear()
+      touchPanned = false
       // `[`/`]` in the level map arrive as a cleared map (tile_new_level
       // → clear_minimap), and a tap-walk landing held for the vgrdc
       // policy below then names a cell on the level just left. It can't
@@ -1544,9 +1562,16 @@ export function buildGameView(opts: GameViewOptions): HTMLElement {
     // the (possibly drag-panned) view instead — policy in map-pan.ts.
     let panned = false
     if (msg.vgrdc) {
+      // Redraws repeat vgrdc even when nothing moves. Keep a Touch pan on
+      // those frames; an actual server-center change resumes following.
+      const keepTouchPan = touchPanned && serverCenter?.x === msg.vgrdc.x
+        && serverCenter.y === msg.vgrdc.y
       serverCenter = msg.vgrdc
-      const keep = inXMode && keepLocalCenter(mapJumper.destination(), mapView.viewRect())
-      if (!keep) panned = mapView.setViewCenter(msg.vgrdc)
+      const keep = inXMode ? keepLocalCenter(mapJumper.destination(), mapView.viewRect()) : keepTouchPan
+      if (!keep) {
+        touchPanned = false
+        panned = mapView.setViewCenter(msg.vgrdc)
+      }
     }
     // Sticky like the reference's inv_mons_msg: only a present key
     // changes it ('' clears); store.clear() above also resets it.
@@ -1737,10 +1762,6 @@ export function buildGameView(opts: GameViewOptions): HTMLElement {
   function onInputMode(msg: MsgOf<'input_mode'>): void {
     const prevInputMode = currentInputMode
     currentInputMode = msg.mode
-    if (prevInputMode !== msg.mode) {
-      touchCursor = null
-      mapView.setCursor(shownCursor())
-    }
     if (msg.mode === 1) {  // COMMAND: normal play resumed
       messageLog.hideMore()
       messageLog.disablePrompt()
@@ -1887,6 +1908,7 @@ export function buildGameView(opts: GameViewOptions): HTMLElement {
   // --- X mode (eXamine level map) ---
 
   function enterXMode(): void {
+    resetTouchPan()
     // The examine map is itself an overview — a player entering it has
     // switched tools, and the lens would hide the cursor they're steering
     // (keys pass through the lens, so X/x reach the server under it). A
