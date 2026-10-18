@@ -127,6 +127,7 @@ function freshClone(base: ControlSet): ControlSet {
 function renderHome(body: HTMLElement): void {
   body.innerHTML = ''
   pageIntercept = null
+  renderMovementSection(body)
   renderDisplaySection(body)
   renderMonsterListSection(body)
   if (document.getElementById('game-view')) {
@@ -293,7 +294,7 @@ function renderControlsSection(body: HTMLElement): void {
 // Segmented radio bound to an enum- or bool-valued pref. setPref fires the
 // pref's live-apply event itself (prefs.ts PREF_EVENTS), so a mounted
 // game/login view picks the change up immediately.
-function segPref<K extends 'mapRenderMode' | 'monsterListMode' | 'loginSprites'>(
+function segPref<K extends 'mapRenderMode' | 'movementMode' | 'monsterListMode' | 'loginSprites'>(
   ariaLabel: string,
   prefKey: K,
   options: ReadonlyArray<{ value: Prefs[K]; label: string }>,
@@ -508,11 +509,15 @@ function renderMsglogSection(body: HTMLElement): void {
   cell.appendChild(msglogFontSlider())
 }
 
+function renderMovementSection(body: HTMLElement): void {
+  section(body, 'Movement', { bare: true }).appendChild(segPref('Movement', 'movementMode', [
+    { value: 'touch', label: 'Touch' },
+    { value: 'keypad', label: 'Keypad' },
+  ]))
+}
+
 function renderDisplaySection(body: HTMLElement): void {
-  section(body, 'Map display', {
-    bare: true,
-    footer: 'A two-finger long-press on the map also toggles this mid-game.',
-  }).appendChild(segPref('Map display', 'mapRenderMode', [
+  section(body, 'Map display', { bare: true }).appendChild(segPref('Map display', 'mapRenderMode', [
     { value: 'ascii', label: 'ASCII' },
     { value: 'tiles', label: 'Tiles' },
   ]))

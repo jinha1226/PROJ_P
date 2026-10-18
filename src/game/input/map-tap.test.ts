@@ -68,6 +68,17 @@ describe('attachMapGestures', () => {
     expect(taps).toEqual([{ x: 2, y: 3 }])
   })
 
+  it.each(['tap', 'hold'])('keeps the original %s cell when a hover reply recenters the viewport', action => {
+    let offset = 0
+    const { grid, taps, presses } = setup((x, y) => ({ x: offset + Math.floor(x / 10), y: Math.floor(y / 10) }))
+    fire(grid, 'pointerdown', 25, 35)
+    offset = 10
+    if (action === 'hold') vi.advanceTimersByTime(LONG_PRESS_MS)
+    fire(grid, 'pointerup', 25, 35)
+    expect(action === 'tap' ? taps : presses).toEqual([{ x: 2, y: 3 }])
+    expect(action === 'tap' ? presses : taps).toEqual([])
+  })
+
   it('neither a drag nor a completed hold counts as a tap', () => {
     const { grid, taps, presses } = setup()
     fire(grid, 'pointerdown', 5, 5)
@@ -149,6 +160,16 @@ describe('attachMapGestures', () => {
     vi.advanceTimersByTime(LONG_PRESS_MS + 50)
     expect(hovers.length).toBe(seen.hovers)
     expect(pans.length).toBe(seen.pans)
+    expect(taps).toEqual([])
+  })
+
+  it('explicit cancellation drops a pending hold and the trailing tap', () => {
+    const { grid, gestures, presses, taps } = setup()
+    fire(grid, 'pointerdown', 25, 35)
+    gestures.cancel()
+    vi.advanceTimersByTime(LONG_PRESS_MS + 50)
+    fire(grid, 'pointerup', 25, 35)
+    expect(presses).toEqual([])
     expect(taps).toEqual([])
   })
 

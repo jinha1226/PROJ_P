@@ -15,10 +15,19 @@ beforeEach(() => {
 
 describe('prefs defaults', () => {
   it('serves defaults on an empty store', () => {
+    expect(getPref('movementMode')).toBe('keypad')
     expect(getPref('monsterListMode')).toBe('full')
     expect(getPref('loginSprites')).toBe(true)
     expect(getPref('loginOnlineOpen')).toBeNull()
     expect(getPref('loginOfflineOpen')).toBeNull()
+  })
+
+  it('keeps existing users on Keypad until they choose Touch', () => {
+    localStorage.setItem(KEY, JSON.stringify({ mapRenderMode: 'tiles' }))
+    expect(getPref('movementMode')).toBe('keypad')
+    setPref('movementMode', 'touch')
+    setPref('loginSprites', false)
+    expect(getPref('movementMode')).toBe('touch')
   })
 })
 

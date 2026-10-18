@@ -115,6 +115,7 @@ export class TileMapView {
   // setViewportSize early-exit (see the comment there).
   private lastCssW = 0
   private zoomMode = false
+  private userZoom = 1
   private zoomAxis = viewFloorDiameter({})
   // Multiplier on cellPx — mirrors MapView.fontScale. X-mode sets this to
   // <1 to shrink cells and let the full-bleed fill add more of them.
@@ -281,6 +282,7 @@ export class TileMapView {
   // ⇒ more of them fit, courtesy of the full-bleed fill); back to 1.0
   // on exit. Caller is expected to invoke fitToContainer() next.
   setFontScale(scale: number): void { this.renderScale = scale }
+  setUserZoom(scale: number): void { this.userZoom = scale }
   setZoomMode(on: boolean): void { this.zoomMode = on }
   isZoomMode(): boolean { return this.zoomMode }
   // Wire `player` facts → zoom floor (viewFloorDiameter). Returns whether
@@ -331,7 +333,7 @@ export class TileMapView {
     // renderScale (X-mode) shrinks the result further; clamp stays in [8,96]
     // so tiny containers can't underflow.
     const baseCell = Math.min(availW / baseAxis, availH / baseAxis)
-    const cell = Math.max(8, Math.min(96, baseCell * this.renderScale))
+    const cell = Math.max(8, Math.min(96, baseCell * this.renderScale * this.userZoom))
     this.cellPx = cell
 
     // Full-bleed: cover the ENTIRE element on both axes, partial cells

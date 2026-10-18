@@ -9,6 +9,7 @@ const KEY = 'pocketzot:prefs'
 // Lets a live game view swap renderers immediately when the settings page
 // (or the two-finger gesture) changes mapRenderMode.
 export const RENDER_MODE_CHANGED_EVENT = 'pocketzot:render-mode-changed'
+export const MOVEMENT_MODE_CHANGED_EVENT = 'pocketzot:movement-mode-changed'
 // Same live-apply contract for the monster-list mode (settings ⇄ the in-game
 // chevron, which only walks collapsed⇄full) and the login-screen character
 // sprites (settings opens over the still-mounted login view).
@@ -20,6 +21,7 @@ export const UI_SCALE_CHANGED_EVENT = 'pocketzot:ui-scale-changed'
 
 const PREF_EVENTS: Partial<Record<keyof Prefs, string>> = {
   mapRenderMode: RENDER_MODE_CHANGED_EVENT,
+  movementMode: MOVEMENT_MODE_CHANGED_EVENT,
   monsterListMode: MONSTER_LIST_MODE_CHANGED_EVENT,
   loginSprites: LOGIN_SPRITES_CHANGED_EVENT,
   dpadSize: UI_SCALE_CHANGED_EVENT,
@@ -40,6 +42,7 @@ export interface Prefs {
   monsterListMode: MonsterListMode
   monsterListCorner: MonsterListCorner
   mapRenderMode: 'ascii' | 'tiles'
+  movementMode: 'touch' | 'keypad'
   controlSetId: string
   // Character-sprite shelf on the login screen (and with it the crypt, whose
   // only entry point it is). Avatar recipes keep being captured while off, so
@@ -70,6 +73,7 @@ export interface Prefs {
 const DEFAULTS: Prefs = {
   lastGuestSpectateWsUrl: null,
   mapRenderMode: 'tiles',
+  movementMode: 'keypad',
   monsterListMode: 'full',
   monsterListCorner: 'top-left',
   controlSetId: 'standard',

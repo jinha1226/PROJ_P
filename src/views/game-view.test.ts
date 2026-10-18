@@ -8,7 +8,10 @@ import { ENABLE_SPELL_TAB } from '../game/input/touch'
 import type { WsConnection } from '../ws/connection'
 import type { ServerMsg, ClientMsg, GameExit } from '../ws/types'
 import type { MapStore } from '../game/map/map-store'
-import { setPref } from '../prefs'
+import { getPref, setPref } from '../prefs'
+import { MapView } from '../game/map/map-view'
+import { TileMapView } from '../game/map/tile-map-view'
+import { LONG_PRESS_MS } from '../game/input/map-tap'
 import { fakeStorage } from '../test/fake-storage'
 import { listAllAvatars, saveAvatar } from '../avatars'
 import stashSearchGolden from '../golden/22-stash-search-describe-highlight.golden.json'
@@ -135,6 +138,207 @@ describe('initial render mode', () => {
       replaceWith.mockRestore()
       getContext.mockRestore()
     }
+  })
+})
+
+describe('map movement modes', () => {
+  beforeEach(() => {
+    vi.useFakeTimers()
+    vi.spyOn(MapView.prototype, 'hitTester').mockReturnValue((x, y) => ({ x: Math.floor(x / 10), y: Math.floor(y / 10) }))
+  })
+  afterEach(() => {
+    vi.restoreAllMocks()
+    vi.useRealTimers()
+  })
+
+  function pointer(h: Harness, type: string, x = 25, y = 35): void {
+    h.view.querySelector('#map-grid')!.dispatchEvent(new PointerEvent(type, {
+      clientX: x, clientY: y, bubbles: true, button: 0, pointerId: 1, isPrimary: true,
+    }))
+  }
+  function touch(h: Harness, type: string, xs: number[]): void {
+    const target = h.view.querySelector('#map-grid')!
+    const touches = xs.map((x, identifier) => ({ identifier, clientX: x, clientY: 35, target })) as Touch[]
+    target.dispatchEvent(new TouchEvent(type, { bubbles: true, cancelable: true, touches }))
+  }
+  function pinch(h: Harness, type: string, xs: number[]): void {
+    const target = h.view.querySelector('#map-grid')!
+    xs.forEach((x, i) => target.dispatchEvent(new PointerEvent(type, {
+      clientX: x, clientY: 35, bubbles: true, button: 0, pointerId: i + 1,
+      pointerType: 'touch', isPrimary: i === 0,
+    })))
+  }
+  function touchGame(spectating?: SpectateTarget): Harness {
+    setPref('movementMode', 'touch')
+    return setupAtCommand(spectating)
+  }
+
+  it('leaves Keypad taps inert and opens X on a drag as before', () => {
+    const h = setupAtCommand()
+    pointer(h, 'pointerdown')
+    pointer(h, 'pointerup')
+    expect(h.send).not.toHaveBeenCalled()
+    pointer(h, 'pointerdown')
+    pointer(h, 'pointermove', 85, 35)
+    pointer(h, 'pointerup', 85, 35)
+    expect(sent(h)).toEqual([{ msg: 'input', text: 'X' }])
+  })
+
+  it('sends a single left click on a Touch tap, never at touch-down', () => {
+    const h = touchGame()
+    pointer(h, 'pointerdown')
+    expect(h.send).not.toHaveBeenCalled()
+    pointer(h, 'pointerup')
+    expect(sent(h)).toEqual([{ msg: 'click_cell', x: 2, y: 3, button: 1 }])
+  })
+
+  it('does not run the legacy double-tap zoom on repeated Touch taps', () => {
+    const h = touchGame()
+    const zoom = vi.spyOn(MapView.prototype, 'setZoomMode')
+    for (let i = 0; i < 2; i++) {
+      pointer(h, 'pointerdown', 5, 5)
+      pointer(h, 'pointerup', 5, 5)
+      vi.advanceTimersByTime(100)
+    }
+    expect(zoom).not.toHaveBeenCalled()
+    expect(sent(h)).toEqual([
+      { msg: 'click_cell', x: 0, y: 0, button: 1 },
+      { msg: 'click_cell', x: 0, y: 0, button: 1 },
+    ])
+  })
+
+  it('moves only the local cursor when a Touch finger sweeps the map', () => {
+    const h = touchGame()
+    const cursor = vi.spyOn(MapView.prototype, 'setCursor')
+    pointer(h, 'pointerdown')
+    pointer(h, 'pointermove', 85, 35)
+    pointer(h, 'pointerup', 85, 35)
+    expect(cursor).toHaveBeenLastCalledWith({ x: 8, y: 3 })
+    expect(h.send).not.toHaveBeenCalled()
+    expect(h.view.classList.contains('x-mode')).toBe(false)
+  })
+
+  it.each([2, 3, 4])('aims and fires a Touch tap in targeting mode %s', mode => {
+    const h = touchGame()
+    h.dispatch({ msg: 'input_mode', mode })
+    pointer(h, 'pointerdown')
+    pointer(h, 'pointerup')
+    expect(sent(h)).toEqual([
+      { msg: 'target_cursor', x: 2, y: 3 },
+      { msg: 'click_cell', x: 2, y: 3, button: 1 },
+    ])
+  })
+
+  it('aims a targeting drag without firing on release', () => {
+    const h = touchGame()
+    h.dispatch({ msg: 'input_mode', mode: 2 })
+    pointer(h, 'pointerdown')
+    pointer(h, 'pointermove', 85, 35)
+    pointer(h, 'pointerup', 85, 35)
+    expect(sent(h)).toEqual([
+      { msg: 'target_cursor', x: 2, y: 3 },
+      { msg: 'target_cursor', x: 8, y: 3 },
+    ])
+  })
+
+  it('describes on hold, without moving or casting on release', () => {
+    const h = touchGame()
+    pointer(h, 'pointerdown')
+    vi.advanceTimersByTime(LONG_PRESS_MS)
+    pointer(h, 'pointerup')
+    expect(sent(h)).toEqual([{ msg: 'click_cell', x: 2, y: 3, button: 3 }])
+  })
+
+  it.each([0, 5, 6, 7, 8])('does not click through a prompt in input mode %s', mode => {
+    const h = touchGame()
+    pointer(h, 'pointerdown')
+    h.dispatch({ msg: 'input_mode', mode })
+    pointer(h, 'pointerup')
+    pointer(h, 'pointerdown')
+    vi.advanceTimersByTime(LONG_PRESS_MS)
+    pointer(h, 'pointerup')
+    expect(h.send).not.toHaveBeenCalled()
+  })
+
+  it('never sends map input as a spectator', () => {
+    const h = touchGame({ username: 'watched' })
+    pointer(h, 'pointerdown')
+    pointer(h, 'pointerup')
+    pointer(h, 'pointerdown')
+    vi.advanceTimersByTime(LONG_PRESS_MS)
+    pointer(h, 'pointerup')
+    expect(h.send).not.toHaveBeenCalled()
+  })
+
+  it('blocks touches behind an overlay even without an input-mode update', () => {
+    const h = touchGame()
+    pointer(h, 'pointerdown')
+    h.dispatch({ msg: 'ui-push', type: 'describe-item', title: 'Item', body: 'Description' })
+    pointer(h, 'pointerup')
+    pointer(h, 'pointerdown')
+    vi.advanceTimersByTime(LONG_PRESS_MS)
+    pointer(h, 'pointerup')
+    expect(h.send).not.toHaveBeenCalled()
+  })
+
+  it('pinches without changing the renderer or firing the pending one-finger action', () => {
+    const h = touchGame()
+    const zoom = vi.spyOn(MapView.prototype, 'setUserZoom')
+    pointer(h, 'pointerdown')
+    pinch(h, 'pointerdown', [25, 125])
+    vi.advanceTimersByTime(500)
+    expect(getPref('mapRenderMode')).toBe('ascii')
+    pinch(h, 'pointermove', [0, 150])
+    expect(zoom).toHaveBeenLastCalledWith(1.5)
+    pinch(h, 'pointerup', [0, 150])
+    pointer(h, 'pointerup')
+    expect(h.send).not.toHaveBeenCalled()
+  })
+
+  it('applies mode changes live, cancels pending gestures and restores Keypad zoom', () => {
+    const h = setupAtCommand()
+    const zoom = vi.spyOn(MapView.prototype, 'setUserZoom')
+    setPref('movementMode', 'touch')
+    expect(h.view.classList.contains('touch-movement')).toBe(true)
+    pinch(h, 'pointerdown', [0, 100])
+    pinch(h, 'pointermove', [0, 200])
+    pinch(h, 'pointerup', [0, 200])
+    pointer(h, 'pointerdown')
+    setPref('movementMode', 'keypad')
+    pointer(h, 'pointerup')
+    vi.advanceTimersByTime(LONG_PRESS_MS)
+    expect(h.send).not.toHaveBeenCalled()
+    expect(zoom).toHaveBeenLastCalledWith(1)
+    expect(h.view.classList.contains('touch-movement')).toBe(false)
+    setPref('movementMode', 'touch')
+    expect(zoom).toHaveBeenLastCalledWith(2)
+  })
+
+  it('keeps Touch zoom across ASCII and tile renderer swaps', () => {
+    const ctx = new Proxy({}, { get: () => () => {}, set: () => true }) as CanvasRenderingContext2D
+    vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(ctx)
+    const h = touchGame()
+    const asciiZoom = vi.spyOn(MapView.prototype, 'setUserZoom')
+    const tileZoom = vi.spyOn(TileMapView.prototype, 'setUserZoom')
+    pinch(h, 'pointerdown', [0, 100])
+    pinch(h, 'pointermove', [0, 200])
+    pinch(h, 'pointerup', [0, 200])
+    setPref('mapRenderMode', 'tiles')
+    expect(tileZoom).toHaveBeenLastCalledWith(2)
+    setPref('mapRenderMode', 'ascii')
+    expect(asciiZoom).toHaveBeenLastCalledWith(2)
+    expect(h.send).not.toHaveBeenCalled()
+  })
+
+  it('keeps the two-finger renderer toggle available in Keypad', () => {
+    const ctx = new Proxy({}, { get: () => () => {}, set: () => true }) as CanvasRenderingContext2D
+    vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(ctx)
+    const h = setupAtCommand()
+    touch(h, 'touchstart', [0, 100])
+    vi.advanceTimersByTime(450)
+    expect(getPref('mapRenderMode')).toBe('tiles')
+    expect(h.view.classList.contains('tiles-mode')).toBe(true)
+    expect(h.send).not.toHaveBeenCalled()
   })
 })
 

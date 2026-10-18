@@ -1,15 +1,7 @@
-// One-finger map gestures, the touch analog of the reference client's mouse
-// control (mouse_control.js + dungeon_renderer.handle_mouse): a tap or drag
-// is mouse *hover* — `target_cursor`, which aims the beam while targeting
-// and moves the examine cursor in `x` mode — and a still long-press is a
-// right-click — `click_cell` button 3, describe. There is deliberately no
-// left-click mapping: movement stays on the d-pad, so a stray map tap can
-// never move the character or fire. In the `X` level map, where the engine
-// ignores hover, the drag instead pans the view locally (onPan; policy in
-// map-pan.ts) and a tap walks the cursor there (map-jump.ts). In normal
-// play a drag has no wire meaning at all, so it opens the level map instead
-// (onDrag → game-view sends `X`) and carries on as that pan once the engine
-// has switched.
+// One-finger gesture recognition shared by Touch and Keypad movement.
+// game-view owns the policy: Touch taps travel/fire, Keypad drags open X,
+// and both modes support hover and hold-to-describe. In the X level map,
+// dragging pans locally and tapping walks the cursor (map-jump.ts).
 
 // Hold duration. Under the platform long-press defaults (iOS 500,
 // Android 400): those guard costly or modal actions, while describe is
@@ -67,10 +59,9 @@ export interface MapGestureOpts {
   onHover(cell: { x: number; y: number }): void
   onLongPress(cell: { x: number; y: number }): void
   // A lift while the press is still "still" — under SLOP_PX and before the
-  // long-press fires. Optional: hover already covers the tap's only wire
-  // meaning in TARGET modes, so this exists for the X level map, where the
-  // engine ignores hover and a tap becomes a synthesized cursor jump
-  // (map-jump.ts). Fires at the touch-down cell, not the lift point.
+  // long-press fires. Touch uses it for travel/target selection; the X map
+  // uses it for a cursor jump. Fires at the touch-down cell, not the lift
+  // point, even if a server reply moves the viewport during the press.
   onTap?(cell: { x: number; y: number }): void
   // Drag as a grab: the cell under the finger at touch-down is the anchor,
   // and each move past SLOP_PX reports how far the view must shift to put
@@ -89,6 +80,8 @@ export interface MapGestureOpts {
 }
 
 export interface MapGestures {
+  // Mode changes and pinches must not turn a pending press into a later tap.
+  cancel(): void
   // Re-measure the grid under a still-held finger and pan the touch-down
   // anchor back under it in one step. For the drag that opened the level
   // map: the hit tester was captured at touch-down against the normal-play
@@ -118,6 +111,7 @@ export function attachMapGestures(el: HTMLElement, opts: MapGestureOpts): MapGes
   let timer: number | null = null
   let lastHover: { x: number; y: number } | null = null
   let hit: CellHitTester | null = null
+  let pressCell: { x: number; y: number } | null = null
   // The grab anchor for onPan, set at touch-down; null once the slop is
   // crossed with nothing under the finger, or when there's no onPan.
   let anchor: { x: number; y: number } | null = null
@@ -135,6 +129,7 @@ export function attachMapGestures(el: HTMLElement, opts: MapGestureOpts): MapGes
     activePointer = null
     lastHover = null
     hit = null
+    pressCell = null
     anchor = null
     dragged = false
     release()
@@ -175,6 +170,7 @@ export function attachMapGestures(el: HTMLElement, opts: MapGestureOpts): MapGes
     startX = lastX = e.clientX
     startY = lastY = e.clientY
     const cell = hit?.(startX, startY) ?? null
+    pressCell = cell
     anchor = opts.onPan ? cell : null
     // Hover fires immediately on touch — instant aim feedback, and a
     // harmless prefix to a long-press (the reference's hover-precedes-click).
@@ -182,8 +178,9 @@ export function attachMapGestures(el: HTMLElement, opts: MapGestureOpts): MapGes
     timer = window.setTimeout(() => {
       timer = null
       activePointer = null
-      const cell = hit?.(startX, startY)
+      const cell = pressCell
       hit = null
+      pressCell = null
       if (!cell) return
       document.documentElement.classList.add(HOLD_CLASS)
       opts.onLongPress(cell)
@@ -214,7 +211,7 @@ export function attachMapGestures(el: HTMLElement, opts: MapGestureOpts): MapGes
     // A live timer at lift means neither the drag conversion nor the hold
     // happened: this was a tap.
     const tapped = timer != null && e.pointerId === activePointer
-    const cell = tapped ? hit?.(startX, startY) : null
+    const cell = tapped ? pressCell : null
     cancel()
     if (cell) opts.onTap?.(cell)
   })
@@ -226,6 +223,7 @@ export function attachMapGestures(el: HTMLElement, opts: MapGestureOpts): MapGes
   window.addEventListener('pointercancel', release)
 
   return {
+    cancel,
     regrab(): void {
       if (activePointer === null) return
       hit = opts.hitTester()

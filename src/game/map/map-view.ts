@@ -32,6 +32,7 @@ export class MapView {
   // the log. See the reserve > 0 branch in fitToContainer.
   private centerRow = Math.floor(NORMAL_H / 2)
   private fontScale = 1.0
+  private userZoom = 1
   private zoomMode = false
   private zoomAxis = ZOOM_MIN_AXIS
   // Absolute viewport center (matches vgrdc from server). In normal play equals playerPos.
@@ -82,6 +83,8 @@ export class MapView {
   setFontScale(scale: number): void {
     this.fontScale = scale
   }
+
+  setUserZoom(scale: number): void { this.userZoom = scale }
 
   // User-toggled zoom. When true and fontScale === 1, fitToContainer shrinks
   // both axis minimums (to ZOOM_MIN_AXIS) and raises the font-size cap so
@@ -183,7 +186,7 @@ export class MapView {
     const widthFs = availW / (minW * charWPerFs)
     const heightFs = availH / (minH * lineHPerFs)
     const maxFs = isZoom ? 64 : 36
-    const fontSize = Math.max(10, Math.min(maxFs, Math.min(widthFs, heightFs))) * this.fontScale
+    const fontSize = Math.max(10, Math.min(maxFs, Math.min(widthFs, heightFs))) * this.fontScale * this.userZoom
     const fontSizePx = fontSize + 'px'
     if (this.container.style.fontSize !== fontSizePx) this.container.style.fontSize = fontSizePx
 

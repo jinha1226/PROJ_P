@@ -38,6 +38,7 @@ import { isOverlayOpen, closeTopOverlay } from './overlay'
 import { keyInput, routeInput, touchInput, type RouterTargets } from '../game/input/input-router'
 import { createShiftToggle } from '../game/input/shift-state'
 import { attachMapGestures, canDescribe, canHover, canOpenLevelMap } from '../game/input/map-tap'
+import { attachMapPinch } from '../game/input/map-pinch'
 import { attachCornerSwipe } from '../game/input/corner-swipe'
 import { MapJumper, clampToBox } from '../game/input/map-jump'
 import { cursorInView, keepLocalCenter } from '../game/input/map-pan'
@@ -56,7 +57,7 @@ import { VersionAdvisory } from './version-advisory'
 import { MessageLog } from './message-log'
 import { MenuModel, isPromptFamily, type MenuMsg } from '../game/menu-model'
 import { compactPlace } from '../game/char-label'
-import { getPref, setPref, MONSTER_LIST_MODE_CHANGED_EVENT, RENDER_MODE_CHANGED_EVENT } from '../prefs'
+import { getPref, setPref, MONSTER_LIST_MODE_CHANGED_EVENT, RENDER_MODE_CHANGED_EVENT, MOVEMENT_MODE_CHANGED_EVENT } from '../prefs'
 import { loadSession, saveSession } from '../auth/session'
 import { stripDcss } from './overlay-body'
 import { SpellHarvester, type SpellEntry } from '../game/spell-harvest'
@@ -133,12 +134,15 @@ export function buildGameView(opts: GameViewOptions): HTMLElement {
   // end of setup needlessly initializes two different viewport geometries.
   // setRenderMode still owns genuine in-session swaps and persists them.
   let renderMode: 'ascii' | 'tiles' = getPref('mapRenderMode')
+  let movementMode = getPref('movementMode')
+  let touchZoom = 1
   const makeMapView = (mode: 'ascii' | 'tiles'): MapView | TileMapView => {
     const map = mode === 'tiles' ? new TileMapView(store) : new MapView(store)
     // Tiles at the full 33x21 viewport are too small on a phone. The old
     // ASCII-to-tiles swap enabled zoom as part of the swap; direct tile
     // construction must start with the same geometry.
     if (mode === 'tiles') map.setZoomMode(true)
+    map.setUserZoom(movementMode === 'touch' ? touchZoom : 1)
     return map
   }
   // This game's per-version tile loader, or null until we know the version.
@@ -447,9 +451,9 @@ export function buildGameView(opts: GameViewOptions): HTMLElement {
   // resend clear the aiming reticle and bounce X mode. Also re-applied to
   // the new view on an ASCII↔tiles swap (each view keeps its own cursor).
   const cursors: Array<{ x: number; y: number } | undefined> = [undefined, undefined, undefined]
-  // Map views draw one cursor: the X map's, else the chooser's, else the
-  // tutorial's.
-  const shownCursor = () => cursors[2] ?? cursors[0] ?? cursors[1]
+  // Server targeting takes precedence over Touch's local hover cursor.
+  let touchCursor: { x: number; y: number } | null = null
+  const shownCursor = () => cursors[2] ?? cursors[0] ?? touchCursor ?? cursors[1]
   // X-map tap-to-jump: walks the level-map cursor with synthesized vi-keys
   // in one atomic `input` message (see map-jump.ts). Fed every id-2 cursor
   // loc below.
@@ -471,6 +475,7 @@ export function buildGameView(opts: GameViewOptions): HTMLElement {
   const view = document.createElement('div')
   view.id = 'game-view'
   view.classList.toggle('tiles-mode', renderMode === 'tiles')
+  view.classList.toggle('touch-movement', movementMode === 'touch')
   // Widens the message log (see the #game-view.spectating rule in style.css).
   if (spectating) view.classList.add('spectating')
 
@@ -547,7 +552,7 @@ export function buildGameView(opts: GameViewOptions): HTMLElement {
   // between MapView and TileMapView.
   let lastTap = { t: 0, x: 0, y: 0 }
   mapWrap.addEventListener('pointerdown', (e) => {
-    if (inXMode || e.button !== 0) return
+    if (movementMode === 'touch' || inXMode || e.button !== 0) return
     // Ignore the secondary finger of a multi-touch gesture — otherwise two
     // close-together touches can satisfy the double-tap-zoom check below.
     if (!e.isPrimary) return
@@ -583,31 +588,46 @@ export function buildGameView(opts: GameViewOptions): HTMLElement {
     minimaps.scheduleRepaint()
   }
 
-  // One-finger map gestures, reference mouse-control on touch: tap/drag =
-  // hover (target_cursor — aims while targeting, moves the `x` examine
-  // cursor), still long-press = right-click (click_cell 3 — describe).
-  // No left-click mapping at all, so a stray tap can never move or fire;
-  // in normal play a tap is wire-silent. Gating mirrors game.js
-  // can_target()/can_describe(); spectators never send.
+  const touchMapAvailable = (): boolean => !spectating && !isOverlayOpen()
+    && uiOverlay.style.display === 'none' && !harvester.isHarvesting()
+
+  // Keypad keeps the original hover/examine gestures. Touch adds the
+  // reference client's left-click: the engine owns travel and targeting,
+  // including range, visibility and confirmation checks.
   const mapGestures = attachMapGestures(mapWrap, {
     hitTester: () => mapView.hitTester(),
     onHover: (cell) => {
+      if (movementMode === 'touch') {
+        if (!touchMapAvailable()) return
+        if (currentInputMode === 1 && !inXMode) {
+          touchCursor = cell
+          mapView.setCursor(shownCursor())
+          return
+        }
+      }
       if (spectating || !canHover(currentInputMode)) return
-      // Own tile: reserved for the double-tap zoom above — see its comment
-      // for why the engine can't be trusted to ignore it. Self-targeting
-      // stays on the keyboard/d-pad.
-      if (cell.x === store.playerPos.x && cell.y === store.playerPos.y) return
+      // Keypad reserves the player's tile for double-tap zoom. Touch uses
+      // pinch instead and lets the engine validate self-targeting.
+      if (movementMode === 'keypad' && cell.x === store.playerPos.x && cell.y === store.playerPos.y) return
       conn.send({ msg: 'target_cursor', x: cell.x, y: cell.y })
     },
     onLongPress: (cell) => {
+      if (movementMode === 'touch' && !touchMapAvailable()) return
       if (spectating || !canDescribe(currentInputMode, inXMode)) return
       conn.send({ msg: 'click_cell', x: cell.x, y: cell.y, button: 3 })
     },
     // X level map only: the engine ignores hover there, so a tap becomes a
     // synthesized cursor walk (map-jump.ts). Local tiles also travels when
     // the cursor's own cell is clicked (CMD_MAP_GOTO_TARGET) — deliberately
-    // not mirrored: no tap on the map ever acts.
+    // not mirrored: an X-map tap only positions the cursor.
     onTap: (cell) => {
+      if (movementMode === 'touch' && !inXMode) {
+        if (!touchMapAvailable() || !canDescribe(currentInputMode, false)) return
+        touchCursor = null
+        mapView.setCursor(shownCursor())
+        conn.send({ msg: 'click_cell', x: cell.x, y: cell.y, button: 1 })
+        return
+      }
       const mapCursor = cursors[2]
       if (spectating || !inXMode || !mapCursor) return
       mapJumper.tap(mapCursor, cell)
@@ -633,15 +653,14 @@ export function buildGameView(opts: GameViewOptions): HTMLElement {
     // Command-prompt only (canOpenLevelMap): the key rides the normal
     // pipeline, so a user keymap on X applies as it would to the kbd's X.
     onDrag: () => {
+      if (movementMode === 'touch') return
       if (spectating || inXMode || !canOpenLevelMap(currentInputMode)) return
       conn.send({ msg: 'input', text: 'X' })
     },
   })
 
-  // Two-finger long-press on the map flips between ASCII and tile rendering.
-  // Hidden gesture (no on-screen affordance) because the toggle is rare and
-  // not first-launch discovery — atlases are ~10 MB and we never start a
-  // session in tile mode. Hold ~450 ms; cancel on finger movement >40 px,
+  // Keypad's two-finger hold flips rendering; Touch reserves it for pinch
+  // zoom. Hold ~450 ms; cancel on finger movement >40 px,
   // any lift before the timer, or a 3rd touch.
   let tileGestureTimer: number | null = null
   let tileGestureCenter: { x: number; y: number } | null = null
@@ -650,6 +669,7 @@ export function buildGameView(opts: GameViewOptions): HTMLElement {
     tileGestureCenter = null
   }
   mapWrap.addEventListener('touchstart', (e) => {
+    if (movementMode === 'touch') { cancelTileGesture(); return }
     if (e.touches.length !== 2) { cancelTileGesture(); return }
     const target = e.target as HTMLElement | null
     if (!target || !target.closest('#map-grid')) { cancelTileGesture(); return }
@@ -675,6 +695,21 @@ export function buildGameView(opts: GameViewOptions): HTMLElement {
   }, { passive: true })
   mapWrap.addEventListener('touchend', cancelTileGesture, { passive: true })
   mapWrap.addEventListener('touchcancel', cancelTileGesture, { passive: true })
+
+  const mapPinch = attachMapPinch(mapWrap, {
+    enabled: () => movementMode === 'touch' && !isOverlayOpen(),
+    getZoom: () => touchZoom,
+    setZoom: (scale) => {
+      touchZoom = scale
+      mapView.setUserZoom(scale)
+      scheduleFit()
+    },
+    onStart: () => {
+      mapGestures.cancel()
+      cancelTileGesture()
+      lastTap = { t: 0, x: 0, y: 0 }
+    },
+  })
 
   // Tap the compact monster list to open the full-screen GUI variant.
   // Refuse while a server-side prompt is up so we don't drop the user out
@@ -1117,6 +1152,20 @@ export function buildGameView(opts: GameViewOptions): HTMLElement {
     setRenderMode(getPref('mapRenderMode'))
   }
   window.addEventListener(RENDER_MODE_CHANGED_EVENT, onRenderModePref)
+
+  function onMovementModePref(): void {
+    movementMode = getPref('movementMode')
+    view.classList.toggle('touch-movement', movementMode === 'touch')
+    mapGestures.cancel()
+    mapPinch.cancel()
+    cancelTileGesture()
+    lastTap = { t: 0, x: 0, y: 0 }
+    touchCursor = null
+    mapView.setCursor(shownCursor())
+    mapView.setUserZoom(movementMode === 'touch' ? touchZoom : 1)
+    scheduleFit()
+  }
+  window.addEventListener(MOVEMENT_MODE_CHANGED_EVENT, onMovementModePref)
 
   // Same live-apply for the monster-list mode (the in-game chevron writes the
   // pref too, but setListMode no-ops when the value matches).
@@ -1688,6 +1737,10 @@ export function buildGameView(opts: GameViewOptions): HTMLElement {
   function onInputMode(msg: MsgOf<'input_mode'>): void {
     const prevInputMode = currentInputMode
     currentInputMode = msg.mode
+    if (prevInputMode !== msg.mode) {
+      touchCursor = null
+      mapView.setCursor(shownCursor())
+    }
     if (msg.mode === 1) {  // COMMAND: normal play resumed
       messageLog.hideMore()
       messageLog.disablePrompt()
@@ -2217,11 +2270,13 @@ export function buildGameView(opts: GameViewOptions): HTMLElement {
     if (disposed) return
     disposed = true
     window.removeEventListener(RENDER_MODE_CHANGED_EVENT, onRenderModePref)
+    window.removeEventListener(MOVEMENT_MODE_CHANGED_EVENT, onMovementModePref)
     window.removeEventListener(MONSTER_LIST_MODE_CHANGED_EVENT, onMonsterListModePref)
     closeWatcher?.destroy()
     closeWatcher = null
     touchControls.destroy()
     mapGestures.destroy()
+    mapPinch.destroy()
     document.removeEventListener('keydown', docKeyHandler)
     compactMql.removeEventListener('change', syncMonsterCompact)
     window.clearInterval(publicChatCleanupTimer)

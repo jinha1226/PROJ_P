@@ -12,7 +12,7 @@ import {
 } from '../game/input/control-sets'
 import {
   getPref, LOGIN_SPRITES_CHANGED_EVENT, MONSTER_LIST_MODE_CHANGED_EVENT,
-  RENDER_MODE_CHANGED_EVENT, UI_SCALE_CHANGED_EVENT,
+  RENDER_MODE_CHANGED_EVENT, MOVEMENT_MODE_CHANGED_EVENT, UI_SCALE_CHANGED_EVENT,
 } from '../prefs'
 import { DPAD_STOPS, MSGLOG_FONT_STOPS, MSGLOG_LINE_STOPS } from '../ui-scale'
 
@@ -486,7 +486,7 @@ describe('settings sub-page navigation', () => {
     openSettings()
     const headings = $$('.settings-h').map(h => h.textContent)
     expect(headings).toEqual([
-      'Map display', 'Monster list', 'Message log', 'D-pad', 'Control sets',
+      'Movement', 'Map display', 'Monster list', 'Message log', 'D-pad', 'Control sets',
       'Character sprites', 'Help',
     ])
   })
@@ -512,6 +512,33 @@ describe('settings sub-page navigation', () => {
       expect(fired).toHaveBeenCalledTimes(1)
     } finally {
       window.removeEventListener(RENDER_MODE_CHANGED_EVENT, fired)
+    }
+  })
+
+  it('switches Movement between Touch and Keypad with a persistent live preference', () => {
+    const fired = vi.fn()
+    window.addEventListener(MOVEMENT_MODE_CHANGED_EVENT, fired)
+    try {
+      openSettings()
+      const group = segGroup('Movement')
+      const touch = findButton('Touch', group)
+      const keypad = findButton('Keypad', group)
+      expect(keypad.getAttribute('aria-checked')).toBe('true')
+      touch.click()
+      expect(getPref('movementMode')).toBe('touch')
+      expect(touch.getAttribute('aria-checked')).toBe('true')
+      expect(keypad.getAttribute('aria-checked')).toBe('false')
+      expect(fired).toHaveBeenCalledTimes(1)
+      touch.click()
+      expect(fired).toHaveBeenCalledTimes(1)
+      document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }))
+      openSettings()
+      expect(findButton('Touch', segGroup('Movement')).getAttribute('aria-checked')).toBe('true')
+      findButton('Keypad', segGroup('Movement')).click()
+      expect(getPref('movementMode')).toBe('keypad')
+      expect(fired).toHaveBeenCalledTimes(2)
+    } finally {
+      window.removeEventListener(MOVEMENT_MODE_CHANGED_EVENT, fired)
     }
   })
 
@@ -709,7 +736,7 @@ describe('floating size palette', () => {
     openSettings()
     const headings = $$('.settings-h').map(h => h.textContent)
     expect(headings).toEqual([
-      'Map display', 'Monster list', 'D-pad and message log', 'Control sets',
+      'Movement', 'Map display', 'Monster list', 'D-pad and message log', 'Control sets',
       'Character sprites', 'Help',
     ])
     // no sliders or previews on the card — the palette is the in-game surface
