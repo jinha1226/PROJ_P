@@ -128,13 +128,19 @@ export function buildGameView(opts: GameViewOptions): HTMLElement {
   const send =(m: ClientMsg): void => conn.send(m)
   const store = new MapStore()
   if (import.meta.env.DEV) (window as unknown as { __dcssStore: MapStore }).__dcssStore = store
-  // Map render mode. Starts in ASCII regardless of the saved preference; tile
-  // mode (reachable in-session via a two-finger long-press on the map, see
-  // below) is applied just after setup via setRenderMode, which handles the
-  // view swap, atlas preload (~10 MB), and monster-list mode in one place.
-  // setRenderMode persists every change to prefs, so a tile-mode session
-  // resumes in tiles next launch.
-  let renderMode: 'ascii' | 'tiles' = 'ascii'
+  // Construct the requested renderer directly. This matters now that DWEM
+  // defaults to tiles: building an ASCII MapView only to replace it near the
+  // end of setup needlessly initializes two different viewport geometries.
+  // setRenderMode still owns genuine in-session swaps and persists them.
+  let renderMode: 'ascii' | 'tiles' = getPref('mapRenderMode')
+  const makeMapView = (mode: 'ascii' | 'tiles'): MapView | TileMapView => {
+    const map = mode === 'tiles' ? new TileMapView(store) : new MapView(store)
+    // Tiles at the full 33x21 viewport are too small on a phone. The old
+    // ASCII-to-tiles swap enabled zoom as part of the swap; direct tile
+    // construction must start with the same geometry.
+    if (mode === 'tiles') map.setZoomMode(true)
+    return map
+  }
   // This game's per-version tile loader, or null until we know the version.
   // The lobby consumes `game_client` (which carries the version) whenever it
   // arrives before the lobby→game transition, and hands us the resolved loader
@@ -149,7 +155,7 @@ export function buildGameView(opts: GameViewOptions): HTMLElement {
   // black-tile-after-version-switch class is gone by construction. Tile views
   // only paint once they're handed this loader (adoptLoader).
   let loader: TileLoader | null = null
-  let mapView: MapView | TileMapView = new MapView(store)
+  let mapView = makeMapView(renderMode)
   // The player's tile_*_anim RC options, and the tile_realtime_anim timer.
   // The reference steps animations at the end of every `map` message
   // (display.js display()), on every `txt` update, and on that 4 Hz timer
@@ -464,6 +470,7 @@ export function buildGameView(opts: GameViewOptions): HTMLElement {
 
   const view = document.createElement('div')
   view.id = 'game-view'
+  view.classList.toggle('tiles-mode', renderMode === 'tiles')
   // Widens the message log (see the #game-view.spectating rule in style.css).
   if (spectating) view.classList.add('spectating')
 
@@ -1058,11 +1065,8 @@ export function buildGameView(opts: GameViewOptions): HTMLElement {
     const center = mapView.getViewCenter()  // survives an X-mode drag-pan
     fontScaleObserver.unobserve(mapView.element)
     const oldEl = mapView.element
-    const next: MapView | TileMapView = mode === 'tiles' ? new TileMapView(store) : new MapView(store)
+    const next = makeMapView(mode)
     next.setViewCenter(center)
-    // Default tile mode to zoom-on. Apply unconditionally — tile X-mode
-    // uses the zoom-on (LoS-floor) base shrunk by X_MODE_SCALE.
-    if (mode === 'tiles') next.setZoomMode(true)
     next.setSight(sight)
     // Carry the X-mode scale across the swap: the new view starts at 1.0
     // by default, which would visibly un-zoom the map mid-X-mode. inXMode
@@ -1294,12 +1298,14 @@ export function buildGameView(opts: GameViewOptions): HTMLElement {
       }
   }
 
-  // Apply the persisted render-mode preference now that the map element,
-  // font-scale observer, and monster-list view are all wired up. Routed
-  // through setRenderMode, which swaps in the tile view immediately (before
-  // first paint, so no ASCII flash). The atlas preload waits until we hold the
-  // loader (see `loader`).
-  if (getPref('mapRenderMode') === 'tiles') setRenderMode('tiles')
+  // The initial renderer already matches the persisted preference. Prime the
+  // direct tile path with the same preload and first fitted paint that an
+  // in-session ASCII-to-tiles swap receives. If game_client has not supplied
+  // the version yet, its handler starts the preload when it arrives.
+  if (renderMode === 'tiles') {
+    if (loader) preloadTiles(loader)
+    requestAnimationFrame(() => { fitNow(); mapView.fullRender() })
+  }
 
   const docKeyHandler = (e: KeyboardEvent) => {
     // A body-mounted overlay (Settings, docs, crypt) is open over the game and

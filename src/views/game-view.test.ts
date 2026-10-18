@@ -34,8 +34,13 @@ interface Harness {
   dispatch: (msg: unknown) => void
 }
 
-function setup(spectating?: SpectateTarget, gameId = '', resumed = false): Harness {
-  setPref('mapRenderMode', 'ascii')
+function setup(
+  spectating?: SpectateTarget,
+  gameId = '',
+  resumed = false,
+  renderMode: 'ascii' | 'tiles' = 'ascii',
+): Harness {
+  setPref('mapRenderMode', renderMode)
   const send = vi.fn()
   const conn = {
     wsUrl: 'wss://test.example/socket',
@@ -112,6 +117,26 @@ const msgRows = (h: Harness) => [...msgLog(h).querySelectorAll<HTMLElement>('.ga
 // msgLog is flex column-reverse, so the visual order (oldest→newest) is the
 // reverse of DOM order — undo that here so assertions read naturally.
 const msgTexts = (h: Harness) => msgRows(h).map(r => r.textContent?.trim()).reverse()
+
+describe('initial render mode', () => {
+  it('constructs the tile renderer directly instead of swapping out an ASCII view', () => {
+    const ctx = new Proxy({}, {
+      get: () => () => {},
+      set: () => true,
+    }) as unknown as CanvasRenderingContext2D
+    const getContext = vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(ctx)
+    const replaceWith = vi.spyOn(Element.prototype, 'replaceWith')
+    try {
+      const h = setup(undefined, '', false, 'tiles')
+      expect(h.view.classList.contains('tiles-mode')).toBe(true)
+      expect(h.view.querySelector('#map-grid')?.classList.contains('map-tile')).toBe(true)
+      expect(replaceWith).not.toHaveBeenCalled()
+    } finally {
+      replaceWith.mockRestore()
+      getContext.mockRestore()
+    }
+  })
+})
 
 describe('message log (msgs)', () => {
   it('prepends rows so the newest sits at the visual bottom (DOM firstChild)', () => {
