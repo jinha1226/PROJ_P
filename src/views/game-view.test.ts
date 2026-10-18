@@ -37,6 +37,20 @@ interface Harness {
   send: ReturnType<typeof vi.fn>
   onLobby: ReturnType<typeof vi.fn>
   dispatch: (msg: unknown) => void
+  dispatchBatch: (msgs: unknown[]) => void
+}
+
+const microtasks: VoidFunction[] = []
+function flushMicrotasks(): void {
+  while (microtasks.length) microtasks.shift()!()
+}
+
+function frameDispatcher(conn: WsConnection): Pick<Harness, 'dispatch' | 'dispatchBatch'> {
+  const dispatchBatch = (msgs: unknown[]): void => {
+    for (const msg of msgs) conn.onMessage(msg as ServerMsg)
+    flushMicrotasks()
+  }
+  return { dispatch: msg => dispatchBatch([msg]), dispatchBatch }
 }
 
 function setup(
@@ -60,7 +74,7 @@ function setup(
   const view = buildGameView({ conn, onLobby, spectating, gameId, resumed })
   mounted.push(view)
   document.body.appendChild(view)
-  return { view, send, onLobby, dispatch: (msg) => conn.onMessage(msg as ServerMsg) }
+  return { view, send, onLobby, ...frameDispatcher(conn) }
 }
 
 // Views mounted by a test, disposed after it as the app shell would
@@ -69,11 +83,15 @@ const mounted: HTMLElement[] = []
 
 beforeEach(() => {
   vi.stubGlobal('localStorage', fakeStorage())
+  // A dispatch is one WebSocket frame; a batch must finish before the
+  // game's deferred probes run, just as WsConnection's synchronous loop does.
+  vi.stubGlobal('queueMicrotask', (callback: VoidFunction) => microtasks.push(callback))
 })
 
 afterEach(() => {
   for (const view of mounted.splice(0)) disposeView(view)
   document.body.innerHTML = ''
+  microtasks.length = 0
   vi.unstubAllGlobals()
 })
 
@@ -107,7 +125,7 @@ function setupOffline(readMorgue: (f: string) => Promise<Uint8Array<ArrayBuffer>
   const view = buildGameView({ conn, onLobby, username: 'Dumptest', gameId: 'offline', readMorgue })
   mounted.push(view)
   document.body.appendChild(view)
-  return { view, send, onLobby, dispatch: (msg) => conn.onMessage(msg as ServerMsg) }
+  return { view, send, onLobby, ...frameDispatcher(conn) }
 }
 
 // --- small DOM helpers, scoped to the view under test ---
@@ -2968,6 +2986,108 @@ describe('lobby transitions', () => {
   })
 })
 
+describe('startup spell harvest batching', () => {
+  const sentI = (h: Harness) => sent(h).filter(m => m.msg === 'input' && m.text === 'I')
+
+  it('waits for the startup RC skill menu to close before probing', () => {
+    const h = setup()
+    h.dispatchBatch([
+      { msg: 'input_mode', mode: 1 },
+      { msg: 'input_mode', mode: 0 },
+      { msg: 'menu', type: 'crt', tag: 'skills' },
+    ])
+    expect(sentI(h)).toEqual([])
+    h.dispatchBatch([
+      { msg: 'close_menu' },
+      { msg: 'close_all_menus' },
+      { msg: 'input_mode', mode: 1 },
+    ])
+    expect(sentI(h)).toHaveLength(1)
+    h.dispatchBatch([
+      { msg: 'input_mode', mode: 0 },
+      { msg: 'menu', tag: 'spell', items: [{ hotkeys: [97], tiles: [{ t: 42, tex: 0 }],
+        text: ` a - ${'Magic Dart'.padEnd(32)}${'Conjuration'.padEnd(26)}1%       1` }] },
+    ])
+    expect(h.view.querySelector('#spell-rail')?.textContent).toContain('a')
+    expect(isHidden(overlay(h))).toBe(true)
+  })
+
+  it('also waits for a popup sent after COMMAND without another mode change', () => {
+    const h = setup()
+    h.dispatchBatch([
+      { msg: 'input_mode', mode: 1 },
+      { msg: 'ui-push', type: 'describe-item', title: 'Startup', body: 'Text' },
+    ])
+    expect(sentI(h)).toEqual([])
+    h.dispatch({ msg: 'ui-pop' })
+    expect(sentI(h)).toHaveLength(1)
+  })
+
+  it('does not probe into a startup prompt or targeting mode later in the batch', () => {
+    const h = setup()
+    h.dispatchBatch([
+      { msg: 'input_mode', mode: 1 },
+      { msg: 'input_mode', mode: 7 },
+      { msg: 'init_input', type: 'messages', prompt: 'Target skill level:' },
+    ])
+    expect(sentI(h)).toEqual([])
+    h.dispatchBatch([
+      { msg: 'close_input' },
+      { msg: 'input_mode', mode: 1 },
+      { msg: 'input_mode', mode: 4 },
+    ])
+    expect(sentI(h)).toEqual([])
+    h.dispatch({ msg: 'input_mode', mode: 1 })
+    expect(sentI(h)).toHaveLength(1)
+  })
+
+  it('retries a raced-in foreign menu only on returning to COMMAND', () => {
+    const h = setup()
+    h.dispatch({ msg: 'input_mode', mode: 1 })
+    h.dispatchBatch([
+      { msg: 'input_mode', mode: 0 },
+      { msg: 'menu', type: 'crt', tag: 'skills' },
+    ])
+    expect(sentI(h)).toHaveLength(1)
+    h.dispatchBatch([
+      { msg: 'close_menu' },
+      { msg: 'close_all_menus' },
+      { msg: 'input_mode', mode: 1 },
+    ])
+    expect(sentI(h)).toHaveLength(2)
+  })
+
+  it('coalesces repeated COMMAND messages into one probe', () => {
+    const h = setup()
+    h.dispatchBatch([
+      { msg: 'input_mode', mode: 1 },
+      { msg: 'input_mode', mode: 1 },
+      { msg: 'msgs', messages: [{ text: 'Welcome.' }] },
+    ])
+    expect(sentI(h)).toHaveLength(1)
+  })
+
+  it('retains a genuine command entry while a popup blocks its pending retry', () => {
+    const h = setup()
+    h.dispatch({ msg: 'input_mode', mode: 1 })
+    h.dispatchBatch([
+      { msg: 'input_mode', mode: 0 },
+      { msg: 'menu', type: 'crt', tag: 'skills' },
+      { msg: 'input_mode', mode: 1 },
+    ])
+    expect(sentI(h)).toHaveLength(1)
+    h.dispatch({ msg: 'close_menu' })
+    expect(sentI(h)).toHaveLength(2)
+  })
+
+  it('does not send a queued probe after leaving the game', () => {
+    const h = setup()
+    h.dispatchBatch([{ msg: 'input_mode', mode: 1 }, { msg: 'go_lobby' }])
+    expect(h.onLobby).toHaveBeenCalledOnce()
+    expect(sentI(h)).toEqual([])
+  })
+})
+
 // Silent spell harvest: fire `I`, capture the default columns, then Escape —
 // all without rendering the menu. Driven via the dev hooks
 // (window.__dcssHarvestSpells / __dcssSpellCache, present because vitest runs
@@ -3005,6 +3125,32 @@ describe('spell harvest (silent I → Esc) + preface parsing', () => {
   const feedBase = (h: Harness) => h.dispatch({ msg: 'menu', tag: 'spell', items: BASE })
   const fullHarvest = (h: Harness) => { startHarvest(); feedBase(h) }
   const sentInputI = (h: Harness) => sent(h).filter(m => m.msg === 'input' && (m as { text?: string }).text === 'I')
+
+  it('manual keyboard I fills an empty rail immediately and keeps the spell window open', () => {
+    const h = setup()
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'I', code: 'KeyI', shiftKey: true, bubbles: true }))
+    h.dispatchBatch([
+      { msg: 'input_mode', mode: 0 },
+      { msg: 'menu', tag: 'spell', title: { text: '당신의 주문 (설명)' }, items: BASE },
+    ])
+    expect(cache().map(s => s.letter)).toEqual(['a', 'c'])
+    expect(isHidden(h.view.querySelector<HTMLElement>('#spell-rail')!)).toBe(false)
+    expect(isHidden(overlay(h))).toBe(false)
+    expect(sent(h)).toEqual([{ msg: 'input', text: 'I' }])
+    h.dispatchBatch([{ msg: 'close_menu' }, { msg: 'input_mode', mode: 1 }])
+    expect(sentInputI(h)).toHaveLength(1)
+  })
+
+  it('manual M never fills the spell rail with unmemorised spells', () => {
+    const h = setup()
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'M', code: 'KeyM', shiftKey: true, bubbles: true }))
+    h.dispatchBatch([
+      { msg: 'input_mode', mode: 0 },
+      { msg: 'menu', tag: 'spell', title: { text: 'Spells (Memorise)' }, items: BASE },
+    ])
+    expect(cache()).toEqual([])
+    expect(isHidden(overlay(h))).toBe(false)
+  })
 
   it('drives exactly the silent I → Esc sequence and never shows an overlay', () => {
     const h = setup()
@@ -3650,8 +3796,13 @@ describe('spell harvest (silent I → Esc) + preface parsing', () => {
       ready(h)
       bookBtn(h).click()
       h.dispatch({ msg: 'input_mode', mode: 0 })
-      h.dispatch({ msg: 'menu', tag: 'spell', title: { text: 'Your spells (describe)' }, items: BASE })
+      h.dispatch({ msg: 'menu', tag: 'spell', title: { text: 'Your spells (describe)' }, items: [
+        baseRow('-', 'b', 98, 'Magic Dart', 'Conjuration', '1%', 1),
+      ] })
       expect(isHidden(overlay(h))).toBe(false)
+      expect(cache()).toMatchObject([{ letter: 'b', title: 'Magic Dart' }])
+      expect(railBtn(h, 'a')).toBeUndefined()
+      expect(railBtn(h, 'b')).toBeDefined()
     })
   })
 })

@@ -5,6 +5,7 @@
 // view-only, costs no turn and can't cast), capture the resulting menu
 // items, Escape it closed, and never render it. The cache feeds the
 // quick-cast spell rail and the touch panel's z tab.
+// A player-opened I list refreshes the same cache without closing the menu.
 //
 // The spell menu is a ToggleableMenu with two column sets: the default
 // (schools / failure% / level) arrives in the `menu` message; the alternate
@@ -69,21 +70,21 @@ export class SpellHarvester {
   // so the late menu is still captured silently instead of rendering as a
   // surprise full-screen spell list with the rail abandoned empty for the
   // whole game.
-  private phase: 'idle' | 'base' | 'late-base' = 'idle'
+  private phase: 'idle' | 'base' | 'late-base' | 'manual' = 'idle'
   private timer = 0
   // Set when we send the harvest-closing Escape so the matching server
   // close_menu — for a menu we deliberately never pushed onto the menu
   // stack — is swallowed instead of popping/clearing real overlay state.
   private pendingClose = false
-  // Auto-harvest fires once per game (so the rail is populated without the
-  // player opening the tray). One harvester per game view, so per game.
-  private autoHarvested = false
+  // An attempted startup probe is not necessarily a successful capture.
+  // Failed attempts use the bounded retry below, never another auto probe.
+  private autoAttempted = false
   // Set when the letter→spell map changes (memorise / forget / `=`
   // reassign) so the rail isn't left mapping a stale letter — which would
   // cast the WRONG spell on tap. Resolved by reharvestIfDirty() at the next
   // clean command-mode moment. Event-driven, not timer-polled.
   private dirty = false
-  // The give-up's one retry (armTimeout). `retryPending` waits for
+  // An interrupted or timed-out probe's one retry. `retryPending` waits for
   // retryOnCommandEntry; `retried` spends the retry until any reply
   // (capture or no-spells terminator) re-arms it. A retry cut
   // short by an abort (foreign menu, close_all_menus) stays
@@ -152,13 +153,41 @@ export class SpellHarvester {
     this.pendingClose = false
   }
 
+  // A foreign menu or bulk close interrupted the probe. Retry only once,
+  // after the server returns to a safe command prompt.
+  interrupt(): void {
+    const probing = this.phase === 'base' || this.phase === 'late-base'
+    this.reset()
+    if (probing && !this.retried) {
+      this.retried = true
+      this.retryPending = true
+    }
+  }
+
+  // Track the command, not the menu's translated title. A manual I refreshes
+  // the cache but must leave the spell window open for the player.
+  onUserSend(msg: ClientMsg): void {
+    if (this.spectating || (msg.msg !== 'input' && msg.msg !== 'key')) return
+    const inspecting = (msg.msg === 'input' ? msg.text === 'I' : msg.keycode === 73)
+      && this.hooks.uiQuiet() && !this.isHarvesting()
+    if (this.phase === 'late-base') this.interrupt()
+    else if (this.phase === 'manual') this.reset()
+    if (!inspecting) return
+    this.reset()
+    this.phase = 'manual'
+    this.timer = window.setTimeout(() => this.reset(), HARVEST_SUPPRESS_MS + HARVEST_LATE_MS)
+  }
+
   // Fire a silent `I` to (re)populate the cache. Only from a clean game
   // state — otherwise the keystroke is swallowed by whatever prompt/menu/
   // overlay is up (and could mean something else entirely).
-  // Returns true if the harvest actually started (so the auto-trigger only
-  // marks itself done when it really fired, not when the guard bailed).
+  // Returns true if the harvest actually started; a blocked attempt spends
+  // neither the startup probe nor a pending refresh/retry.
   harvest(): boolean {
     if (!this.channelIdle()) return false
+    this.autoAttempted = true
+    this.dirty = false
+    this.retryPending = false
     this.phase = 'base'
     this.hooks.send({ msg: 'input', text: 'I' })
     this.armTimeout()
@@ -168,8 +197,8 @@ export class SpellHarvester {
   // Auto-harvest once per game so the persistent rail is populated. Fired
   // on the first clean COMMAND-mode transition.
   maybeAutoHarvest(): void {
-    if (this.spectating || this.autoHarvested || this.isHarvesting()) return
-    if (this.harvest()) this.autoHarvested = true
+    if (this.spectating || this.autoAttempted) return
+    this.harvest()
   }
 
   // Resolve a pending letter-map change (dirty): re-harvest so the rail
@@ -180,11 +209,11 @@ export class SpellHarvester {
   reharvestIfDirty(): void {
     if (!this.dirty) return
     if (this.spectating) { this.dirty = false; return }
-    if (this.harvest()) this.dirty = false
+    this.harvest()
   }
 
-  // Resolve the give-up's pending retry (armTimeout). The caller invokes
-  // this only on an input_mode 0→1 transition, never on a 1→1 repeat: a
+  // Resolve a failed probe's pending retry. The caller invokes this after
+  // an input_mode 0→1 transition becomes quiet, never on a 1→1 repeat: a
   // spectator join makes the engine re-send the current mode to the player
   // too (tileweb.cc _send_everything → update_input_mode(mode, true)), so
   // a repeated 1 can reach us while the engine has yet to read our first
@@ -193,7 +222,7 @@ export class SpellHarvester {
   retryOnCommandEntry(): void {
     if (!this.retryPending) return
     if (this.spectating) { this.retryPending = false; return }
-    if (this.harvest()) this.retryPending = false
+    this.harvest()
   }
 
   // A `menu` message arrived; titlePlain is the DCSS-markup-stripped title.
@@ -206,16 +235,15 @@ export class SpellHarvester {
   // the title is the probe's own "Your spells (describe)" (`I` →
   // list_spells(viewing=true) → real_action "describe").
   onMenu(tag: string | undefined, titlePlain: string, items: SpellMenuItem[] | undefined): boolean {
-    if (tag === 'spell'
-        && (this.phase === 'base'
+    if (!this.spectating && tag === 'spell'
+        && (this.phase === 'base' || this.phase === 'manual'
             || (this.phase === 'late-base'
-                && /^Your spells \(describe\)/.test(titlePlain)))) {
-      this.reset()  // timer + phase; the latch is re-set just below
-      this.retried = false
-      this.cache = (items ?? [])
+                && /^Your spells \(describe\)/.test(titlePlain.trimStart())))) {
+      const silent = this.phase !== 'manual'
+      this.capture((items ?? [])
         .filter(it => !!it.hotkeys?.length && !!it.tiles?.length)
-        .map(parseSpellItem)
-      this.hooks.onSpellsChanged()
+        .map(parseSpellItem))
+      if (!silent) return false
       this.pendingClose = true
       this.hooks.send({ msg: 'key', keycode: 27 })  // Escape closes the menu
       return true
@@ -228,7 +256,7 @@ export class SpellHarvester {
     // fallback, leaving a real menu the user can see but can't touch.
     // (Covers `late-base` too: a foreign menu opening means the server
     // isn't sitting in our probe's menu, so stop waiting for it.)
-    if (this.phase !== 'idle') this.reset()
+    if (this.phase !== 'idle') this.interrupt()
     // A real menu is opening, so any pending harvest-close expectation is
     // stale (its close_menu already came or never will). Drop the latch —
     // otherwise THIS menu's eventual close_menu would be wrongly swallowed.
@@ -268,11 +296,9 @@ export class SpellHarvester {
     // of every msgs batch, and only a mid-harvest line can be the
     // terminator.
     if (this.phase !== 'idle' && /^You don't know any spells\b/.test(stripDcss(text).trim())) {
-      this.cache = []
-      this.reset()
-      this.retried = false
-      this.hooks.onSpellsChanged()
-      return true
+      const silent = this.phase !== 'manual'
+      this.capture([])
+      return silent
     }
     // The letter→spell map just changed under us — flag the rail stale so
     // reharvestIfDirty() refreshes it; otherwise a tap would cast the wrong
@@ -294,6 +320,15 @@ export class SpellHarvester {
     return false
   }
 
+  private capture(entries: SpellEntry[]): void {
+    this.reset()
+    this.autoAttempted = true
+    this.dirty = false
+    this.retryPending = false
+    this.retried = false
+    this.setSpells(entries)
+  }
+
   // Fallback if the harvest's `I` reply never arrives within the
   // input-suppression budget — either the character has no spells and the
   // MSG_NO_SPELLS fast path was lost, or the link is just slower than the
@@ -301,7 +336,7 @@ export class SpellHarvester {
   // `late-base`, which lifts input suppression but keeps listening for the
   // menu so a slow reply is still captured silently — a reset-to-idle here
   // would let that late menu render as an unrequested full-screen spell
-  // list AND leave the rail empty for the rest of the game (autoHarvested
+  // list AND leave the rail empty for the rest of the game (autoAttempted
   // stays true). Only after the extended `late-base` window also passes do
   // we conclude the frame was truly dropped and clear the cache — it is
   // either empty (the auto-harvest) or suspect (a letter-change re-harvest;
@@ -310,7 +345,7 @@ export class SpellHarvester {
   // sends input_mode 0 as it reads our `I` (main.cc _get_next_keycode's
   // mouse_control), so a reply merely slower than this window arrives
   // behind that 0 and retryOnCommandEntry can't fire into its menu. Never
-  // drop the retry: autoHarvested is spent and `dirty` already cleared, so
+  // drop the retry: autoAttempted is spent and `dirty` already cleared, so
   // nothing else would re-probe this game.
   private armTimeout(): void {
     clearTimeout(this.timer)
@@ -319,9 +354,8 @@ export class SpellHarvester {
       this.phase = 'late-base'
       this.timer = window.setTimeout(() => {
         if (this.phase !== 'late-base') return
-        this.reset()
+        this.interrupt()
         this.cache = []
-        if (!this.retried) { this.retried = true; this.retryPending = true }
         this.hooks.onSpellsChanged()
       }, HARVEST_LATE_MS)
     }, HARVEST_SUPPRESS_MS)
@@ -353,14 +387,17 @@ function stripSpellPreface(rawText: string | undefined): string {
 export function parseSpellItem(it: SpellMenuItem): SpellEntry {
   const letter = String.fromCharCode(it.hotkeys![0])
   const plain = stripSpellPreface(it.text)
-  const tail = plain.slice(58).trim().split(/\s+/).filter(Boolean)
+  // DWEM's PAD_END counts non-Latin-1 glyphs as two display cells. Keep
+  // those offsets when parsing translated names and schools as well.
+  const cells = Array.from(plain).flatMap(char => char.codePointAt(0)! > 0xff ? [char, ''] : [char])
+  const tail = cells.slice(58).join('').trim().split(/\s+/).filter(Boolean)
   const level = Number(tail[tail.length - 1])
   return {
     letter,
     tile: it.tiles![0].t,
     colour: it.colour,
-    title: plain.slice(0, 32).trim() || plain.trim(),
-    schools: plain.slice(32, 58).trim() || undefined,
+    title: cells.slice(0, 32).join('').trim() || plain.trim(),
+    schools: cells.slice(32, 58).join('').trim() || undefined,
     fail: tail.slice(0, -1).join(' ') || undefined,
     level: Number.isFinite(level) ? level : undefined,
   }

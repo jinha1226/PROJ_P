@@ -29,7 +29,7 @@ interface TraceFixture {
 
 const fixtures = import.meta.glob<TraceFixture>('./*.golden.json', { eager: true, import: 'default' })
 
-function trace(fx: TraceFixture): string {
+async function trace(fx: TraceFixture): Promise<string> {
   const lines: string[] = []
   // onLobby is where the app hands the socket to the lobby view; frames
   // after it never reach this view, so the replay stops there.
@@ -59,6 +59,7 @@ function trace(fx: TraceFixture): string {
     if (handedOver) break
     const mark = lines.length
     conn.onMessage(m)
+    await Promise.resolve()  // deferred command probes run after the frame
     const now = probeScreen(view)
     if (now === last && lines.length === mark) continue
     lines.splice(mark, 0, `#${i} ${frameLabel(m as unknown as Record<string, unknown>)}`)
@@ -80,7 +81,7 @@ describe('screen traces', () => {
     it(`${name} — ${fx.description}`, async () => {
       vi.stubGlobal('localStorage', fakeStorage())
       setPref('mapRenderMode', 'ascii')
-      await expect(trace(fx)).toMatchFileSnapshot(`./__traces__/${name}.trace`)
+      await expect(await trace(fx)).toMatchFileSnapshot(`./__traces__/${name}.trace`)
     })
   }
 })

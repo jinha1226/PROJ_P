@@ -269,9 +269,116 @@ describe('auto-harvest and spectating', () => {
     h.reharvestIfDirty()
     expect(sent).toEqual([])
   })
+
+  it.each(['foreign menu', 'bulk close'])('retries an interrupted startup probe once (%s)', (reason) => {
+    const { h, sentI, setQuiet } = makeHarvester()
+    const interrupt = () => reason === 'foreign menu'
+      ? h.onMenu('skills', '', []) : h.interrupt()
+    h.maybeAutoHarvest()
+    interrupt()
+    setQuiet(false)
+    h.retryOnCommandEntry()
+    expect(sentI()).toBe(1)
+    setQuiet(true)
+    h.retryOnCommandEntry()
+    expect(sentI()).toBe(2)
+    interrupt()
+    h.retryOnCommandEntry()
+    h.maybeAutoHarvest()
+    expect(sentI()).toBe(2)
+  })
+})
+
+describe('manual spell inspection', () => {
+  it('refreshes spells and changed letters without swallowing or Escaping the menu', () => {
+    const { h, sent, changed } = makeHarvester()
+    h.setSpells([{ title: 'Freeze', letter: 'a', tile: 42 }])
+    h.onUserSend({ msg: 'input', text: 'I' })
+    expect(h.isHarvesting()).toBe(false)
+    expect(h.channelIdle()).toBe(false)
+    expect(h.onMenu('spell', DESCRIBE_TITLE, [row('b', 'Magic Dart')])).toBe(false)
+    expect(h.spells).toMatchObject([{ title: 'Magic Dart', letter: 'b' }])
+    expect(changed()).toBe(2)
+    expect(h.consumePendingClose()).toBe(false)
+    h.maybeAutoHarvest()
+    h.retryOnCommandEntry()
+    expect(sent).toEqual([])
+  })
+
+  it('identifies a translated I menu by the user command, not the title', () => {
+    const { h } = makeHarvester()
+    h.onUserSend({ msg: 'key', keycode: 73 })
+    expect(h.onMenu('spell', '당신의 주문 (설명)', [row('a', 'Magic Dart')])).toBe(false)
+    expect(h.spells).toHaveLength(1)
+  })
+
+  it('never captures unmemorised M lists or I hotkeys inside other menus', () => {
+    const { h, setQuiet } = makeHarvester()
+    h.onUserSend({ msg: 'input', text: 'M' })
+    h.onMenu('spell', 'Spells (Describe)', [row('a', 'Fireball')])
+    setQuiet(false)
+    h.onUserSend({ msg: 'input', text: 'I' })
+    h.onMenu('spell', 'Spells (Memorise)', [row('b', 'Blink')])
+    expect(h.spells).toEqual([])
+  })
+
+  it('clears an old cache on a manual no-spells response but leaves the message visible', () => {
+    const { h, sent } = makeHarvester()
+    h.setSpells([{ title: 'Freeze', letter: 'a', tile: 42 }])
+    h.onUserSend({ msg: 'input', text: 'I' })
+    expect(h.onMsgLine("You don't know any spells.")).toBe(false)
+    expect(h.spells).toEqual([])
+    h.maybeAutoHarvest()
+    expect(sent).toEqual([])
+  })
+
+  it('a successful manual inspection cancels a pending automatic retry and dirty refresh', () => {
+    const { h, sentI } = makeHarvester()
+    h.maybeAutoHarvest()
+    vi.advanceTimersByTime(HARVEST_SUPPRESS_MS + HARVEST_LATE_MS)
+    h.onMsgLine("Spell assigned to 'a'.")
+    h.onUserSend({ msg: 'input', text: 'I' })
+    h.onMenu('spell', DESCRIBE_TITLE, [row('a', 'Magic Dart')])
+    h.retryOnCommandEntry()
+    h.reharvestIfDirty()
+    h.maybeAutoHarvest()
+    expect(sentI()).toBe(1)
+  })
+
+  it('does not mistake a menu after cancelling I for the manual spell list', () => {
+    const { h } = makeHarvester()
+    h.onUserSend({ msg: 'input', text: 'I' })
+    h.onUserSend({ msg: 'key', keycode: 27 })
+    h.onMenu('spell', 'Spells (Memorise)', [row('a', 'Fireball')])
+    expect(h.spells).toEqual([])
+  })
+
+  it('does not keep the command channel blocked if the manual reply never arrives', () => {
+    const { h } = makeHarvester()
+    h.onUserSend({ msg: 'input', text: 'I' })
+    vi.advanceTimersByTime(HARVEST_SUPPRESS_MS + HARVEST_LATE_MS)
+    expect(h.channelIdle()).toBe(true)
+  })
+
+  it('does not populate a spectator cache', () => {
+    const { h } = makeHarvester({ spectating: true })
+    h.onUserSend({ msg: 'input', text: 'I' })
+    h.onMenu('spell', DESCRIBE_TITLE, [row('a', 'Magic Dart')])
+    expect(h.spells).toEqual([])
+  })
 })
 
 describe('parseSpellItem column slicing', () => {
+  it('preserves DWEM double-width padding for translated spell names and schools', () => {
+    const it_ = {
+      hotkeys: [97], tiles: [{ t: 7, tex: 0 }],
+      text: ` a + <lightgrey>마법의 다트${' '.repeat(21)}파괴술${' '.repeat(20)}1%       1      </lightgrey>`,
+    }
+    expect(parseSpellItem(it_)).toMatchObject({
+      letter: 'a', title: '마법의 다트', schools: '파괴술', fail: '1%', level: 1, tile: 7,
+    })
+  })
+
   it('strips the "+" preface on the preselected last-cast row', () => {
     const it_ = {
       hotkeys: [97], tiles: [{ t: 7, tex: 0 }],

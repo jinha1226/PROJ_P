@@ -127,7 +127,10 @@ export function buildGameView(opts: GameViewOptions): HTMLElement {
     username = '', gameId = '', guest = false, resumed = false,
   } = opts
   // conn.send is a method: this keeps its receiver.
-  const send =(m: ClientMsg): void => conn.send(m)
+  const send = (m: ClientMsg): void => {
+    harvester.onUserSend(m)
+    conn.send(m)
+  }
   const store = new MapStore()
   if (import.meta.env.DEV) (window as unknown as { __dcssStore: MapStore }).__dcssStore = store
   // Construct the requested renderer directly. This matters now that DWEM
@@ -434,10 +437,28 @@ export function buildGameView(opts: GameViewOptions): HTMLElement {
   // here is safe; the harvester fires no hook while constructing, so
   // spellRail (built below) is ready.
   const harvester = new SpellHarvester({
-    send,
+    send: (m) => conn.send(m),
     uiQuiet: () => uiQuiet(),
     onSpellsChanged: () => exposeSpellCache(),
   }, !!spectating)
+  let harvestScheduled = false
+  let harvestCommandEntry = false
+
+  function scheduleSpellHarvest(): void {
+    if (harvestScheduled) return
+    harvestScheduled = true
+    // A startup RC can open skills after a transient COMMAND in the same
+    // wire batch. Inspect its final UI state before injecting I.
+    queueMicrotask(() => {
+      harvestScheduled = false
+      if (disposed || !uiQuiet()) return
+      const commandEntry = harvestCommandEntry
+      harvestCommandEntry = false
+      if (commandEntry) harvester.retryOnCommandEntry()
+      harvester.maybeAutoHarvest()
+      harvester.reharvestIfDirty()
+    })
+  }
 
   let inXMode = false
   let exitedXModeForInput = false
@@ -816,7 +837,7 @@ export function buildGameView(opts: GameViewOptions): HTMLElement {
     closeMinimap: () => minimaps.closeLens(),
     menuNav: (nav) => menuView.nav(nav),
     scrollerNav: (nav, page) => layoutView.scrollerNav(nav, page),
-    send: (msg) => { conn.send(msg); afterUserSend(msg) },
+    send: (msg) => { send(msg); afterUserSend(msg) },
   }
 
   // The touch strip's and the Android back gesture's way in: an injected Esc
@@ -1461,9 +1482,8 @@ export function buildGameView(opts: GameViewOptions): HTMLElement {
       // A memorise/forget's "Spell assigned…" line arrives after that turn's
       // input_mode 1 (update_input_mode skips the redraw on NORMAL→COMMAND,
       // so the mode frame precedes the msgs flush; fixtures 10, 14), so
-      // re-harvest here. One flushed earlier, in mode 0, waits for the next
-      // input_mode 1 (uiQuiet requires COMMAND).
-      msgs: (msg) => { messageLog.onMsgs(msg); harvester.reharvestIfDirty() },
+      // handleMsg schedules a re-harvest after the whole batch is processed.
+      msgs: (msg) => messageLog.onMsgs(msg),
       cursor: onCursor,
       close_input: onCloseInput,
       close_menu: onCloseMenu,
@@ -1482,6 +1502,7 @@ export function buildGameView(opts: GameViewOptions): HTMLElement {
     // Unhandled types are dropped: the lobby's messages reach the game view
     // in the same batch as its exit (game_ended, go_lobby, lobby list).
     dispatch(handlers, msg)
+    if (currentInputMode === 1) scheduleSpellHarvest()
   }
 
   // Raw-HTML modal. No emitter in upstream trunk or 0.34.1 (the reference
@@ -1777,6 +1798,7 @@ export function buildGameView(opts: GameViewOptions): HTMLElement {
   function onInputMode(msg: MsgOf<'input_mode'>): void {
     const prevInputMode = currentInputMode
     currentInputMode = msg.mode
+    if (msg.mode !== 1) harvestCommandEntry = false
     if (prevInputMode !== msg.mode) setTouchCursor(null)
     if (msg.mode === 1) {  // COMMAND: normal play resumed
       messageLog.hideMore()
@@ -1786,10 +1808,8 @@ export function buildGameView(opts: GameViewOptions): HTMLElement {
       // COMMAND-while-COMMAND repeat (game.js set_input_mode early-returns).
       if (prevInputMode !== 1) {
         messageLog.markLast('cmd')
-        harvester.retryOnCommandEntry()  // a given-up probe's one retry
+        harvestCommandEntry = true
       }
-      harvester.maybeAutoHarvest()  // populate the spell rail on first entry to play
-      harvester.reharvestIfDirty()  // refresh after a `=` reassign (or a deferred memorise/forget)
     }
     // YESNO prompts fire inside any menu that calls yesno() while open:
     // shop purchase (shopping.cc), acquirement (acquire.cc), Nemelex
@@ -1903,7 +1923,7 @@ export function buildGameView(opts: GameViewOptions): HTMLElement {
     menuShift.reset()
     closeClientOverlays()
     menuView.dropFilter()
-    harvester.reset()
+    harvester.interrupt()
     if (!gameOverSeen) hideOverlay()
   }
 
