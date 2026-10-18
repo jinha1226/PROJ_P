@@ -421,23 +421,21 @@ export function buildLobbyView(
   function renderGameButtons(html: string): void {
     if (!gamesEl) return
 
-    // Trust the server: every #play-<id> link the server advertises becomes a
-    // button. We only decide *visibility* — main DCSS (latest stable + trunk)
-    // is shown up front; everything else (older versions, sprint, seeded,
-    // descent, ...) goes behind a "Show all versions" toggle so the lobby
-    // stays compact on a phone.
-    const all = parseGameLinks(html)
+    // Trust the server: every advertised #play-<id> link gets a button in
+    // "Show all versions". Latest stable and trunk also get headline buttons
+    // so the lobby stays compact on a phone.
+    const groups = parseGameLinkGroups(html)
+    const all = groups.flat()
     if (all.length === 0) return
 
     // The two headline games, already in display order (newest stable on top,
-    // trunk second); everything else goes behind the "Show all versions" toggle.
+    // trunk second), remain in the full list as well.
     const primaryIds = selectPrimaryGameIds(all.map(g => g.gameId))
-    const primarySet = new Set(primaryIds)
     const byId = new Map(all.map(g => [g.gameId, g] as const))
 
+    const expanded = gamesEl.querySelector<HTMLDetailsElement>('.lobby-more-games')?.open ?? false
     gamesEl.innerHTML = ''
     const primaryGames = primaryIds.map(id => byId.get(id)!)
-    const otherGames = all.filter(g => !primarySet.has(g.gameId))
 
     for (const g of primaryGames) {
       if (TRUNK_RE.test(g.gameId)) {
@@ -454,20 +452,28 @@ export function buildLobbyView(
       }
     }
 
-    if (otherGames.length > 0) {
+    if (all.length > primaryGames.length) {
       const details = document.createElement('details')
       details.className = 'lobby-more-games'
+      details.open = expanded
       const summary = document.createElement('summary')
-      summary.textContent = `Show all versions (${otherGames.length})`
+      summary.textContent = `Show all versions (${all.length})`
       details.appendChild(summary)
       const moreList = document.createElement('div')
       moreList.className = 'lobby-more-games-list'
-      for (const g of otherGames) moreList.appendChild(makeGameBtn(g, 'lobby-btn-secondary'))
+      for (const group of groups) {
+        const row = document.createElement('div')
+        row.className = 'lobby-more-games-row'
+        row.setAttribute('role', 'group')
+        row.setAttribute('aria-label', group[0].label)
+        for (const g of group) row.appendChild(makeGameBtn(g, 'lobby-btn-secondary'))
+        moreList.appendChild(row)
+      }
       details.appendChild(moreList)
       // Advisory footnote, only when this server actually offers pre-cutoff
       // versions (the parse fails open, so fork-only lists show nothing).
       // Informs at the moment of intent; nothing is hidden or blocked.
-      if (otherGames.some(g => isBelowSupportCutoff(parseDcssVersion(g.gameId)))) {
+      if (all.some(g => isBelowSupportCutoff(parseDcssVersion(g.gameId)))) {
         const note = document.createElement('p')
         note.className = 'lobby-more-games-note'
         note.textContent = 'Versions before 0.24 predate PocketZot’s supported range — starting a new character there usually won’t work.'
@@ -637,19 +643,31 @@ export function buildLobbyView(
 export interface GameLink { gameId: string; label: string; save?: string }
 
 export function parseGameLinks(html: string): GameLink[] {
+  return parseGameLinkGroups(html).flat()
+}
+
+function parseGameLinkGroups(html: string): GameLink[][] {
   const doc = new DOMParser().parseFromString(html, 'text/html')
-  const out: GameLink[] = []
-  doc.querySelectorAll<HTMLAnchorElement>('a[href^="#play-"]').forEach(link => {
+  const groups: GameLink[][] = []
+  let row: GameLink[] = []
+  // Server line breaks group a release with its modes; keep those boundaries
+  // even inside collapsed server sections, without guessing from game ids.
+  doc.querySelectorAll('br, a[href^="#play-"]').forEach(link => {
+    if (link.tagName === 'BR') {
+      if (row.length > 0) { groups.push(row); row = [] }
+      return
+    }
     const gameId = link.getAttribute('href')!.slice(6) // strip "#play-"
     const text = link.textContent?.trim() ?? ''
     const save = /^\[(.*)\]$/.exec(text)?.[1]
-    if (save === undefined) { out.push({ gameId, label: text || gameId }); return }
+    if (save === undefined) { row.push({ gameId, label: text || gameId }); return }
     // The name is the text node before the link's wrapper <span>, behind the
     // template's " | " separator when the game shares an rc row.
     const name = link.parentElement?.previousSibling?.textContent?.replace(/^[\s|]+/, '').trim()
-    out.push({ gameId, label: name || gameId, save })
+    row.push({ gameId, label: name || gameId, save })
   })
-  return out
+  if (row.length > 0) groups.push(row)
+  return groups
 }
 
 // Expected end-of-game reasons; anything outside this set is "abnormal"

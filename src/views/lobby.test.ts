@@ -334,7 +334,66 @@ describe('lobby renders the headline buttons', () => {
 
     const secondary = [...view.querySelectorAll('#lobby-games .lobby-btn-secondary')]
       .map(b => b.textContent)
-    expect(secondary).toEqual(['Sprint Mode'])
+    expect(secondary).toEqual(['Trunk (unstable)', 'v0.34', 'Sprint Mode'])
+    expect(view.querySelector('.lobby-more-games > summary')?.textContent)
+      .toBe('Show all versions (3)')
+  })
+
+  it('includes a saved CNC trunk game in all versions and launches its exact id', () => {
+    const { dispatch, view, conn } = setupLobby()
+    const content =
+      '<span>DCSS trunk <span><a href="#play-dcss-git">[tester, a level 4 Mountain Dwarf Warper]</a></span></span>' +
+      '<a href="#play-dcss-0.34">DCSS 0.34</a>' +
+      '<a href="#play-spr-git">Sprint trunk</a>'
+    dispatch({ msg: 'set_game_links', content } as unknown as ServerMsg)
+
+    const details = view.querySelector<HTMLDetailsElement>('.lobby-more-games')!
+    details.open = true
+    const buttons = [...details.querySelectorAll<HTMLButtonElement>('button')]
+    expect(buttons.map(b => b.textContent)).toEqual(['DCSS trunk', 'DCSS 0.34', 'Sprint trunk'])
+    expect(buttons[0].classList.contains('has-save')).toBe(true)
+
+    buttons[0].click()
+    expect(conn.send).toHaveBeenCalledWith({ msg: 'play', game_id: 'dcss-git' })
+  })
+
+  it('keeps the server version rows and their modes together, including nested older versions', () => {
+    const { dispatch, view, conn } = setupLobby()
+    const content =
+      '<span><br><a href="#play-dcss-git">DCSS trunk</a></span>' +
+      '<span> | <a href="#play-dcss-git-sprint">Sprint</a></span><br>' +
+      '<span><br><a href="#play-dcss-0.34">DCSS 0.34</a></span>' +
+      '<span> | <a href="#play-dcss-0.34-sprint">Sprint</a></span>' +
+      '<details><summary>Old stable versions</summary>' +
+      '<span><br>DCSS 0.33 <span><a href="#play-dcss-0.33">[playing]</a></span></span>' +
+      '<span> | Tutorial <span>[slot full]</span></span>' +
+      '<span> | <a href="#play-dcss-0.33-sprint">Sprint</a></span></details><br>'
+    dispatch({ msg: 'set_game_links', content } as unknown as ServerMsg)
+
+    const rows = [...view.querySelectorAll('.lobby-more-games-row')]
+    expect(rows.map(row => [...row.querySelectorAll('button')].map(b => b.textContent)))
+      .toEqual([
+        ['DCSS trunk', 'Sprint'],
+        ['DCSS 0.34', 'Sprint'],
+        ['DCSS 0.33', 'Sprint'],
+      ])
+    rows[1].querySelectorAll('button')[1].click()
+    expect(conn.send).toHaveBeenCalledWith({ msg: 'play', game_id: 'dcss-0.34-sprint' })
+  })
+
+  it('keeps all versions expanded when the server refreshes saved games', () => {
+    const { dispatch, view } = setupLobby()
+    const others = '<br><a href="#play-dcss-0.34">DCSS 0.34</a>' +
+      '<br><a href="#play-dcss-0.33">DCSS 0.33</a>'
+    dispatch({ msg: 'set_game_links', content: '<a href="#play-dcss-git">DCSS trunk</a>' + others } as unknown as ServerMsg)
+    view.querySelector<HTMLDetailsElement>('.lobby-more-games')!.open = true
+
+    dispatch({
+      msg: 'set_game_links',
+      content: '<span>DCSS trunk <span><a href="#play-dcss-git">[playing]</a></span></span>' + others,
+    } as unknown as ServerMsg)
+    expect(view.querySelector<HTMLDetailsElement>('.lobby-more-games')!.open).toBe(true)
+    expect(view.querySelector('.lobby-more-games .has-save')?.textContent).toBe('DCSS trunk')
   })
 
   it('keeps a non-redundant trunk label intact (CDI-style)', () => {

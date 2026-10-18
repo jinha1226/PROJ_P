@@ -1459,9 +1459,22 @@ button.lobby-account-chip:active { background: var(--press); }
 
 .lobby-more-games-list {
   display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  margin-top: 0.4rem;
+}
+
+.lobby-more-games-row {
+  display: flex;
   flex-wrap: wrap;
   gap: 0.4rem;
-  margin-top: 0.4rem;
+}
+
+.lobby-more-games-row > .lobby-btn-secondary {
+  max-width: 100%;
+  padding-block: 0.4rem;
+  white-space: normal;
+  overflow-wrap: anywhere;
 }
 
 .lobby-more-games > summary {
