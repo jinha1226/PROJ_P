@@ -101,8 +101,9 @@ export class TileMapView {
   private canvas: HTMLCanvasElement
   private ctx: CanvasRenderingContext2D
   private store: MapStore
-  private viewportW = NORMAL_AXIS
-  private viewportH = NORMAL_AXIS
+  // Include one right/bottom overscan cell for fractional local panning.
+  private viewportW = NORMAL_AXIS + 1
+  private viewportH = NORMAL_AXIS + 1
   // Cell that viewCenter (the player, in normal play) renders on. The canvas
   // full-bleeds the element on both axes (partial cells clip at the edges),
   // so this is NOT simply the middle cell: fitToContainer picks it — together
@@ -274,6 +275,7 @@ export class TileMapView {
   setViewCenter(c: { x: number; y: number }): boolean {
     const changed = c.x !== this.viewCenter.x || c.y !== this.viewCenter.y
     this.viewCenter = { ...c }
+    this.updatePanOffset()
     return changed
   }
   getViewCenter(): { x: number; y: number } { return { ...this.viewCenter } }
@@ -369,6 +371,8 @@ export class TileMapView {
   // repainted); false on the unchanged early-exit, so callers know whether a
   // centerCol/centerRow-only change still needs an explicit fullRender.
   setViewportSize(w: number, h: number): boolean {
+    w++
+    h++
     const cssW = w * this.cellPx
     const cssH = h * this.cellPx
     // lastCssW (a number) rather than comparing this.canvas.style.width
@@ -387,6 +391,7 @@ export class TileMapView {
     this.canvas.height = h * ATLAS_CELL
     this.canvas.style.width = `${cssW}px`
     this.canvas.style.height = `${cssH}px`
+    this.updatePanOffset()
     this.ctx.setTransform(1, 0, 0, 1, 0, 0)
     this.ctx.imageSmoothingEnabled = false
     this.fullRender()
@@ -404,8 +409,13 @@ export class TileMapView {
   // cell (col,row) ↔ dungeon (offX+col, offY+row). One definition each so the
   // centering rule lives in a single place (see CLAUDE.md coordinate system).
   // The center is `centerCol`/`centerRow`, not the middle cell — see the fields.
-  private get offX(): number { return this.viewCenter.x - this.centerCol }
-  private get offY(): number { return this.viewCenter.y - this.centerRow }
+  private get offX(): number { return Math.floor(this.viewCenter.x) - this.centerCol }
+  private get offY(): number { return Math.floor(this.viewCenter.y) - this.centerRow }
+  private updatePanOffset(): void {
+    const x = (this.viewCenter.x - Math.floor(this.viewCenter.x)) * this.cellPx
+    const y = (this.viewCenter.y - Math.floor(this.viewCenter.y)) * this.cellPx
+    this.canvas.style.transform = `translate(${-x}px, ${-y}px)`
+  }
   // Viewport origin as of the last complete paint (fullRender sweep or
   // panRender blit) — panRender's blit is valid only relative to this.
   // Stamped after painting, so canvas reconfiguration (setViewportSize wipes
@@ -422,7 +432,10 @@ export class TileMapView {
   // The viewport's footprint in dungeon coords (top-left + size), for the
   // minimap's you-are-here rectangle.
   viewRect(): { x: number; y: number; w: number; h: number } {
-    return { x: this.offX, y: this.offY, w: this.viewportW, h: this.viewportH }
+    return {
+      x: this.viewCenter.x - this.centerCol, y: this.viewCenter.y - this.centerRow,
+      w: this.viewportW - 1, h: this.viewportH - 1,
+    }
   }
 
   // Screen point → dungeon coord, for the map tap gestures; same contract
@@ -430,17 +443,21 @@ export class TileMapView {
   // canvas rect already reflects the CSS scale (cellPx per cell) and the
   // sub-cell full-bleed shift margins, so plain rect division is exact.
   // Null before layout (zero-sized rect, e.g. happy-dom).
-  hitTester(): CellHitTester | null {
+  hitTester(continuous = false): CellHitTester | null {
     const r = this.canvas.getBoundingClientRect()
     if (r.width <= 0 || r.height <= 0) return null
-    const { left, top } = r
     const cellW = r.width / this.viewportW
     const cellH = r.height / this.viewportH
+    const left = r.left + (this.viewCenter.x - Math.floor(this.viewCenter.x)) * cellW
+    const top = r.top + (this.viewCenter.y - Math.floor(this.viewCenter.y)) * cellH
     return (clientX, clientY) => {
-      const col = Math.floor((clientX - left) / cellW)
-      const row = Math.floor((clientY - top) / cellH)
-      if (!this.inView(col, row)) return null
-      return { x: this.offX + col, y: this.offY + row }
+      const col = (clientX - left) / cellW + this.viewCenter.x - Math.floor(this.viewCenter.x)
+      const row = (clientY - top) / cellH + this.viewCenter.y - Math.floor(this.viewCenter.y)
+      if (!this.inView(Math.floor(col), Math.floor(row))) return null
+      return {
+        x: this.offX + (continuous ? col : Math.floor(col)),
+        y: this.offY + (continuous ? row : Math.floor(row)),
+      }
     }
   }
 

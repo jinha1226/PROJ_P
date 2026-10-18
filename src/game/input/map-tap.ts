@@ -56,7 +56,13 @@ export interface MapGestureOpts {
   // (see MapView.hitTester). Null = not laid out yet; the gesture still
   // runs its timing, just with no callbacks.
   hitTester(): CellHitTester | null
+  // Optional continuous dungeon coordinates for pixel-smooth grabbing.
+  // Tap/hold/hover still use the integer cell tester above.
+  panHitTester?(): CellHitTester | null
   onHover(cell: { x: number; y: number }): void
+  // Local feedback, not server hover: the pending tap/hold cell while still,
+  // then the cell under the finger AFTER panning. Null ends the highlight.
+  onContact?(cell: { x: number; y: number } | null): void
   onLongPress(cell: { x: number; y: number }): void
   // A lift while the press is still "still" — under SLOP_PX and before the
   // long-press fires. Touch uses it for travel/target selection; the X map
@@ -68,8 +74,8 @@ export interface MapGestureOpts {
   // the anchor back under the finger (anchor − cell now under it). The
   // caller applies it to its view center and repaints; the hit tester reads
   // offsets live, so the next event sees the anchor under the finger again
-  // and reports nothing until the finger crosses another cell. Touch and
-  // the X level map pan locally on it; Keypad targeting uses hover instead.
+  // and reports the remaining displacement. With panHitTester this includes
+  // sub-cell movement; otherwise it waits for another cell boundary.
   onPan?(delta: { x: number; y: number }): void
   // Once per gesture, when the finger first passes DRAG_PX from touch-down:
   // the drag is now deliberate. Optional — game-view opens the `X` level
@@ -109,11 +115,19 @@ export function attachMapGestures(el: HTMLElement, opts: MapGestureOpts): MapGes
   let dragged = false
   let timer: number | null = null
   let lastHover: { x: number; y: number } | null = null
+  let contactCell: { x: number; y: number } | null = null
   let hit: CellHitTester | null = null
+  let panHit: CellHitTester | null = null
   let pressCell: { x: number; y: number } | null = null
   // The grab anchor for onPan, set at touch-down; null once the slop is
   // crossed with nothing under the finger, or when there's no onPan.
   let anchor: { x: number; y: number } | null = null
+
+  const contact = (cell: { x: number; y: number } | null): void => {
+    if (contactCell?.x === cell?.x && contactCell?.y === cell?.y) return
+    contactCell = cell
+    opts.onContact?.(cell)
+  }
 
   // Set from the moment the long-press fires until the finger lifts. The
   // describe overlay opens UNDER the still-held finger, and iOS's native
@@ -121,13 +135,17 @@ export function attachMapGestures(el: HTMLElement, opts: MapGestureOpts): MapGes
   // DOM touch targets) then selects a word in it with a haptic pop. The
   // class makes the page unselectable for exactly that window (style.css).
   const HOLD_CLASS = 'map-hold'
-  const release = (): void => document.documentElement.classList.remove(HOLD_CLASS)
+  const release = (): void => {
+    document.documentElement.classList.remove(HOLD_CLASS)
+    contact(null)
+  }
 
   const cancel = (): void => {
     if (timer != null) { window.clearTimeout(timer); timer = null }
     activePointer = null
     lastHover = null
     hit = null
+    panHit = null
     pressCell = null
     anchor = null
     dragged = false
@@ -138,7 +156,7 @@ export function attachMapGestures(el: HTMLElement, opts: MapGestureOpts): MapGes
   // anchor sits under the finger at (x, y). Only past the slop (timer gone)
   // and only when the caller passed onPan (anchor is set only then).
   const grab = (x: number, y: number): void => {
-    const now = hit?.(x, y) ?? null
+    const now = panHit?.(x, y) ?? null
     if (timer == null && anchor && now && (now.x !== anchor.x || now.y !== anchor.y)) {
       opts.onPan!({ x: anchor.x - now.x, y: anchor.y - now.y })
     }
@@ -166,11 +184,13 @@ export function attachMapGestures(el: HTMLElement, opts: MapGestureOpts): MapGes
     // would pan (seen in desktop WebKit). Capture makes both deliver here.
     try { el.setPointerCapture(e.pointerId) } catch { /* pointer no longer active, or detached */ }
     hit = opts.hitTester()
+    panHit = opts.panHitTester?.() ?? hit
     startX = lastX = e.clientX
     startY = lastY = e.clientY
     const cell = hit?.(startX, startY) ?? null
     pressCell = cell
-    anchor = opts.onPan ? cell : null
+    anchor = opts.onPan && cell ? panHit?.(startX, startY) ?? null : null
+    contact(cell)
     // Keypad hover fires immediately for aim feedback. Touch ignores it:
     // a gesture that becomes a pan or pinch must not change the target.
     hoverCell(cell)
@@ -179,6 +199,7 @@ export function attachMapGestures(el: HTMLElement, opts: MapGestureOpts): MapGes
       activePointer = null
       const cell = pressCell
       hit = null
+      panHit = null
       pressCell = null
       if (!cell) return
       document.documentElement.classList.add(HOLD_CLASS)
@@ -204,6 +225,7 @@ export function attachMapGestures(el: HTMLElement, opts: MapGestureOpts): MapGes
     hoverCell(hit?.(e.clientX, e.clientY) ?? null)
     // Past the slop the drag is also a grab — see onPan.
     grab(e.clientX, e.clientY)
+    contact(timer != null ? pressCell : hit?.(e.clientX, e.clientY) ?? null)
   })
 
   el.addEventListener('pointerup', (e) => {
@@ -215,6 +237,9 @@ export function attachMapGestures(el: HTMLElement, opts: MapGestureOpts): MapGes
     if (cell) opts.onTap?.(cell)
   })
   el.addEventListener('pointercancel', cancel)
+  el.addEventListener('lostpointercapture', (e) => {
+    if (e.target === el) cancel()
+  })
   // Touch pointers are implicitly captured to the pointerdown target, so
   // the lift reaches `el` even with the overlay now under the finger; the
   // window hooks are insurance that the hold class can never stick.
@@ -226,7 +251,9 @@ export function attachMapGestures(el: HTMLElement, opts: MapGestureOpts): MapGes
     regrab(): void {
       if (activePointer === null) return
       hit = opts.hitTester()
+      panHit = opts.panHitTester?.() ?? hit
       grab(lastX, lastY)
+      contact(timer != null ? pressCell : hit?.(lastX, lastY) ?? null)
     },
     destroy(): void {
       cancel()

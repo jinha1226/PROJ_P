@@ -2340,7 +2340,10 @@ html.map-hold, html.map-hold * {
 }
 
 #map-grid div { display: flex; }
-#map-grid span { display: inline-block; width: 1ch; }
+#map-grid .map-ascii-surface { display: block; position: relative; flex: none; width: max-content; }
+/* Overscan must not change the vertically centered grid's layout height. */
+#map-grid .map-ascii-surface > :last-child { position: absolute; top: 100%; left: 0; }
+#map-grid span { display: inline-block; flex: none; width: 1ch; }
 #map-grid span.map-cursor { position: relative; isolation: isolate; }
 #map-grid span.map-cursor::before {
   content: '';

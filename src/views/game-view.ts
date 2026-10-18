@@ -452,7 +452,15 @@ export function buildGameView(opts: GameViewOptions): HTMLElement {
   // resend clear the aiming reticle and bounce X mode. Also re-applied to
   // the new view on an ASCII↔tiles swap (each view keeps its own cursor).
   const cursors: Array<{ x: number; y: number } | undefined> = [undefined, undefined, undefined]
-  const shownCursor = () => cursors[2] ?? cursors[0] ?? cursors[1]
+  // A held Touch contact temporarily highlights its action point without
+  // changing the server's aim. Releasing restores the latest server cursor.
+  let touchCursor: { x: number; y: number } | null = null
+  const shownCursor = () => touchCursor ?? cursors[2] ?? cursors[0] ?? cursors[1]
+  function setTouchCursor(cell: { x: number; y: number } | null): void {
+    if (touchCursor?.x === cell?.x && touchCursor?.y === cell?.y) return
+    touchCursor = cell
+    mapView.setCursor(shownCursor())
+  }
   // X-map tap-to-jump: walks the level-map cursor with synthesized vi-keys
   // in one atomic `input` message (see map-jump.ts). Fed every id-2 cursor
   // loc below.
@@ -606,6 +614,11 @@ export function buildGameView(opts: GameViewOptions): HTMLElement {
   // including range, visibility and confirmation checks.
   const mapGestures = attachMapGestures(mapWrap, {
     hitTester: () => mapView.hitTester(),
+    panHitTester: () => movementMode === 'touch' ? mapView.hitTester(true) : null,
+    onContact: (cell) => {
+      setTouchCursor(movementMode === 'touch' && touchMapAvailable()
+        && canDescribe(currentInputMode, inXMode) ? cell : null)
+    },
     onHover: (cell) => {
       // Touch may still become a pan or pinch; don't re-aim at touch-down.
       if (movementMode === 'touch') return
@@ -615,6 +628,7 @@ export function buildGameView(opts: GameViewOptions): HTMLElement {
       conn.send({ msg: 'target_cursor', x: cell.x, y: cell.y })
     },
     onLongPress: (cell) => {
+      setTouchCursor(null)
       if (movementMode === 'touch' && !touchMapAvailable()) return
       if (spectating || !canDescribe(currentInputMode, inXMode)) return
       conn.send({ msg: 'click_cell', x: cell.x, y: cell.y, button: 3 })
@@ -1536,6 +1550,7 @@ export function buildGameView(opts: GameViewOptions): HTMLElement {
     // signal (character-record.ts welcomeLine).
     advisory.onMap()
     if (msg.clear) {
+      setTouchCursor(null)
       store.clear()
       touchPanned = false
       // `[`/`]` in the level map arrive as a cleared map (tile_new_level
@@ -1762,6 +1777,7 @@ export function buildGameView(opts: GameViewOptions): HTMLElement {
   function onInputMode(msg: MsgOf<'input_mode'>): void {
     const prevInputMode = currentInputMode
     currentInputMode = msg.mode
+    if (prevInputMode !== msg.mode) setTouchCursor(null)
     if (msg.mode === 1) {  // COMMAND: normal play resumed
       messageLog.hideMore()
       messageLog.disablePrompt()
@@ -2145,6 +2161,7 @@ export function buildGameView(opts: GameViewOptions): HTMLElement {
   // `over`: layer the content as a prompt card over a copy of that frame's
   // last DOM (see frameDom), when there is one.
   function enterOverlayLayout(opts?: { touch?: boolean; float?: boolean; screen?: 'newgame'; over?: object }): void {
+    setTouchCursor(null)
     // Every server-driven overlay passes through here; the map-area minimap
     // lens must not linger over (or under) it, and neither may a chat pill
     // already mid-display (new pills are vetoed via pillAllowed, but that

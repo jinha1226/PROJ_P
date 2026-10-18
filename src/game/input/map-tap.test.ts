@@ -22,13 +22,18 @@ function fire(el: HTMLElement, type: string, x: number, y: number, extra: Pointe
   }))
 }
 
-function setup(cellAt?: (x: number, y: number) => { x: number; y: number } | null) {
+function setup(
+  cellAt?: (x: number, y: number) => { x: number; y: number } | null,
+  onPan?: (delta: { x: number; y: number }) => void,
+  panAt?: (x: number, y: number) => { x: number; y: number } | null,
+) {
   const wrap = document.createElement('div')
   const grid = document.createElement('pre')
   grid.id = 'map-grid'
   wrap.appendChild(grid)
   document.body.appendChild(wrap)
   const hovers: { x: number; y: number }[] = []
+  const contacts: Array<{ x: number; y: number } | null> = []
   const presses: { x: number; y: number }[] = []
   const taps: { x: number; y: number }[] = []
   const pans: { x: number; y: number }[] = []
@@ -37,19 +42,98 @@ function setup(cellAt?: (x: number, y: number) => { x: number; y: number } | nul
   const geometry = {
     // Default fake geometry: 10px cells, dungeon origin at the screen origin.
     cellAt: cellAt ?? ((x: number, y: number) => ({ x: Math.floor(x / 10), y: Math.floor(y / 10) })),
+    panAt,
   }
   const gestures = attachMapGestures(wrap, {
     hitTester: () => geometry.cellAt,
+    panHitTester: () => geometry.panAt ?? null,
     onHover: (c) => hovers.push(c),
+    onContact: (c) => contacts.push(c),
     onLongPress: (c) => presses.push(c),
     onTap: (c) => taps.push(c),
-    onPan: (d) => pans.push(d),
+    onPan: (d) => { pans.push(d); onPan?.(d) },
     onDrag: () => { drags++ },
   })
-  return { wrap, grid, hovers, presses, taps, pans, geometry, gestures, drags: () => drags }
+  return { wrap, grid, hovers, contacts, presses, taps, pans, geometry, gestures, drags: () => drags }
 }
 
 describe('attachMapGestures', () => {
+  it('grabs a fractional point while keeping tap/hold/contact coordinates integral', () => {
+    let off = { x: 0, y: 0 }
+    const { grid, contacts, taps, presses } = setup(
+      (x, y) => ({ x: Math.floor(off.x + x / 10), y: Math.floor(off.y + y / 10) }),
+      delta => { off = { x: off.x + delta.x, y: off.y + delta.y } },
+      (x, y) => ({ x: off.x + x / 10, y: off.y + y / 10 }),
+    )
+    fire(grid, 'pointerdown', 25, 35)
+    fire(grid, 'pointermove', 30, 35)
+    expect(off).toEqual({ x: 0, y: 0 })
+    for (const x of [41, 42, 43, 54, 55, 56]) {
+      fire(grid, 'pointermove', x, 38)
+      expect(off.x).toBeCloseTo(-(x - 25) / 10)
+      expect(off.y).toBeCloseTo(-0.3)
+    }
+    expect(contacts).toEqual([{ x: 2, y: 3 }])
+    fire(grid, 'pointerup', 56, 38)
+    expect(off.x).toBeCloseTo(-3.1)
+    expect(taps).toEqual([])
+    expect(presses).toEqual([])
+    fire(grid, 'pointerdown', 25, 35)
+    fire(grid, 'pointerup', 25, 35)
+    expect(taps).toEqual([{ x: -1, y: 3 }])
+  })
+
+  it('highlights the pending action cell through hold jitter, then clears on lift', () => {
+    const { grid, contacts, presses } = setup()
+    fire(grid, 'pointerdown', 25, 35)
+    fire(grid, 'pointermove', 35, 35) // another cell, but still within tap/hold slop
+    expect(contacts).toEqual([{ x: 2, y: 3 }])
+    expect(presses).toEqual([])
+    vi.advanceTimersByTime(LONG_PRESS_MS)
+    expect(presses).toEqual([{ x: 2, y: 3 }])
+    fire(grid, 'pointerup', 35, 35)
+    expect(contacts).toEqual([{ x: 2, y: 3 }, null])
+  })
+
+  it('reports contact after the pan, including when a map edge clamps the pan', () => {
+    let off = 0
+    const { grid, contacts } = setup(
+      (x, y) => ({ x: off + Math.floor(x / 10), y: Math.floor(y / 10) }),
+      delta => { off = Math.max(-3, off + delta.x) },
+    )
+    fire(grid, 'pointerdown', 25, 35)
+    fire(grid, 'pointermove', 55, 35) // follows the finger, same world cell
+    expect(off).toBe(-3)
+    expect(contacts).toEqual([{ x: 2, y: 3 }])
+    fire(grid, 'pointermove', 85, 35) // clamp: the finger is now over (5,3)
+    expect(contacts).toEqual([{ x: 2, y: 3 }, { x: 5, y: 3 }])
+    fire(grid, 'pointerup', 85, 35)
+    expect(contacts.at(-1)).toBeNull()
+  })
+
+  it.each(['pointercancel', 'lostpointercapture'])('clears contact on %s without acting', event => {
+    const { wrap, grid, contacts, taps, presses } = setup()
+    fire(grid, 'pointerdown', 25, 35)
+    fire(wrap, event, 25, 35)
+    vi.advanceTimersByTime(LONG_PRESS_MS)
+    fire(grid, 'pointerup', 25, 35)
+    expect(contacts).toEqual([{ x: 2, y: 3 }, null])
+    expect(taps).toEqual([])
+    expect(presses).toEqual([])
+  })
+
+  it('clears contact when a second finger starts a pinch', () => {
+    const { grid, contacts, taps, presses } = setup()
+    fire(grid, 'pointerdown', 25, 35)
+    fire(grid, 'pointerdown', 85, 35, { pointerId: 2, isPrimary: false })
+    fire(grid, 'pointermove', 40, 35)
+    vi.advanceTimersByTime(LONG_PRESS_MS)
+    fire(grid, 'pointerup', 40, 35)
+    expect(contacts).toEqual([{ x: 2, y: 3 }, null])
+    expect(taps).toEqual([])
+    expect(presses).toEqual([])
+  })
+
   it('a tap hovers the touched cell once, then reports the tap on lift', () => {
     const { grid, hovers, presses, taps } = setup()
     fire(grid, 'pointerdown', 25, 35)

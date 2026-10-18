@@ -17,6 +17,7 @@ const ZOOM_REDUCTION = 8
 // Each span holds one character and a CSS color. Only dirty cells are updated on redraw.
 export class MapView {
   private container: HTMLElement
+  private surface: HTMLDivElement
   private spans: HTMLSpanElement[][] = []
   // Last values written to each span (parallel to `spans`), so #paintSpan can
   // skip DOM writes that wouldn't change anything. Objects are allocated once
@@ -37,6 +38,7 @@ export class MapView {
   private zoomAxis = ZOOM_MIN_AXIS
   // Absolute viewport center (matches vgrdc from server). In normal play equals playerPos.
   private viewCenter = { x: 0, y: 0 }
+  private lastPaintOff: { x: number; y: number } | null = null
   private cursorLoc: { x: number; y: number } | null = null
   private cursorSpan: HTMLSpanElement | null = null
   // Char-width-per-font-size-px ratio from the probe measurement, cached per
@@ -51,6 +53,9 @@ export class MapView {
     this.container = document.createElement('pre')
     this.container.id = 'map-grid'
     this.container.setAttribute('aria-label', 'Dungeon map')
+    this.surface = document.createElement('div')
+    this.surface.className = 'map-ascii-surface'
+    this.container.appendChild(this.surface)
     this.buildGrid()
   }
 
@@ -65,6 +70,7 @@ export class MapView {
   setViewCenter(c: { x: number; y: number }): boolean {
     const changed = c.x !== this.viewCenter.x || c.y !== this.viewCenter.y
     this.viewCenter = { ...c }
+    this.updatePanOffset()
     return changed
   }
   getViewCenter(): { x: number; y: number } { return { ...this.viewCenter } }
@@ -201,7 +207,9 @@ export class MapView {
     const lineH = fontSize * lineHPerFs
     const fitW = Math.floor(availW / charW)
     const keepW = this.viewportW > fitW && this.viewportW * charW - availW < charW / 2
-    const w = Math.max(minW, keepW ? this.viewportW : fitW)
+    // Pinch magnifies cells, not the minimum grid footprint. Keeping the
+    // unzoomed floor here pushes the player off-center on narrow screens.
+    const w = Math.max(Math.ceil(minW / this.userZoom), keepW ? this.viewportW : fitW)
 
     // Whole rows only — never partial: a clipped half-glyph reads as a
     // rendering bug in ASCII. (The tile view full-bleeds with partial cells
@@ -212,7 +220,7 @@ export class MapView {
     const availHFit = availH + reserve + occl
     const fitH = Math.floor(availHFit / lineH)
     const keepH = this.viewportH > fitH && this.viewportH * lineH - availHFit < lineH / 2
-    const h = Math.max(minH, keepH ? this.viewportH : fitH)
+    const h = Math.max(Math.ceil(minH / this.userZoom), keepH ? this.viewportH : fitH)
 
     // With a reserve (or top occlusion) the grid is top-anchored and overruns
     // the content box downward, so "visually centered in the clear area" is
@@ -253,16 +261,28 @@ export class MapView {
   // cell (col,row) ↔ dungeon (offX+col, offY+row). One definition each so the
   // centering rule lives in a single place (see CLAUDE.md coordinate system).
   // Vertically the center is `centerRow`, not the middle row — see the field.
-  private get offX(): number { return this.viewCenter.x - Math.floor(this.viewportW / 2) }
-  private get offY(): number { return this.viewCenter.y - this.centerRow }
+  private get offX(): number { return Math.floor(this.viewCenter.x) - Math.floor(this.viewportW / 2) }
+  private get offY(): number { return Math.floor(this.viewCenter.y) - this.centerRow }
   private inView(col: number, row: number): boolean {
-    return col >= 0 && col < this.viewportW && row >= 0 && row < this.viewportH
+    return col >= 0 && col <= this.viewportW && row >= 0 && row <= this.viewportH
+  }
+
+  // Keep store indices integral; translate the surface by the remaining
+  // fraction of a cell. Its extra right/bottom cells cover the exposed edge.
+  private updatePanOffset(): void {
+    const x = this.viewCenter.x - Math.floor(this.viewCenter.x)
+    const y = this.viewCenter.y - Math.floor(this.viewCenter.y)
+    this.surface.style.transform = `translate(${-x * 100 / (this.viewportW + 1)}%, ${-y * 100 / this.viewportH}%)`
   }
 
   // The viewport's footprint in dungeon coords (top-left + size), for the
   // minimap's you-are-here rectangle.
   viewRect(): { x: number; y: number; w: number; h: number } {
-    return { x: this.offX, y: this.offY, w: this.viewportW, h: this.viewportH }
+    return {
+      x: this.viewCenter.x - Math.floor(this.viewportW / 2),
+      y: this.viewCenter.y - this.centerRow,
+      w: this.viewportW, h: this.viewportH,
+    }
   }
 
   // Screen point → dungeon coord of the cell under it, for the map tap
@@ -271,10 +291,10 @@ export class MapView {
   // so only the spans place the true origin) and then does pure arithmetic:
   // during a targeting drag the engine's replies dirty the span grid between
   // pointer events, so a per-event rect read would force a full relayout at
-  // pointer rate. Geometry can't change mid-gesture (zoom is a double-tap,
-  // not a drag); offX/offY are read live so a pan can't stale the tester.
+  // pointer rate. Pinch cancels the one-finger gesture; the integer origin
+  // and fractional pan are read live so a drag can't stale the tester.
   // Null before layout (zero-sized rects, e.g. happy-dom).
-  hitTester(): CellHitTester | null {
+  hitTester(continuous = false): CellHitTester | null {
     const s00 = this.spans[0]?.[0]
     if (!s00) return null
     const a = s00.getBoundingClientRect()
@@ -285,12 +305,16 @@ export class MapView {
     const s10 = this.spans[1]?.[0]
     const lineH = s10 ? s10.getBoundingClientRect().top - a.top : a.height
     if (charW <= 0 || lineH <= 0) return null
-    const { left, top } = a
+    const left = a.left + (this.viewCenter.x - Math.floor(this.viewCenter.x)) * charW
+    const top = a.top + (this.viewCenter.y - Math.floor(this.viewCenter.y)) * lineH
     return (clientX, clientY) => {
-      const col = Math.floor((clientX - left) / charW)
-      const row = Math.floor((clientY - top) / lineH)
-      if (!this.inView(col, row)) return null
-      return { x: this.offX + col, y: this.offY + row }
+      const col = (clientX - left) / charW + this.viewCenter.x - Math.floor(this.viewCenter.x)
+      const row = (clientY - top) / lineH + this.viewCenter.y - Math.floor(this.viewCenter.y)
+      if (!this.inView(Math.floor(col), Math.floor(row))) return null
+      return {
+        x: this.offX + (continuous ? col : Math.floor(col)),
+        y: this.offY + (continuous ? row : Math.floor(row)),
+      }
     }
   }
 
@@ -320,8 +344,8 @@ export class MapView {
       return
     }
 
-    for (let row = 0; row < this.viewportH; row++) {
-      for (let col = 0; col < this.viewportW; col++) {
+    for (let row = 0; row <= this.viewportH; row++) {
+      for (let col = 0; col <= this.viewportW; col++) {
         this.#paintSpan(col, row, offX + col, offY + row)
       }
     }
@@ -360,15 +384,19 @@ export class MapView {
 
   // Full redraw — called when viewport center or map changes.
   fullRender(): void {
+    this.updatePanOffset()
     this.render()
     this.updateCursorSpan()
+    this.lastPaintOff = { x: this.offX, y: this.offY }
   }
 
-  // Pan-only repaint. The ASCII grid can't blit DOM spans, but the per-span
-  // `painted` diff cache already makes the full sweep cheap, so a pan is just
-  // a fullRender; the parameter exists for TileMapView parity (its blit path
-  // needs the turn's dirty cells).
-  panRender(_dirty?: Set<string>): void {
+  // Sub-cell moves only translate the surface. Crossing a cell boundary
+  // remaps the spans; their painted cache skips unchanged DOM writes.
+  panRender(dirty?: Set<string>): void {
+    if (this.lastPaintOff?.x === this.offX && this.lastPaintOff?.y === this.offY) {
+      if (dirty?.size) this.render(dirty)
+      return
+    }
     this.fullRender()
   }
 
@@ -389,15 +417,15 @@ export class MapView {
   }
 
   private buildGrid(): void {
-    this.container.textContent = ''
+    this.surface.textContent = ''
     this.spans = []
     this.painted = []
-    for (let row = 0; row < this.viewportH; row++) {
+    for (let row = 0; row <= this.viewportH; row++) {
       const rowDiv = document.createElement('div')
       const rowSpans: HTMLSpanElement[] = []
       const rowPainted: { g: string; fg: string; bg: string; flash: string }[] = []
 
-      for (let col = 0; col < this.viewportW; col++) {
+      for (let col = 0; col <= this.viewportW; col++) {
         const span = document.createElement('span')
         span.textContent = ' '
         rowDiv.appendChild(span)
@@ -406,7 +434,7 @@ export class MapView {
         rowPainted.push({ g: ' ', fg: '', bg: '', flash: '' })
       }
 
-      this.container.appendChild(rowDiv)
+      this.surface.appendChild(rowDiv)
       this.spans.push(rowSpans)
       this.painted.push(rowPainted)
     }

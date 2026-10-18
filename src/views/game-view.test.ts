@@ -146,10 +146,11 @@ describe('initial render mode', () => {
 describe('map movement modes', () => {
   beforeEach(() => {
     vi.useFakeTimers()
-    vi.spyOn(MapView.prototype, 'hitTester').mockImplementation(function (this: MapView) {
+    vi.spyOn(MapView.prototype, 'hitTester').mockImplementation(function (this: MapView, continuous = false) {
       return (x, y) => {
         const c = this.getViewCenter()
-        return { x: c.x + Math.floor(x / 10), y: c.y + Math.floor(y / 10) }
+        return continuous ? { x: c.x + x / 10, y: c.y + y / 10 }
+          : { x: Math.floor(c.x + x / 10), y: Math.floor(c.y + y / 10) }
       }
     })
   })
@@ -221,18 +222,20 @@ describe('map movement modes', () => {
     ])
   })
 
-  it('grabs and pans the map without moving any cursor or sending input', () => {
+  it('highlights the grabbed cell while panning without sending input', () => {
     const h = touchGame()
     const cursor = vi.spyOn(MapView.prototype, 'setCursor')
     const pan = vi.spyOn(MapView.prototype, 'panRender')
     pointer(h, 'pointerdown')
+    expect(cursor).toHaveBeenLastCalledWith({ x: 2, y: 3 })
     pointer(h, 'pointermove', 85, 35)
     expect(center()).toEqual({ x: -6, y: 0 })
+    expect(cursor).toHaveBeenLastCalledWith({ x: 2, y: 3 })
     pointer(h, 'pointermove', 115, 35)
     expect(center()).toEqual({ x: -9, y: 0 })
     pointer(h, 'pointerup', 115, 35)
     expect(pan).toHaveBeenCalledTimes(2)
-    expect(cursor).not.toHaveBeenCalled()
+    expect(cursor.mock.calls).toEqual([[{ x: 2, y: 3 }], [undefined]])
     expect(h.send).not.toHaveBeenCalled()
     expect(h.view.classList.contains('x-mode')).toBe(false)
   })
@@ -246,6 +249,30 @@ describe('map movement modes', () => {
     expect(sent(h)).toEqual([{ msg: 'click_cell', x: 2, y: 3, button: 1 }])
   })
 
+  it('pans by individual pixels, retains the fraction on lift, and hits whole cells afterwards', () => {
+    const h = touchGame()
+    const cursor = vi.spyOn(MapView.prototype, 'setCursor')
+    pointer(h, 'pointerdown')
+    for (const x of [41, 42, 43, 54, 55, 56]) {
+      pointer(h, 'pointermove', x, 38)
+      expect(center().x).toBeCloseTo(-(x - 25) / 10)
+      expect(center().y).toBeCloseTo(-0.3)
+      expect(cursor).toHaveBeenLastCalledWith({ x: 2, y: 3 })
+    }
+    pointer(h, 'pointerup', 56, 38)
+    expect(center().x).toBeCloseTo(-3.1)
+    expect(h.send).not.toHaveBeenCalled()
+    pointer(h, 'pointerdown')
+    pointer(h, 'pointerup')
+    pointer(h, 'pointerdown')
+    vi.advanceTimersByTime(LONG_PRESS_MS)
+    pointer(h, 'pointerup')
+    expect(sent(h)).toEqual([
+      { msg: 'click_cell', x: -1, y: 3, button: 1 },
+      { msg: 'click_cell', x: -1, y: 3, button: 3 },
+    ])
+  })
+
   it.each([2, 3, 4])('pans while targeting in mode %s without re-aiming or firing', mode => {
     const h = touchGame()
     h.dispatch({ msg: 'input_mode', mode })
@@ -253,7 +280,85 @@ describe('map movement modes', () => {
     const cursor = vi.spyOn(MapView.prototype, 'setCursor')
     drag(h)
     expect(center()).toEqual({ x: -6, y: 0 })
-    expect(cursor).not.toHaveBeenCalled()
+    expect(cursor.mock.calls).toEqual([[{ x: 2, y: 3 }], [{ x: 8, y: 3 }]])
+    expect(h.send).not.toHaveBeenCalled()
+  })
+
+  it('previews a hold at its action cell without changing the server target', () => {
+    const h = touchGame()
+    h.dispatch({ msg: 'input_mode', mode: 4 })
+    h.dispatch({ msg: 'cursor', id: 0, loc: { x: 8, y: 3 } })
+    const cursor = vi.spyOn(MapView.prototype, 'setCursor')
+    pointer(h, 'pointerdown')
+    pointer(h, 'pointermove', 35, 35) // sub-slop jitter must not move the preview
+    vi.advanceTimersByTime(LONG_PRESS_MS - 1)
+    expect(cursor).toHaveBeenLastCalledWith({ x: 2, y: 3 })
+    expect(h.send).not.toHaveBeenCalled()
+    vi.advanceTimersByTime(1)
+    expect(sent(h)).toEqual([{ msg: 'click_cell', x: 2, y: 3, button: 3 }])
+    expect(cursor).toHaveBeenLastCalledWith({ x: 8, y: 3 })
+    pointer(h, 'pointerup')
+    expect(sent(h)).toHaveLength(1)
+  })
+
+  it('restores the latest server cursor after a held contact ends', () => {
+    const h = touchGame()
+    h.dispatch({ msg: 'input_mode', mode: 4 })
+    const cursor = vi.spyOn(MapView.prototype, 'setCursor')
+    pointer(h, 'pointerdown')
+    h.dispatch({ msg: 'cursor', id: 0, loc: { x: 8, y: 3 } })
+    expect(cursor).toHaveBeenLastCalledWith({ x: 2, y: 3 })
+    pointer(h, 'pointercancel')
+    expect(cursor).toHaveBeenLastCalledWith({ x: 8, y: 3 })
+    expect(h.send).not.toHaveBeenCalled()
+  })
+
+  it('highlights the actual cell under the finger when a pan reaches the map edge', () => {
+    const h = touchGame()
+    h.dispatch({ msg: 'map', cells: [
+      { x: -2, y: -2, mf: 1 }, { x: 2, y: 3, mf: 1 },
+    ] })
+    const cursor = vi.spyOn(MapView.prototype, 'setCursor')
+    pointer(h, 'pointerdown')
+    pointer(h, 'pointermove', 85, 35)
+    expect(center()).toEqual({ x: -2, y: 0 })
+    expect(cursor).toHaveBeenLastCalledWith({ x: 6, y: 3 })
+    pointer(h, 'pointerup', 85, 35)
+    expect(cursor).toHaveBeenLastCalledWith(undefined)
+    expect(h.send).not.toHaveBeenCalled()
+  })
+
+  it('clears the contact cursor when pinching or switching to Keypad', () => {
+    const h = touchGame()
+    const cursor = vi.spyOn(MapView.prototype, 'setCursor')
+    pointer(h, 'pointerdown')
+    pinch(h, 'pointerdown', [25, 125])
+    expect(cursor).toHaveBeenLastCalledWith(undefined)
+    pinch(h, 'pointerup', [25, 125])
+    pointer(h, 'pointerdown')
+    expect(cursor).toHaveBeenLastCalledWith({ x: 2, y: 3 })
+    setPref('movementMode', 'keypad')
+    expect(cursor).toHaveBeenLastCalledWith(undefined)
+    pointer(h, 'pointerup')
+    expect(h.send).not.toHaveBeenCalled()
+  })
+
+  it('clears the contact on a prompt, overlay or map clear', () => {
+    const h = touchGame()
+    const cursor = vi.spyOn(MapView.prototype, 'setCursor')
+    pointer(h, 'pointerdown')
+    h.dispatch({ msg: 'map', clear: true })
+    expect(cursor).toHaveBeenLastCalledWith(undefined)
+    pointer(h, 'pointercancel')
+    pointer(h, 'pointerdown')
+    h.dispatch({ msg: 'input_mode', mode: 7 })
+    expect(cursor).toHaveBeenLastCalledWith(undefined)
+    pointer(h, 'pointerup')
+    h.dispatch({ msg: 'input_mode', mode: 1 })
+    pointer(h, 'pointerdown')
+    h.dispatch({ msg: 'ui-push', type: 'describe-item', title: 'Item', body: 'Description' })
+    expect(cursor).toHaveBeenLastCalledWith(undefined)
+    pointer(h, 'pointerup')
     expect(h.send).not.toHaveBeenCalled()
   })
 
