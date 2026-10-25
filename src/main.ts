@@ -7,6 +7,7 @@ import { maybeMountSafeAreaProbe } from './safe-area-probe'
 import { registerServiceWorker } from './sw/register'
 import { count } from './counter'
 import { consumeStaleShellHeal } from './util/self-heal'
+import { initScreenWakeLock } from './screen-wake-lock'
 
 // First: "booted" for the stale-shell heal means this chunk ran, and the
 // healed-load mark must exist before anything below can fail (self-heal.ts).
@@ -18,6 +19,7 @@ if (!appEl) throw new Error('#app element not found')
 installDwem()
 // Before the first view mounts, so nothing lays out at stock size first.
 initUiScale()
+initScreenWakeLock()
 // Without this, iOS never paints :active: WebKit forwards a touch to the
 // page only where a touch/pointer/mouse listener covers the point
 // (WebPageProxy::touchEventTrackingType), and :active is set by that

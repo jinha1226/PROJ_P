@@ -17,10 +17,11 @@ import {
 import type { ControlSet, ControlTabDef, SlotDef } from '../game/input/control-sets'
 import { dcssToHtml } from '../game/dcss-colors'
 import { DPAD_LAYOUT } from '../game/input/touch'
-import { defaultPref, getPref, setPref, type Prefs } from '../prefs'
+import { defaultPref, getPref, setPref, KEEP_SCREEN_AWAKE_CHANGED_EVENT, type Prefs } from '../prefs'
 import { DPAD_STOPS, MSGLOG_FONT_STOPS, MSGLOG_LINE_STOPS, nearestStop } from '../ui-scale'
 import { strokeIcon } from '../util/svg-icon'
 import { openGesturesDoc } from './docs'
+import { getScreenWakeLockStatus, SCREEN_WAKE_LOCK_STATUS_EVENT, supportsScreenWakeLock } from '../screen-wake-lock'
 
 // Close handle of the last-mounted settings card, for surfaces that replace
 // it (the floating size palette). May be stale after ✕/Escape closed the
@@ -41,12 +42,17 @@ let homeScroll = 0
 
 export function openSettings(): void {
   closePalette?.()  // one surface at a time; a stale palette would desync
+  const listeners = new AbortController()
   const { body, close } = mountCardOverlay('Settings', {
     backdrop: 'settings-backdrop',
     card: 'settings-card',
     body: 'settings-body',
-  }, () => { pageIntercept = null }, via => pageIntercept?.(via) ?? false)
+  }, () => { pageIntercept = null; listeners.abort() }, via => pageIntercept?.(via) ?? false)
   closeSettings = close
+  const { signal } = listeners
+  document.addEventListener('fullscreenchange', () => syncFullscreenButton(body), { signal })
+  window.addEventListener(SCREEN_WAKE_LOCK_STATUS_EVENT, () => syncWakeLockControl(body), { signal })
+  window.addEventListener(KEEP_SCREEN_AWAKE_CHANGED_EVENT, () => syncWakeLockControl(body), { signal })
   renderHome(body)
 }
 
@@ -139,6 +145,82 @@ function renderHome(body: HTMLElement): void {
   renderControlsSection(body)
   renderSpritesSection(body)
   renderHelpSection(body)
+  renderScreenSection(body)
+}
+
+function syncFullscreenButton(body: HTMLElement): void {
+  const btn = body.querySelector<HTMLButtonElement>('.settings-fullscreen-btn')
+  if (!btn) return
+  const active = !!document.fullscreenElement
+  btn.textContent = active ? 'Exit Fullscreen' : 'Use Fullscreen'
+  btn.disabled = active ? typeof document.exitFullscreen !== 'function'
+    : !document.fullscreenEnabled || typeof document.documentElement.requestFullscreen !== 'function'
+  btn.title = btn.disabled ? 'Fullscreen is not supported by this browser.' : btn.textContent
+}
+
+function syncWakeLockControl(body: HTMLElement): void {
+  const input = body.querySelector<HTMLInputElement>('.settings-wake-lock')
+  const label = body.querySelector<HTMLElement>('.settings-wake-state')
+  const note = body.querySelector<HTMLElement>('.settings-wake-status')
+  if (!input || !label || !note) return
+  input.checked = getPref('keepScreenAwake')
+  input.disabled = !supportsScreenWakeLock() && !input.checked
+  label.textContent = input.checked ? 'On' : 'Off'
+  const status = getScreenWakeLockStatus()
+  const messages = {
+    off: '', pending: 'Requesting...', active: 'Active', paused: 'Paused',
+    blocked: 'Screen wake lock was declined or released by the browser.',
+    unsupported: 'Screen wake lock is not supported by this browser.',
+  }
+  note.textContent = status === 'unsupported' || input.checked ? messages[status] : ''
+  note.hidden = !note.textContent
+}
+
+function renderScreenSection(body: HTMLElement): void {
+  const cell = section(body, 'Screen', { bare: true })
+  const row = el('label', 'settings-toggle')
+  row.appendChild(el('span', '', 'Keep screen awake'))
+  const state = el('span', 'settings-wake-state')
+  state.setAttribute('aria-hidden', 'true')
+  const input = el('input', 'settings-wake-lock')
+  input.type = 'checkbox'
+  input.setAttribute('role', 'switch')
+  input.setAttribute('aria-label', 'Keep screen awake')
+  input.addEventListener('change', () => setPref('keepScreenAwake', input.checked))
+  row.append(state, input)
+  const status = el('p', 'settings-footer settings-wake-status')
+  status.setAttribute('role', 'status')
+  cell.append(row, status)
+  syncWakeLockControl(body)
+
+  // Fullscreen API also changes display-mode. Keep an Exit button in a
+  // browser tab; do not mistake that state for a fullscreen-installed PWA.
+  const installed = (navigator as { standalone?: boolean }).standalone === true
+    || window.matchMedia('(display-mode: standalone), (display-mode: minimal-ui)').matches
+    || (window.matchMedia('(display-mode: fullscreen)').matches && !document.fullscreenElement)
+  if (installed) return
+  const actions = el('div', 'settings-actions')
+  const error = el('p', 'settings-error')
+  error.setAttribute('role', 'alert')
+  error.hidden = true
+  const btn = button('Use Fullscreen', 'settings-btn settings-fullscreen-btn', async () => {
+    if (btn.disabled) return
+    const exiting = !!document.fullscreenElement
+    btn.disabled = true
+    error.hidden = true
+    try {
+      if (exiting) await document.exitFullscreen()
+      else await document.documentElement.requestFullscreen({ navigationUI: 'hide' })
+    } catch {
+      error.textContent = exiting ? 'Could not exit fullscreen.' : 'Could not enter fullscreen.'
+      error.hidden = false
+    } finally {
+      syncFullscreenButton(body)
+    }
+  })
+  actions.appendChild(btn)
+  cell.append(actions, error)
+  syncFullscreenButton(body)
 }
 
 // Sub-page navigation (viewer, editor); see homeScroll.

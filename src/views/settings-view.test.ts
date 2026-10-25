@@ -487,7 +487,7 @@ describe('settings sub-page navigation', () => {
     const headings = $$('.settings-h').map(h => h.textContent)
     expect(headings).toEqual([
       'Movement', 'Map display', 'Monster list', 'Message log', 'D-pad', 'Control sets',
-      'Character sprites', 'Help',
+      'Character sprites', 'Help', 'Screen',
     ])
   })
 
@@ -737,7 +737,7 @@ describe('floating size palette', () => {
     const headings = $$('.settings-h').map(h => h.textContent)
     expect(headings).toEqual([
       'Movement', 'Map display', 'Monster list', 'D-pad and message log', 'Control sets',
-      'Character sprites', 'Help',
+      'Character sprites', 'Help', 'Screen',
     ])
     // no sliders or previews on the card — the palette is the in-game surface
     expect($('.settings-card .set-slider')).toBeNull()

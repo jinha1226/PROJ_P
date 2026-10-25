@@ -5,7 +5,7 @@ import { fakeStorage } from './test/fake-storage'
 
 vi.stubGlobal('localStorage', fakeStorage())
 
-import { getPref, setPref } from './prefs'
+import { getPref, setPref, KEEP_SCREEN_AWAKE_CHANGED_EVENT } from './prefs'
 
 const KEY = 'pocketzot:prefs'
 
@@ -16,6 +16,7 @@ beforeEach(() => {
 describe('prefs defaults', () => {
   it('serves defaults on an empty store', () => {
     expect(getPref('movementMode')).toBe('keypad')
+    expect(getPref('keepScreenAwake')).toBe(false)
     expect(getPref('monsterListMode')).toBe('full')
     expect(getPref('loginSprites')).toBe(true)
     expect(getPref('loginOnlineOpen')).toBeNull()
@@ -28,6 +29,24 @@ describe('prefs defaults', () => {
     setPref('movementMode', 'touch')
     setPref('loginSprites', false)
     expect(getPref('movementMode')).toBe('touch')
+  })
+})
+
+describe('screen wake lock preference', () => {
+  it('persists the choice and emits only real changes', () => {
+    const changed = vi.fn()
+    window.addEventListener(KEEP_SCREEN_AWAKE_CHANGED_EVENT, changed)
+    try {
+      setPref('keepScreenAwake', true)
+      expect(getPref('keepScreenAwake')).toBe(true)
+      expect(JSON.parse(localStorage.getItem(KEY)!).keepScreenAwake).toBe(true)
+      setPref('keepScreenAwake', true)
+      expect(changed).toHaveBeenCalledOnce()
+      setPref('keepScreenAwake', false)
+      expect(changed).toHaveBeenCalledTimes(2)
+    } finally {
+      window.removeEventListener(KEEP_SCREEN_AWAKE_CHANGED_EVENT, changed)
+    }
   })
 })
 

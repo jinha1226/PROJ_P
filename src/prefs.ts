@@ -18,6 +18,7 @@ export const LOGIN_SPRITES_CHANGED_EVENT = 'pocketzot:login-sprites-changed'
 // One event for all three size prefs — the sole listener (ui-scale.ts)
 // re-reads every stop and rewrites the CSS variables wholesale.
 export const UI_SCALE_CHANGED_EVENT = 'pocketzot:ui-scale-changed'
+export const KEEP_SCREEN_AWAKE_CHANGED_EVENT = 'pocketzot:keep-screen-awake-changed'
 
 const PREF_EVENTS: Partial<Record<keyof Prefs, string>> = {
   mapRenderMode: RENDER_MODE_CHANGED_EVENT,
@@ -27,6 +28,7 @@ const PREF_EVENTS: Partial<Record<keyof Prefs, string>> = {
   dpadSize: UI_SCALE_CHANGED_EVENT,
   msglogLines: UI_SCALE_CHANGED_EVENT,
   msglogFont: UI_SCALE_CHANGED_EVENT,
+  keepScreenAwake: KEEP_SCREEN_AWAKE_CHANGED_EVENT,
 }
 
 // 'hidden' is reachable only from the settings page — once hidden there is no
@@ -43,6 +45,7 @@ export interface Prefs {
   monsterListCorner: MonsterListCorner
   mapRenderMode: 'ascii' | 'tiles'
   movementMode: 'touch' | 'keypad'
+  keepScreenAwake: boolean
   controlSetId: string
   // Character-sprite shelf on the login screen (and with it the crypt, whose
   // only entry point it is). Avatar recipes keep being captured while off, so
@@ -74,6 +77,7 @@ const DEFAULTS: Prefs = {
   lastGuestSpectateWsUrl: null,
   mapRenderMode: 'tiles',
   movementMode: 'keypad',
+  keepScreenAwake: false,
   monsterListMode: 'full',
   monsterListCorner: 'top-left',
   controlSetId: 'standard',
