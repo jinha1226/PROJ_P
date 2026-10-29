@@ -3777,6 +3777,7 @@ describe('spell harvest (silent I → Esc) + preface parsing', () => {
     })
 
     it('keeps rail taps inert in Keypad targeting and after a Touch drag-off', () => {
+      setPref('movementMode', 'keypad')
       const h = setup()
       ready(h)
       h.send.mockClear()
