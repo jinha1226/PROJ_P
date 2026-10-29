@@ -62,6 +62,7 @@ import { getPref, setPref, MONSTER_LIST_MODE_CHANGED_EVENT, RENDER_MODE_CHANGED_
 import { SpdToolbar } from '../game/hud/spd-toolbar'
 import { SpdIndicators } from '../game/hud/spd-indicators'
 import { SpdHeroTabs } from '../game/hud/spd-hero-tabs'
+import { SpdPortrait } from '../game/hud/spd-portrait'
 import { loadSession, saveSession } from '../auth/session'
 import { stripDcss } from './overlay-body'
 import { SpellHarvester, type SpellEntry } from '../game/spell-harvest'
@@ -791,6 +792,10 @@ export function buildGameView(opts: GameViewOptions): HTMLElement {
 
   const hudTop = document.createElement('div')
   hudTop.id = 'hud-top'
+  // SPD layout only (CSS: #game-view.spd-ui); heroTabs is declared further
+  // down, which the tap reaches long after construction.
+  const spdPortrait = new SpdPortrait(() => { if (spdLayout) heroTabs.open() })
+  hudTop.appendChild(spdPortrait.element)
   hudTop.appendChild(statsView.element)
 
   const hud = document.createElement('div')
@@ -929,7 +934,9 @@ export function buildGameView(opts: GameViewOptions): HTMLElement {
     if (spdLayout) heroTabs.open()
   })
   function updateSpdIndicators(): void {
-    if (spdLayout) spdIndicators.update(store, loader, renderMode === 'tiles')
+    if (!spdLayout) return
+    spdIndicators.update(store, loader, renderMode === 'tiles')
+    spdPortrait.update(store, loader)
   }
 
   const minimaps = new MinimapHosts({
@@ -994,6 +1001,7 @@ export function buildGameView(opts: GameViewOptions): HTMLElement {
     spdToolbar.setKeysOpen(spdKeysOpen)
     spdIndicators.element.style.display = spdLayout && playfield ? '' : 'none'
     view.classList.toggle('spd-bar-on', spdBar)
+    view.classList.toggle('spd-ui', spdLayout)
     if (!spdBar) spdToolbar.closePicker()
     touchControls.setOverlayMode(overlayMode !== 'none')
     // The bar REPLACES the touch panel. Portrait gets that from the inline
@@ -1720,6 +1728,7 @@ export function buildGameView(opts: GameViewOptions): HTMLElement {
     mapView.setPlayerStats(playerStats)
     inventoryStore.update(msg.inv)
     if (msg.inv) spdToolbar.refresh()
+    if (msg.xl !== undefined) spdPortrait.setLevel(msg.xl)
     if (msg.pos) updateSpdIndicators()
     statsView.update(msg)
     if (msg.status !== undefined) statusView.update(msg.status)

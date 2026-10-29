@@ -1187,6 +1187,16 @@ describe('SPD hero window tabs', () => {
     expect(h.send).not.toHaveBeenCalled()
   })
 
+  it('opens Status from the portrait, which shows the level', () => {
+    const h = playing()
+    h.dispatch({ msg: 'player', xl: 7 })
+    const portrait = h.view.querySelector<HTMLElement>('#spd-portrait')!
+    expect(portrait.textContent).toContain('7')
+    expect(portrait.textContent).toContain('@')
+    portrait.click()
+    expect(sentMsgs(h)).toEqual([{ msg: 'input', text: '%' }])
+  })
+
   it('does nothing from the HUD outside the SPD layout', () => {
     setPref('spdLayout', false)
     const h = playing()
