@@ -9,7 +9,7 @@ import { bakeCryptStrip } from './src/build/crypt-strip.js'
 import { STRIP } from './src/views/crypt-room-layout'
 
 const projectRoot = dirname(fileURLToPath(import.meta.url))
-const appBase = '/pocketzot-dwem/'
+const appBase = '/PROJ_P/'
 
 // The `/*` block of public/_headers, as a header map. The SW's synthetic
 // shell Response never traverses the edge, so the security headers Pages
