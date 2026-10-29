@@ -66,7 +66,6 @@ import { ioHook } from '../dwem/io-hook'
 import { TRANSLATION_CHANGED_EVENT } from '../dwem/translation-module'
 import { relabel } from '../game/hud/spd-i18n'
 import { SpdPortrait } from '../game/hud/spd-portrait'
-import { SpdBuffs } from '../game/hud/spd-buffs'
 import { SpdHpFloat, hpChange, type HpSnapshot } from '../game/hud/spd-hp-float'
 import { parseAbilityItems, type AbilityEntry } from '../game/hud/spd-quickslots'
 import { loadSession, saveSession } from '../auth/session'
@@ -820,9 +819,6 @@ export function buildGameView(opts: GameViewOptions): HTMLElement {
   let hudRevealed = false
   hud.appendChild(hudTop)
   hud.appendChild(statusView.element)
-  // SPD layout: icons in place of the status lights (CSS: .spd-ui).
-  const spdBuffs = new SpdBuffs()
-  hud.appendChild(spdBuffs.element)
   const spdHpFloat = new SpdHpFloat()
   let spdHpPrev: HpSnapshot = {}
 
@@ -985,14 +981,13 @@ export function buildGameView(opts: GameViewOptions): HTMLElement {
     if (spdLayout) heroTabs.open()
   })
   // Text the SPD chrome matches is read before DWEM's translation
-  // (priority 0) rewrites it: the loot indicator's log lines and the status
-  // lights the buff icons key on stay the engine's English. Higher priority
-  // runs first (io-hook.ts HandlerList).
-  let rawStatusLights: string[] = []
+  // (priority 0) rewrites it: the loot indicator's log lines and the quiver
+  // the fire button keys on stay the engine's English. Higher priority runs
+  // first (io-hook.ts HandlerList).
   ioHook.handle_message.before.addHandler('spd-raw', (m) => {
     if (m.msg === 'player') {
-      const status = (m as MsgOf<'player'>).status
-      if (status) rawStatusLights = status.map(st => st.light ?? '')
+      const quiver = (m as MsgOf<'player'>).quiver_desc
+      if (quiver !== undefined) spdIndicators.setQuiver(stripDcss(quiver))
       return
     }
     if (m.msg !== 'msgs' || !spdLayout) return
@@ -1820,10 +1815,7 @@ export function buildGameView(opts: GameViewOptions): HTMLElement {
     if (msg.xl !== undefined) spdPortrait.setLevel(msg.xl)
     if (msg.pos) updateSpdIndicators()
     statsView.update(msg)
-    if (msg.status !== undefined) {
-      statusView.update(msg.status)
-      spdBuffs.update(msg.status, rawStatusLights)
-    }
+    if (msg.status !== undefined) statusView.update(msg.status)
     if (msg.hp !== undefined || msg.hp_max !== undefined) {
       const next = { hp: msg.hp ?? spdHpPrev.hp, hp_max: msg.hp_max ?? spdHpPrev.hp_max }
       const delta = msg.hp !== undefined ? hpChange(spdHpPrev, { hp: msg.hp, hp_max: msg.hp_max }) : 0

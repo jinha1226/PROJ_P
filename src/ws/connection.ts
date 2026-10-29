@@ -1,5 +1,6 @@
 import type { ClientMsg, ServerMsg } from './types'
 import { ioHook, type IncomingMessage, type OutgoingMessage } from '../dwem/io-hook'
+import { siteInformation } from '../dwem/site-information'
 import { recordFrame } from '../perf/recorder'
 import { devRingPush } from '../util/dev-ring'
 
@@ -193,6 +194,7 @@ export class WsConnection implements GameConnection {
       return
     }
     const sink = (next: IncomingMessage) => this.onMessage(next as ServerMsg)
+    siteInformation.liveConn = this
     ioHook.setIncomingSink(sink)
     ioHook.handleMessage(msg as IncomingMessage)
   }

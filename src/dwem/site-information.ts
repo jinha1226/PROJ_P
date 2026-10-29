@@ -9,6 +9,11 @@ export interface DwemContext {
 
 export class SiteInformation {
   conn: GameConnection | null = null
+  // The connection that delivered the latest server message. Ahead of
+  // `conn` during an auto-resume: the new socket's game_client arrives
+  // before the app adopts it (setGame), and an RC request sent on the old,
+  // dead socket would never be answered.
+  liveConn: GameConnection | null = null
   current_user = ''
   watching = false
   watching_username = ''
@@ -36,6 +41,7 @@ export class SiteInformation {
 
   clear(): void {
     this.conn = null
+    this.liveConn = null
     this.current_user = ''
     this.watching = false
     this.watching_username = ''

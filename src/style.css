@@ -7059,46 +7059,6 @@ html.map-hold, html.map-hold * {
 }
 .spd-slot-dots span.on { background: var(--accent); }
 
-/* Status icons (spd-buffs.ts) in place of the text lights. */
-#spd-buffs { display: none; }
-#game-view.spd-ui #hud-status { display: none; }
-#game-view.spd-ui #spd-buffs { display: block; position: relative; }
-.spd-buff-row { display: flex; flex-wrap: wrap; gap: 0.2rem; min-height: 1.5rem; }
-.spd-buff {
-  width: 1.5rem;
-  height: 1.5rem;
-  padding: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: var(--surface2);
-  border: 1px solid var(--border);
-  border-radius: 0.3rem;
-  font-size: 0.85rem;
-  line-height: 1;
-  touch-action: manipulation;
-}
-.spd-buff.text { font-family: var(--font-mono); font-size: 0.6rem; font-weight: bold; }
-.spd-buff.active { outline: 1px solid var(--accent); }
-.spd-buff-pop {
-  position: absolute;
-  left: 0;
-  right: 0;
-  top: calc(100% + 0.25rem);
-  z-index: var(--z-map-above-overlay);
-  padding: 0.45rem 0.55rem;
-  background: var(--surface);
-  border: 1px solid var(--accent);
-  border-radius: 0.45rem;
-  font-family: var(--font-mono);
-  font-size: 0.75rem;
-  color: var(--text);
-}
-.spd-buff-pop[hidden] { display: none; }
-.spd-buff-light { font-weight: bold; margin-bottom: 0.15rem; }
-.spd-buff-text { color: var(--text-dim); }
-.spd-buff-desc { margin-top: 0.25rem; color: var(--text-dim); line-height: 1.35; }
-
 /* Floating HP numbers (spd-hp-float.ts) over the player's cell. */
 #spd-hp-float {
   position: fixed;
@@ -7214,6 +7174,13 @@ html.map-hold, html.map-hold * {
   font-size: 0.85rem;
 }
 .spd-ind-icon { font-size: 0.9rem; }
+.spd-fire {
+  width: 2.6rem;
+  height: 2.6rem;
+  border-radius: 50%;
+  border: 2px solid var(--accent);
+  font-size: 1.2rem;
+}
 .spd-attack {
   width: 3.2rem;
   height: 3.2rem;

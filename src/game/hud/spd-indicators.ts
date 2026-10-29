@@ -1,6 +1,9 @@
 // SPD-style map-edge indicators (the "SPD layout" pref), after Shattered
 // Pixel Dungeon's DangerIndicator, AttackIndicator and LootIndicator:
 //   - loot: something lies underfoot; tap picks it up (`g`).
+//   - fire: the quivered action (a launcher's ammo, a throwable, a wand);
+//     tap sends `f`, which opens the direction chooser — the toolbar's aim
+//     row then picks the target.
 //   - danger: how many hostiles are in view; tap opens the monster panel.
 //   - attack: the nearest hostile's portrait; tap attacks it — a direction
 //     key when adjacent (deterministic: always that monster), else Tab,
@@ -71,6 +74,8 @@ export class SpdIndicators {
   private readonly danger: HTMLButtonElement
   private readonly attack: HTMLButtonElement
   private readonly loot: HTMLButtonElement
+  private readonly fire: HTMLButtonElement
+  private quiver = ''
   private lootHere = false
   private lootPos = ''
   private target: MonsterCell | null = null
@@ -111,8 +116,20 @@ export class SpdIndicators {
       deps.send({ msg: 'input', text: 'g' })
     })
 
+    this.fire = document.createElement('button')
+    this.fire.type = 'button'
+    this.fire.className = 'spd-ind spd-fire'
+    this.fire.innerHTML = '<span class="spd-ind-icon">🏹</span>'
+    trTitle(this.fire, 'Fire')
+    bindPressedClass(this.fire)
+    this.fire.addEventListener('click', () => {
+      if (!deps.canAct()) return
+      deps.send({ msg: 'input', text: 'f' })
+    })
+
     root.appendChild(this.loot)
     root.appendChild(this.danger)
+    root.appendChild(this.fire)
     root.appendChild(this.attack)
     this.sync()
   }
@@ -134,12 +151,24 @@ export class SpdIndicators {
     this.sync()
   }
 
+  // The engine's quiver line (untranslated, markup stripped).
+  setQuiver(desc: string): void {
+    this.quiver = desc
+    this.sync()
+  }
+
+  private hasQuiver(): boolean {
+    return !!this.quiver.trim() && !/nothing (quivered|to fire)|^none$/i.test(this.quiver.trim())
+  }
+
   private sync(): void {
     const posKey = `${this.from.x},${this.from.y}`
     if (this.lootHere && this.lootPos !== PENDING && posKey !== this.lootPos) this.lootHere = false
     this.loot.hidden = !this.lootHere
     this.danger.hidden = !this.target
     this.attack.hidden = !this.target
+    this.fire.hidden = !this.target || !this.hasQuiver()
+    if (!this.fire.hidden) this.fire.title = `${tr('Fire')}: ${this.quiver}`
     this.element.hidden = !this.lootHere && !this.target
   }
 

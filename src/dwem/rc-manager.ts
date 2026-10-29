@@ -199,7 +199,7 @@ export class RCManager {
   }
 
   private requestRcfileFromServer(): Promise<string | null> {
-    const conn = siteInformation.conn
+    const conn = siteInformation.liveConn?.connected ? siteInformation.liveConn : siteInformation.conn
     const gameId = this.session?.game_id
     if (!conn || !gameId) return Promise.resolve(null)
 
@@ -256,7 +256,7 @@ export class RCManager {
 
   private getRCURL(version: string, username: string): string | undefined {
     if (!username) return undefined
-    const host = wsHost(siteInformation.conn?.wsUrl)
+    const host = wsHost((siteInformation.liveConn ?? siteInformation.conn)?.wsUrl)
     const baseURL = host ? this.locations[host] : undefined
     if (!baseURL) return undefined
 

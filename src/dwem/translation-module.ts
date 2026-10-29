@@ -88,7 +88,12 @@ export class TranslationModule {
   private async initialize(rcfile: string): Promise<void> {
     this.unload()
     this.config = this.getTranslationConfig(rcfile)
-    if (!this.config.translationLanguage) return
+    if (!this.config.translationLanguage) {
+      // An empty RC is the load failing (rc-manager falls back to ''), not a
+      // choice: say so, or a translated player just sees English.
+      if (!rcfile.trim()) this.sendMessage('<cyan>[TranslationModule]</cyan> <yellow>RC 파일을 불러오지 못해 번역이 꺼져 있어요. (RC file not loaded — translation off)</yellow>')
+      return
+    }
 
     if (this.config.useTranslationFont) this.loadTranslationFont(this.config.translationLanguage)
 
@@ -111,6 +116,7 @@ export class TranslationModule {
     } catch (err) {
       console.error('[DWEM][TranslationModule] failed to initialize', err)
       this.translator = null
+      this.sendMessage('<cyan>[TranslationModule]</cyan> <yellow>번역 데이터를 불러오지 못했어요. (translation data failed to load)</yellow>')
     }
   }
 
