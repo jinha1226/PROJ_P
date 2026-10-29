@@ -64,6 +64,8 @@ import { SpdIndicators } from '../game/hud/spd-indicators'
 import { SpdHeroTabs } from '../game/hud/spd-hero-tabs'
 import { ioHook } from '../dwem/io-hook'
 import { SpdPortrait } from '../game/hud/spd-portrait'
+import { SpdBuffs } from '../game/hud/spd-buffs'
+import { SpdHpFloat, hpChange, type HpSnapshot } from '../game/hud/spd-hp-float'
 import { parseAbilityItems, type AbilityEntry } from '../game/hud/spd-quickslots'
 import { loadSession, saveSession } from '../auth/session'
 import { stripDcss } from './overlay-body'
@@ -809,6 +811,11 @@ export function buildGameView(opts: GameViewOptions): HTMLElement {
   let hudRevealed = false
   hud.appendChild(hudTop)
   hud.appendChild(statusView.element)
+  // SPD layout: icons in place of the status lights (CSS: .spd-ui).
+  const spdBuffs = new SpdBuffs()
+  hud.appendChild(spdBuffs.element)
+  const spdHpFloat = new SpdHpFloat()
+  let spdHpPrev: HpSnapshot = {}
 
   const numpad = new NumpadInput({ send, focusView })
 
@@ -968,10 +975,17 @@ export function buildGameView(opts: GameViewOptions): HTMLElement {
   statsView.setOnHeroTap(() => {
     if (spdLayout) heroTabs.open()
   })
-  // Underfoot items are read off the log before DWEM's translation
-  // (priority 0) rewrites it: the loot indicator matches the engine's
-  // English. Higher priority runs first (io-hook.ts HandlerList).
-  ioHook.handle_message.before.addHandler('spd-loot', (m) => {
+  // Text the SPD chrome matches is read before DWEM's translation
+  // (priority 0) rewrites it: the loot indicator's log lines and the status
+  // lights the buff icons key on stay the engine's English. Higher priority
+  // runs first (io-hook.ts HandlerList).
+  let rawStatusLights: string[] = []
+  ioHook.handle_message.before.addHandler('spd-raw', (m) => {
+    if (m.msg === 'player') {
+      const status = (m as MsgOf<'player'>).status
+      if (status) rawStatusLights = status.map(st => st.light ?? '')
+      return
+    }
     if (m.msg !== 'msgs' || !spdLayout) return
     const lines = (m as MsgOf<'msgs'>).messages ?? []
     for (const line of lines) spdIndicators.onMessage(stripDcss(String(line.text ?? '')))
@@ -1185,6 +1199,7 @@ export function buildGameView(opts: GameViewOptions): HTMLElement {
     view.appendChild(spdToolbar.element)
     view.appendChild(spdIndicators.element)
     view.appendChild(heroTabs.element)
+    view.appendChild(spdHpFloat.element)
     view.appendChild(menuControls)
   }
   // Both roles: spectators share the watched player's screens too.
@@ -1782,7 +1797,17 @@ export function buildGameView(opts: GameViewOptions): HTMLElement {
     if (msg.xl !== undefined) spdPortrait.setLevel(msg.xl)
     if (msg.pos) updateSpdIndicators()
     statsView.update(msg)
-    if (msg.status !== undefined) statusView.update(msg.status)
+    if (msg.status !== undefined) {
+      statusView.update(msg.status)
+      spdBuffs.update(msg.status, rawStatusLights)
+    }
+    if (msg.hp !== undefined || msg.hp_max !== undefined) {
+      const next = { hp: msg.hp ?? spdHpPrev.hp, hp_max: msg.hp_max ?? spdHpPrev.hp_max }
+      const delta = msg.hp !== undefined ? hpChange(spdHpPrev, { hp: msg.hp, hp_max: msg.hp_max }) : 0
+      spdHpPrev = next
+      const at = delta && spdLayout ? mapView.cellClientCenter(store.playerPos.x, store.playerPos.y) : null
+      if (at) spdHpFloat.show(delta, at)
+    }
     if (msg.time !== undefined) messageLog.markLast('turn')
     if (!hudRevealed) {
       hudRevealed = true
@@ -2467,7 +2492,7 @@ export function buildGameView(opts: GameViewOptions): HTMLElement {
     window.removeEventListener(RENDER_MODE_CHANGED_EVENT, onRenderModePref)
     window.removeEventListener(MOVEMENT_MODE_CHANGED_EVENT, onMovementModePref)
     window.removeEventListener(SPD_LAYOUT_CHANGED_EVENT, onSpdLayoutPref)
-    ioHook.handle_message.before.removeHandler('spd-loot')
+    ioHook.handle_message.before.removeHandler('spd-raw')
     window.removeEventListener(MONSTER_LIST_MODE_CHANGED_EVENT, onMonsterListModePref)
     closeWatcher?.destroy()
     closeWatcher = null

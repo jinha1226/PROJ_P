@@ -20,7 +20,7 @@ import { escHtml } from '../dcss-colors'
 import { bindPressedClass } from '../input/touch'
 import { SpdBag } from './spd-bag'
 import {
-  KIND_GLYPH, QUICKSLOT_COUNT, itemCount, itemKind, itemTile, loadSlots, nameKindGlyph,
+  KIND_GLYPH, QUICKSLOT_COUNT, QUICKSLOT_PAGE, itemCount, itemKind, itemTile, loadSlots, nameKindGlyph,
   resolveNamed, resolveSlot, saveSlots, shortLabel, useMsg, type AbilityEntry, type QuickSlot,
   type SpellInfo,
 } from './spd-quickslots'
@@ -86,16 +86,39 @@ export class SpdToolbar {
       () => this.key('s'), () => this.key('5')))
     bar.appendChild(this.actionButton('spd-explore', '🧭', tr('Explore'), tr('Auto-explore'), () => this.key('o')))
 
+    // Pages of QUICKSLOT_PAGE, side by side in a snapping scroller: swipe
+    // for the next page; the dots show which one is up.
     const slotRow = document.createElement('div')
     slotRow.className = 'spd-slots'
+    const pages = document.createElement('div')
+    pages.className = 'spd-slot-pages'
+    let page: HTMLElement | null = null
     for (let i = 0; i < QUICKSLOT_COUNT; i++) {
+      if (i % QUICKSLOT_PAGE === 0) {
+        page = document.createElement('div')
+        page.className = 'spd-slot-page'
+        pages.appendChild(page)
+      }
       const b = document.createElement('button')
       b.type = 'button'
       b.className = 'spd-btn spd-slot'
+      b.dataset.slot = String(i)
       this.bindPress(b, () => this.useSlot(i), () => this.bag.open(i))
       this.slotEls.push(b)
-      slotRow.appendChild(b)
+      page!.appendChild(b)
     }
+    const dots = document.createElement('div')
+    dots.className = 'spd-slot-dots'
+    const pageCount = Math.ceil(QUICKSLOT_COUNT / QUICKSLOT_PAGE)
+    for (let p = 0; p < pageCount; p++) dots.appendChild(document.createElement('span'))
+    const syncDots = (): void => {
+      const w = pages.clientWidth || 1
+      const cur = Math.round(pages.scrollLeft / w)
+      dots.querySelectorAll('span').forEach((d, p) => d.classList.toggle('on', p === cur))
+    }
+    pages.addEventListener('scroll', syncDots, { passive: true })
+    syncDots()
+    slotRow.append(pages, dots)
     bar.appendChild(slotRow)
 
     this.keysBtn = this.actionButton('spd-keys', '⌨', tr('Keys'), tr('Show the keypad'), () => deps.toggleKeys())

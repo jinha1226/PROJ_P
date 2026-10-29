@@ -1230,6 +1230,26 @@ describe('SPD layout toolbar', () => {
     expect(h.send.mock.calls.map(c => c[0])).toEqual([{ msg: 'input', text: 'aa' }])
   })
 
+  it('shows status icons from the untranslated lights, translated text on tap', () => {
+    const h = playing()
+    // DWEM's translation runs at IOHook priority 0, after the raw capture:
+    // the view gets the translated light, the icon comes from the English.
+    ioHook.handleMessage({ msg: 'player', status: [{ light: 'Hasted', text: 'Hasted (5)', col: 9 }] } as unknown as IncomingMessage)
+    h.dispatch({ msg: 'player', status: [{ light: '가속', text: '가속 (5)', col: 9 }] })
+    const icon = h.view.querySelector<HTMLButtonElement>('.spd-buff')!
+    expect(icon.textContent).toBe('⚡')
+    icon.click()
+    const pop = h.view.querySelector<HTMLElement>('.spd-buff-pop')!
+    expect(pop.hidden).toBe(false)
+    expect(pop.textContent).toContain('가속 (5)')
+  })
+
+  it('pages the quickslots: eight slots, four to a page', () => {
+    const h = playing()
+    expect(bar(h).querySelectorAll('.spd-slot-page')).toHaveLength(2)
+    expect(bar(h).querySelectorAll('.spd-slot')).toHaveLength(8)
+  })
+
   it('offers pick-up while something lies underfoot', () => {
     const h = playing()
     const loot = () => h.view.querySelector<HTMLButtonElement>('.spd-loot')!

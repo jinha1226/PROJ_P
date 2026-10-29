@@ -67,7 +67,9 @@ export interface SpellInfo {
   fail?: string
 }
 
-export const QUICKSLOT_COUNT = 4
+// Two pages of four on the toolbar (swipe between them).
+export const QUICKSLOT_PAGE = 4
+export const QUICKSLOT_COUNT = 8
 const STORAGE_KEY = 'pocketzot:spd-quickslots'
 
 export type ItemKind = 'potion' | 'scroll' | 'wand' | 'evoke' | 'missile' | 'equip' | 'other'

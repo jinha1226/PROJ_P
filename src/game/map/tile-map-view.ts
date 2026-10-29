@@ -465,6 +465,17 @@ export class TileMapView {
     return this.hitTester()?.(clientX, clientY) ?? null
   }
 
+  // Dungeon cell → the client point at its centre (hitTester inverted; its
+  // fractional-pan terms cancel). Null off-view or before layout.
+  cellClientCenter(x: number, y: number): { x: number; y: number } | null {
+    const r = this.canvas.getBoundingClientRect()
+    if (r.width <= 0 || r.height <= 0) return null
+    if (!this.inView(x - this.offX, y - this.offY)) return null
+    const cellW = r.width / this.viewportW
+    const cellH = r.height / this.viewportH
+    return { x: r.left + (x - this.offX + 0.5) * cellW, y: r.top + (y - this.offY + 0.5) * cellH }
+  }
+
   render(dirty?: Set<string>): void {
     if (dirty) {
       const cells = new Set<number>()

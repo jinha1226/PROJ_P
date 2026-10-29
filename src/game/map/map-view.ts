@@ -318,6 +318,22 @@ export class MapView {
     }
   }
 
+  // Dungeon cell → the client point at its centre (hitTester inverted),
+  // for overlays pinned to a cell. Null off-view or before layout.
+  cellClientCenter(x: number, y: number): { x: number; y: number } | null {
+    const s00 = this.spans[0]?.[0]
+    if (!s00) return null
+    const a = s00.getBoundingClientRect()
+    const s01 = this.spans[0]?.[1]
+    const charW = s01 ? s01.getBoundingClientRect().left - a.left : a.width
+    const s10 = this.spans[1]?.[0]
+    const lineH = s10 ? s10.getBoundingClientRect().top - a.top : a.height
+    if (charW <= 0 || lineH <= 0) return null
+    if (!this.inView(x - this.offX, y - this.offY)) return null
+    // hitTester's fractional-pan terms cancel out in the inverse.
+    return { x: a.left + (x - this.offX + 0.5) * charW, y: a.top + (y - this.offY + 0.5) * lineH }
+  }
+
   // One-shot form of hitTester, for single taps.
   cellAtPoint(clientX: number, clientY: number): { x: number; y: number } | null {
     return this.hitTester()?.(clientX, clientY) ?? null
