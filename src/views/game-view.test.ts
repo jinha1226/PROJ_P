@@ -1136,6 +1136,65 @@ describe('SPD layout toolbar', () => {
   })
 })
 
+describe('SPD hero window tabs', () => {
+  const strip = (h: Harness) => h.view.querySelector<HTMLElement>('#spd-hero-tabs')!
+  const tab = (h: Harness, key: string) => strip(h).querySelector<HTMLButtonElement>(`[data-key="${key}"]`)!
+  const sentMsgs = (h: Harness) => h.send.mock.calls.map(c => c[0])
+  function playing(): Harness {
+    const h = setupAtCommand()
+    h.dispatch({ msg: 'player', hp: 10, hp_max: 10, pos: { x: 2, y: 2 } })
+    h.send.mockClear()
+    return h
+  }
+  const openMenu = (h: Harness, title: string) => {
+    h.dispatch({ msg: 'menu', tag: 'skills', title: { text: title }, items: [] })
+  }
+
+  it('opens Status from a HUD tap and shows the strip over the screen', () => {
+    const h = playing()
+    h.view.querySelector<HTMLElement>('#hud-hp')!.click()
+    expect(sentMsgs(h)).toEqual([{ msg: 'input', text: '%' }])
+    expect(strip(h).style.display).toBe('none')
+    openMenu(h, 'Overview')
+    expect(strip(h).style.display).toBe('')
+    expect(tab(h, '%').classList.contains('active')).toBe(true)
+    expect(h.view.classList.contains('hero-tabs-on')).toBe(true)
+  })
+
+  it('switches tabs with one Esc, then the next key once back at the prompt', () => {
+    const h = playing()
+    h.view.querySelector<HTMLElement>('#hud-hp')!.click()
+    openMenu(h, 'Overview')
+    h.send.mockClear()
+    tab(h, 'm').click()
+    tab(h, 'M').click()  // a second switch before the close lands: no second Esc
+    expect(sentMsgs(h)).toEqual([{ msg: 'key', keycode: 27 }])
+    h.dispatch({ msg: 'close_menu' })
+    expect(sentMsgs(h)).toEqual([{ msg: 'key', keycode: 27 }, { msg: 'input', text: 'M' }])
+    openMenu(h, 'Memorise')
+    expect(tab(h, 'M').classList.contains('active')).toBe(true)
+  })
+
+  it('ends the session when the player closes the screen', () => {
+    const h = playing()
+    h.view.querySelector<HTMLElement>('#hud-hp')!.click()
+    openMenu(h, 'Overview')
+    h.dispatch({ msg: 'close_menu' })
+    expect(strip(h).style.display).toBe('none')
+    expect(h.view.classList.contains('hero-tabs-on')).toBe(false)
+    h.send.mockClear()
+    h.dispatch({ msg: 'input_mode', mode: 1 })
+    expect(h.send).not.toHaveBeenCalled()
+  })
+
+  it('does nothing from the HUD outside the SPD layout', () => {
+    setPref('spdLayout', false)
+    const h = playing()
+    h.view.querySelector<HTMLElement>('#hud-hp')!.click()
+    expect(h.send).not.toHaveBeenCalled()
+  })
+})
+
 // A spectator joining makes the engine re-send every cursor id to the player
 // too (tileweb.cc _send_everything: id 0, id 1, then id 2 after the map).
 // Each id has its own slot, so the loc-less resends of the others must not

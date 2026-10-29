@@ -38,6 +38,7 @@ export class StatsView {
   private mql: MediaQueryList | null
   private onPlaceTap: (() => void) | null = null
   private onSettingsTap: (() => void) | null = null
+  private onHeroTap: (() => void) | null = null
 
   constructor(inv: InventoryStore) {
     this.inv = inv
@@ -52,6 +53,7 @@ export class StatsView {
       const t = e.target as HTMLElement
       if (this.onPlaceTap && t.closest?.('.hud-place-chip')) this.onPlaceTap()
       else if (this.onSettingsTap && t.closest?.('.hud-settings-chip')) this.onSettingsTap()
+      else if (this.onHeroTap) this.onHeroTap()
     })
     // Portrait gets the compact HUD (single nowrap rows); landscape gets the
     // square two-column HUD, which fits the 15rem sidebar without clipping.
@@ -75,6 +77,11 @@ export class StatsView {
 
   setOnSettingsTap(cb: () => void): void {
     this.onSettingsTap = cb
+  }
+
+  // The rest of the HUD: SPD's status pane opens the hero window.
+  setOnHeroTap(cb: () => void): void {
+    this.onHeroTap = cb
   }
 
   // Swap templates on rotate and repaint from the accumulated state — render()

@@ -7175,6 +7175,41 @@ html.map-hold, html.map-hold * {
   font-size: 0.8rem;
 }
 
+/* Hero window tabs (spd-hero-tabs.ts): a strip pinned to the top of the
+   map cell, over the server screen it switches between; the overlay drops
+   its content below it. */
+#spd-hero-tabs {
+  grid-area: map;
+  align-self: start;
+  position: relative;
+  z-index: var(--z-map-above-overlay);
+  display: flex;
+  gap: 0.2rem;
+  padding: max(0.35rem, var(--safe-top)) 0.35rem 0.35rem;
+  background: var(--bg);
+  border-bottom: 1px solid var(--border);
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+#game-view.hero-tabs-on #ui-overlay {
+  padding-top: calc(max(0.35rem, var(--safe-top)) + 2.6rem);
+}
+.spd-hero-tab {
+  flex: 1 0 auto;
+  height: 1.9rem;
+  padding: 0 0.45rem;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 0.4rem;
+  color: var(--text-dim);
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  touch-action: manipulation;
+}
+.spd-hero-tab.active { color: var(--accent); border-color: var(--accent); }
+.spd-hero-tab.pressed, .spd-hero-tab:active { background: var(--press); }
+.spd-hero-close { flex: 0 0 2rem; padding: 0; font-size: 1rem; }
+
 @media (orientation: landscape) {
   #spd-toolbar { display: none !important; }
   #spd-indicators { bottom: 0.6rem; }

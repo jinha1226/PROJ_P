@@ -61,6 +61,7 @@ import { compactPlace } from '../game/char-label'
 import { getPref, setPref, MONSTER_LIST_MODE_CHANGED_EVENT, RENDER_MODE_CHANGED_EVENT, MOVEMENT_MODE_CHANGED_EVENT, SPD_LAYOUT_CHANGED_EVENT } from '../prefs'
 import { SpdToolbar } from '../game/hud/spd-toolbar'
 import { SpdIndicators } from '../game/hud/spd-indicators'
+import { SpdHeroTabs } from '../game/hud/spd-hero-tabs'
 import { loadSession, saveSession } from '../auth/session'
 import { stripDcss } from './overlay-body'
 import { SpellHarvester, type SpellEntry } from '../game/spell-harvest'
@@ -918,6 +919,15 @@ export function buildGameView(opts: GameViewOptions): HTMLElement {
       openMonsterPanel()
     },
   })
+  const heroTabs = new SpdHeroTabs({
+    send: dispatchTouchInput,
+    idle: () => idleAtCommandPrompt(),
+    overlayShown: () => uiOverlay.style.display !== 'none',
+    onShownChange: (shown) => view.classList.toggle('hero-tabs-on', shown),
+  })
+  statsView.setOnHeroTap(() => {
+    if (spdLayout) heroTabs.open()
+  })
   function updateSpdIndicators(): void {
     if (spdLayout) spdIndicators.update(store, loader, renderMode === 'tiles')
   }
@@ -1119,6 +1129,7 @@ export function buildGameView(opts: GameViewOptions): HTMLElement {
     view.appendChild(touchControls.element)
     view.appendChild(spdToolbar.element)
     view.appendChild(spdIndicators.element)
+    view.appendChild(heroTabs.element)
     view.appendChild(menuControls)
   }
   // Both roles: spectators share the watched player's screens too.
@@ -1552,6 +1563,7 @@ export function buildGameView(opts: GameViewOptions): HTMLElement {
     // in the same batch as its exit (game_ended, go_lobby, lobby list).
     dispatch(handlers, msg)
     if (currentInputMode === 1) scheduleSpellHarvest()
+    heroTabs.afterMessage(msg)
   }
 
   // Raw-HTML modal. No emitter in upstream trunk or 0.34.1 (the reference
