@@ -63,6 +63,7 @@ import { SpdToolbar } from '../game/hud/spd-toolbar'
 import { SpdIndicators } from '../game/hud/spd-indicators'
 import { SpdHeroTabs } from '../game/hud/spd-hero-tabs'
 import { SpdPortrait } from '../game/hud/spd-portrait'
+import { parseAbilityItems, type AbilityEntry } from '../game/hud/spd-quickslots'
 import { loadSession, saveSession } from '../auth/session'
 import { stripDcss } from './overlay-body'
 import { SpellHarvester, type SpellEntry } from '../game/spell-harvest'
@@ -906,9 +907,41 @@ export function buildGameView(opts: GameViewOptions): HTMLElement {
   // starts open there.
   let spdLayout = !spectating && getPref('spdLayout')
   let spdKeysOpen = movementMode === 'keypad'
+  // Abilities for the bag and quickslots: captured whenever the `a` menu
+  // shows, or fetched unseen by the probe below (null = never seen).
+  let spdAbilities: AbilityEntry[] | null = null
+  // The ability probe: `a` sent from the bag's Load; its menu is captured,
+  // Escaped and never rendered (like the spell harvest), and the bag
+  // reopens on the Abilities tab. `closing` swallows that menu's close_menu.
+  let abilityProbe: { pickFor: number | undefined; timer: number } | null = null
+  let abilityProbeClosing = false
+  function probeAbilities(pickFor: number | undefined): boolean {
+    if (abilityProbe || !idleAtCommandPrompt()) return false
+    spdToolbar.bag.close()
+    abilityProbe = {
+      pickFor,
+      // No menu at all (no abilities: the engine just says so).
+      timer: window.setTimeout(() => endAbilityProbe([]), 4000),
+    }
+    send({ msg: 'input', text: 'a' })
+    return true
+  }
+  function endAbilityProbe(found: AbilityEntry[] | null): void {
+    if (!abilityProbe) return
+    clearTimeout(abilityProbe.timer)
+    const { pickFor } = abilityProbe
+    abilityProbe = null
+    if (found) spdAbilities = found
+    spdToolbar.refresh()
+    spdToolbar.bag.open(pickFor, 'abilities')
+  }
+
   const spdToolbar = new SpdToolbar({
     inventory: inventoryStore,
     loader: () => loader,
+    spells: () => harvester.spells.map(sp => ({ letter: sp.letter, title: sp.title, tile: sp.tile, fail: sp.fail })),
+    abilities: () => spdAbilities,
+    loadAbilities: probeAbilities,
     send: dispatchTouchInput,
     canAct: () => idleAtCommandPrompt(),
     toggleKeys: () => {
@@ -996,7 +1029,11 @@ export function buildGameView(opts: GameViewOptions): HTMLElement {
     // SPD layout: the keypad strip only when asked for (⌨) or when a mode
     // needs its keys — X map, a targeting cursor, any overlay.
     const spdBar = spdLayout && playfield && hudRevealed && overlayMode === 'none'
-    const keysWanted = !spdBar || spdKeysOpen || !!cursors[0]
+    // A targeting cursor: Touch aims on the map with the toolbar's aim row;
+    // Keypad steers it with the d-pad.
+    const aiming = spdBar && !!cursors[0] && movementMode === 'touch'
+    const keysWanted = !spdBar || spdKeysOpen || (!!cursors[0] && !aiming)
+    spdToolbar.setTargeting(aiming)
     touchControls.element.style.display = (touchHidden && !stashPreview) || !keysWanted ? 'none' : ''
     spdToolbar.element.style.display = spdBar ? '' : 'none'
     spdToolbar.setKeysOpen(spdKeysOpen)
@@ -1570,6 +1607,9 @@ export function buildGameView(opts: GameViewOptions): HTMLElement {
     if (abandoningResume && msg.msg !== 'go_lobby' && msg.msg !== 'close') return
     // Unhandled types are dropped: the lobby's messages reach the game view
     // in the same batch as its exit (game_ended, go_lobby, lobby list).
+    // The probe's `a` answered with a message only (no abilities): back at
+    // the prompt with no menu.
+    if (abilityProbe && msg.msg === 'input_mode' && msg.mode === 1) endAbilityProbe([])
     if (msg.msg === 'msgs' && spdLayout) {
       for (const m of msg.messages ?? []) spdIndicators.onMessage(stripDcss(String(m.text ?? '')))
     }
@@ -1859,6 +1899,16 @@ export function buildGameView(opts: GameViewOptions): HTMLElement {
     // The harvest probe's own spell menu is swallowed, never rendered
     // (../game/spell-harvest onMenu).
     if (harvester.onMenu(msg.tag, titlePlain, msg.items)) return
+    if (msg.tag === 'ability') {
+      const found = parseAbilityItems(msg.items)
+      if (abilityProbe) {
+        abilityProbeClosing = true
+        send({ msg: 'key', keycode: 27 })
+        endAbilityProbe(found)
+        return
+      }
+      spdAbilities = found
+    }
     // Like onUiPush, a server menu supersedes the client panel. A
     // panel-row tap sends a describe click_cell; on a multi-occupant tile
     // the server answers with a selection menu, not a describe ui-push.
@@ -1959,6 +2009,7 @@ export function buildGameView(opts: GameViewOptions): HTMLElement {
     // Swallow the close for a spell menu we harvested but never pushed,
     // so it can't pop/clear a real overlay underneath.
     if (harvester.consumePendingClose()) return
+    if (abilityProbeClosing) { abilityProbeClosing = false; return }
     // Pops the top frame, whatever its kind (tileweb.cc pop_menu) — a CRT
     // screen ends through this same close_menu. The usual `m` skill
     // screen masks that: main.cc skill_menu() → redraw_screen() →

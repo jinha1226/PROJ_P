@@ -4,28 +4,42 @@
 // game-view brings it back by itself whenever a mode needs its keys (X map,
 // targeting, overlays).
 //
-// Every action is a command-prompt keystroke, so taps are refused (with a
+// While the engine runs a targeting cursor (a wand, a spell, `x`) the bar
+// turns into SPD's aim row — cancel, next target, fire — in place of the
+// keypad; tapping the map aims as well (game-view's Touch movement).
+//
+// Every other action is a command-prompt keystroke, so taps are refused (with a
 // shake) unless game-view reports the prompt idle: an `o` landing in a
 // --more-- or a y/n prompt would answer it instead.
 
 import type { ClientMsg } from '../../ws/types'
 import type { InventoryStore } from '../inventory-store'
-import type { TileLoader } from '../tiles/tile-loader'
+import { TEX, type TileLoader } from '../tiles/tile-loader'
+import { renderTiles } from '../tiles/tile-view'
 import { escHtml } from '../dcss-colors'
 import { bindPressedClass } from '../input/touch'
 import { SpdBag } from './spd-bag'
 import {
-  KIND_GLYPH, QUICKSLOT_COUNT, itemCount, itemKind, itemTile, loadSlots, makeSlot, nameKindGlyph,
-  resolveSlot, saveSlots, shortLabel, useKeys, type QuickSlot,
+  KIND_GLYPH, QUICKSLOT_COUNT, itemCount, itemKind, itemTile, loadSlots, nameKindGlyph,
+  resolveNamed, resolveSlot, saveSlots, shortLabel, useKeys, type AbilityEntry, type QuickSlot,
+  type SpellInfo,
 } from './spd-quickslots'
 
 // Hold to rest / to repick a slot. Longer than the map's describe hold: on
 // a button a slow tap must stay a tap.
 const HOLD_MS = 500
 
+// Direction-chooser keys (directn.cc): fire at the cursor, cycle targets.
+const FIRE = '.'
+const NEXT_TARGET = '+'
+const ESC = 27
+
 export interface SpdToolbarDeps {
   inventory: InventoryStore
   loader(): TileLoader | null
+  spells(): SpellInfo[]
+  abilities(): AbilityEntry[] | null
+  loadAbilities(pickFor: number | undefined): boolean
   send(msg: ClientMsg): void
   // At the command prompt with nothing modal up.
   canAct(): boolean
@@ -45,11 +59,14 @@ export class SpdToolbar {
     this.bag = new SpdBag({
       inventory: deps.inventory,
       loader: deps.loader,
+      spells: deps.spells,
+      abilities: deps.abilities,
+      loadAbilities: deps.loadAbilities,
       send: deps.send,
       canAct: deps.canAct,
       host: deps.sheetHost,
-      assignSlot: (i, live) => {
-        this.slots[i] = live ? makeSlot(live) : null
+      assignSlot: (i, slot) => {
+        this.slots[i] = slot
         saveSlots(this.slots)
         this.refresh()
       },
@@ -82,24 +99,48 @@ export class SpdToolbar {
 
     this.keysBtn = this.actionButton('spd-keys', '⌨', 'Keys', 'Show the keypad', () => deps.toggleKeys())
     bar.appendChild(this.keysBtn)
+
+    // The aim row (CSS swaps it in under .targeting).
+    bar.appendChild(this.actionButton('spd-tgt spd-tgt-cancel', '✕', 'Cancel', 'Cancel targeting',
+      () => deps.send({ msg: 'key', keycode: ESC })))
+    bar.appendChild(this.actionButton('spd-tgt spd-tgt-next', '⟳', 'Next', 'Next target',
+      () => deps.send({ msg: 'input', text: NEXT_TARGET })))
+    bar.appendChild(this.actionButton('spd-tgt spd-tgt-fire', '◎', 'Fire', 'Fire at the target',
+      () => deps.send({ msg: 'input', text: FIRE })))
     this.refresh()
   }
 
-  // Re-resolve the slot faces against the current inventory.
+  setTargeting(on: boolean): void {
+    this.element.classList.toggle('targeting', on)
+    if (on) this.bag.close()
+  }
+
+  // Re-resolve the slot faces against the current inventory and lists.
   refresh(): void {
     const items = this.deps.inventory.items
     const loader = this.deps.loader()
     this.slots.forEach((slot, i) => {
       const el = this.slotEls[i]
-      const hit = slot ? resolveSlot(slot, items) : null
-      el.classList.toggle('empty', !slot)
-      el.classList.toggle('missing', !!slot && !hit)
       el.textContent = ''
+      el.classList.remove('empty', 'missing')
       if (!slot) {
+        el.classList.add('empty')
         el.innerHTML = '<span class="spd-plus">+</span>'
         el.title = 'Empty quickslot — tap to assign'
         return
       }
+      if (slot.type === 'spell' || slot.type === 'ability') {
+        const tile = !loader ? null
+          : slot.type === 'spell' ? renderTiles(loader, [{ t: slot.tile, tex: TEX.GUI }], 1)
+          : slot.tiles.length ? renderTiles(loader, slot.tiles, 1) : null
+        if (tile) el.appendChild(tile)
+        else el.insertAdjacentHTML('beforeend', `<span class="spd-glyph">${slot.type === 'spell' ? '✦' : '★'}</span>`)
+        el.insertAdjacentHTML('beforeend', `<span class="spd-cap">${escHtml(shortLabel(slot.name))}</span>`)
+        el.title = `${slot.name} — hold to change`
+        return
+      }
+      const hit = resolveSlot(slot, items)
+      el.classList.toggle('missing', !hit)
       const tile = hit ? itemTile(loader, hit.item) : null
       if (tile) el.appendChild(tile)
       else {
@@ -134,6 +175,13 @@ export class SpdToolbar {
     if (!slot) {
       this.bag.open(i)
       return true
+    }
+    if (slot.type === 'spell') {
+      const known = this.deps.spells().map(sp => ({ letter: sp.letter, name: sp.title }))
+      return this.key('z' + resolveNamed(slot, known))
+    }
+    if (slot.type === 'ability') {
+      return this.key('a' + resolveNamed(slot, this.deps.abilities() ?? []))
     }
     const hit = resolveSlot(slot, this.deps.inventory.items)
     if (!hit) return false

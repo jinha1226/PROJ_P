@@ -1096,12 +1096,29 @@ describe('SPD layout toolbar', () => {
     expect(touch(h).style.display).toBe('none')
   })
 
-  it('shows the keypad while a targeting cursor is up', () => {
+  it('swaps in the aim row, not the keypad, while a Touch targeting cursor is up', () => {
     const h = playing()
     h.dispatch({ msg: 'cursor', id: 0, loc: { x: 3, y: 4 } })
-    expect(touch(h).style.display).toBe('')
-    h.dispatch({ msg: 'cursor', id: 0 })
     expect(touch(h).style.display).toBe('none')
+    expect(bar(h).classList.contains('targeting')).toBe(true)
+    btn(h, 'spd-tgt-next').click()
+    btn(h, 'spd-tgt-fire').click()
+    btn(h, 'spd-tgt-cancel').click()
+    expect(h.send.mock.calls.map(c => c[0])).toEqual([
+      { msg: 'input', text: '+' }, { msg: 'input', text: '.' }, { msg: 'key', keycode: 27 },
+    ])
+    h.dispatch({ msg: 'cursor', id: 0 })
+    expect(bar(h).classList.contains('targeting')).toBe(false)
+  })
+
+  it('shows the keypad for a targeting cursor in Keypad movement', () => {
+    setPref('movementMode', 'keypad')
+    const h = playing()
+    btn(h, 'spd-keys').click()  // Keypad starts with the strip open; close it
+    expect(touch(h).style.display).toBe('none')
+    h.dispatch({ msg: 'cursor', id: 0, loc: { x: 3, y: 4 } })
+    expect(touch(h).style.display).toBe('')
+    expect(bar(h).classList.contains('targeting')).toBe(false)
   })
 
   it('sends explore at the command prompt only', () => {
@@ -1142,6 +1159,45 @@ describe('SPD layout toolbar', () => {
     primary.click()
     expect(h.send.mock.calls.map(c => c[0])).toEqual([{ msg: 'input', text: 'qd' }])
     expect(document.querySelector('.spd-sheet')).toBeNull()
+  })
+
+  it('files the pack under category tabs, sorted by class', () => {
+    const h = playing()
+    h.dispatch({ msg: 'player', inv: {
+      ...POTIONS,
+      0: { base_type: 2, quantity: 1, letter: 97, name: '+0 robe', col: 10 },
+      7: { base_type: 5, quantity: 1, letter: 98, name: 'scroll of fog', col: 7 },
+    } })
+    btn(h, 'spd-bag').click()
+    const titles = () => [...document.querySelectorAll<HTMLElement>('.spd-bag-cell')].map(c => c.title)
+    expect(titles()).toEqual(['+0 robe', '2 potions of curing', 'scroll of fog'])
+    document.querySelector<HTMLButtonElement>('.spd-bag-tab[data-tab="potions"]')!.click()
+    expect(titles()).toEqual(['2 potions of curing'])
+  })
+
+  it('loads abilities unseen and pins one to a quickslot', () => {
+    const h = playing()
+    const slot = bar(h).querySelector<HTMLButtonElement>('.spd-slot')!
+    slot.click()
+    document.querySelector<HTMLButtonElement>('.spd-bag-tab[data-tab="abilities"]')!.click()
+    document.querySelector<HTMLButtonElement>('.spd-bag-load')!.click()
+    expect(h.send.mock.calls.map(c => c[0])).toEqual([{ msg: 'input', text: 'a' }])
+    expect(document.querySelector('.spd-sheet')).toBeNull()
+    h.send.mockClear()
+    h.dispatch({ msg: 'menu', tag: 'ability', title: { text: 'Ability - do what?' }, items: [
+      { level: 1, text: 'Invocations' },
+      { level: 2, text: ' a - Recall Undead                    2 MP, Piety                       0%', hotkeys: [97] },
+    ] })
+    expect(h.send.mock.calls.map(c => c[0])).toEqual([{ msg: 'key', keycode: 27 }])
+    // Never rendered; the close is swallowed and the bag is back.
+    expect(isHidden(h.view.querySelector<HTMLElement>('#ui-overlay')!)).toBe(true)
+    h.dispatch({ msg: 'close_menu' })
+    const cell = document.querySelector<HTMLButtonElement>('.spd-bag-cell')!
+    expect(cell.title).toBe('Recall Undead')
+    cell.click()
+    h.send.mockClear()
+    slot.click()
+    expect(h.send.mock.calls.map(c => c[0])).toEqual([{ msg: 'input', text: 'aa' }])
   })
 
   it('offers pick-up while something lies underfoot', () => {

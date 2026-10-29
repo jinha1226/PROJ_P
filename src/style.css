@@ -7202,6 +7202,8 @@ html.map-hold, html.map-hold * {
   font-size: 1.2rem;
 }
 .spd-bag-grid {
+  flex: 1 1 auto;
+  align-content: start;
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(3.1rem, 1fr));
   gap: 0.3rem;
@@ -7246,6 +7248,50 @@ html.map-hold, html.map-hold * {
 .spd-bag-slots .spd-sheet-btn { flex: 0 0 2.4rem; }
 .spd-sheet-btn.primary { border-color: var(--accent); color: var(--accent); }
 .spd-sheet-card.refused { animation: spd-shake 0.25s; }
+
+/* Aim row (spd-toolbar.ts setTargeting): replaces the bar's buttons while
+   a targeting cursor is up. */
+.spd-tgt { display: none; }
+#spd-toolbar.targeting > :not(.spd-tgt) { display: none; }
+#spd-toolbar.targeting > .spd-tgt { display: flex; flex: 1 1 0; width: auto; }
+.spd-tgt-fire { border-color: var(--danger); color: #fca5a5; }
+.spd-tgt-fire .spd-icon { color: var(--danger); }
+
+/* Bag tabs: SPD's pouches as a scrolling strip. */
+.spd-bag-tabs {
+  display: flex;
+  gap: 0.25rem;
+  overflow-x: auto;
+  scrollbar-width: none;
+  margin-bottom: 0.45rem;
+  flex: 0 0 auto;
+}
+.spd-bag-tab {
+  flex: 0 0 auto;
+  padding: 0.3rem 0.55rem;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 0.9rem;
+  color: var(--text-dim);
+  font: inherit;
+  font-size: 0.72rem;
+  white-space: nowrap;
+}
+.spd-bag-tab.active { color: var(--accent); border-color: var(--accent); }
+.spd-bag-tab.empty:not(.active) { opacity: 0.45; }
+.spd-bag-cap {
+  position: absolute;
+  bottom: 0.05rem;
+  left: 0.1rem;
+  right: 0.1rem;
+  font-size: 0.5rem;
+  color: var(--text-dim);
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  text-align: center;
+}
+.spd-bag-load { grid-column: 1 / -1; }
 
 /* Hero portrait (spd-portrait.ts): left of the HUD stats, SPD's status
    pane picture with its level badge. */

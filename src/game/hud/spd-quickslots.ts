@@ -16,12 +16,52 @@
 import type { InvItem } from '../inventory-store'
 import { TEX, type TileLoader } from '../tiles/tile-loader'
 import { renderTiles, type TileRef } from '../tiles/tile-view'
+import { stripDcss } from '../dcss-colors'
 
-export interface QuickSlot {
+// An item (the original, untyped shape — stored slots predate `type`), a
+// memorised spell (cast with z) or an ability, god powers included (a).
+export type QuickSlot = ItemSlot | SpellSlot | AbilitySlot
+
+export interface ItemSlot {
+  type?: 'item'
   name: string       // normalized (slotName)
   letter: string     // inventory letter when assigned / last resolved
   base?: number      // base_type
   sub?: number       // sub_type
+}
+
+export interface SpellSlot {
+  type: 'spell'
+  name: string
+  letter: string
+  tile: number       // GUI atlas
+}
+
+export interface AbilitySlot {
+  type: 'ability'
+  name: string
+  letter: string
+  tiles: TileRef[]
+}
+
+// One row of the engine's ability menu (tag "ability", ability.cc
+// describe_talent): name 32, cost 32, failure.
+export interface AbilityEntry {
+  letter: string
+  name: string
+  cost: string
+  fail: string
+  tiles: TileRef[]
+  colour?: number
+}
+
+// The spells the harvest knows (spell-harvest.ts SpellEntry), as the bag
+// needs them.
+export interface SpellInfo {
+  letter: string
+  title: string
+  tile: number
+  fail?: string
 }
 
 export const QUICKSLOT_COUNT = 4
@@ -90,13 +130,32 @@ export function itemKind(item: Pick<InvItem, 'name' | 'base_type'>): ItemKind {
   return nameKind(item.name)
 }
 
+// Bag tabs (spd-bag.ts) and the All tab's order: SPD sorts by category.
+export type BagTab = 'all' | 'gear' | 'potions' | 'scrolls' | 'wands' | 'misc' | 'spells' | 'abilities'
+const KIND_TAB: Record<ItemKind, BagTab> = {
+  equip: 'gear', potion: 'potions', scroll: 'scrolls', wand: 'wands', evoke: 'wands',
+  missile: 'misc', other: 'misc',
+}
+const KIND_ORDER: ItemKind[] = ['equip', 'missile', 'wand', 'evoke', 'potion', 'scroll', 'other']
+
+export function itemTab(item: InvItem): BagTab {
+  return KIND_TAB[itemKind(item)]
+}
+
+// The pack in category order, then letter.
+export function sortedItems(items: ReadonlyMap<number, InvItem>): LiveItem[] {
+  return liveItems(items).sort((a, b) =>
+    KIND_ORDER.indexOf(itemKind(a.item)) - KIND_ORDER.indexOf(itemKind(b.item))
+    || letterOrder(a.letter) - letterOrder(b.letter))
+}
+
 // The ASCII glyph DCSS draws for the class — the slot face without tiles.
 export const KIND_GLYPH: Record<ItemKind, string> = {
   potion: '!', scroll: '?', wand: '/', evoke: '}', missile: ')', equip: '[', other: '*',
 }
 
 // Face glyph for a slot whose item is gone.
-export function nameKindGlyph(slot: QuickSlot): string {
+export function nameKindGlyph(slot: ItemSlot): string {
   const kind = slot.base !== undefined ? BASE_KIND[slot.base] ?? 'other' : nameKind(slot.name)
   return KIND_GLYPH[kind]
 }
@@ -162,12 +221,12 @@ export function shortLabel(name: string): string {
   return s.length > 8 ? s.slice(0, 7) + '…' : s
 }
 
-export function makeSlot(live: LiveItem): QuickSlot {
+export function makeSlot(live: LiveItem): ItemSlot {
   return { name: slotName(live.item.name), letter: live.letter, base: live.item.base_type, sub: live.item.sub_type }
 }
 
 // Where the slot's item is now, or null when it's gone.
-export function resolveSlot(slot: QuickSlot, items: ReadonlyMap<number, InvItem>): LiveItem | null {
+export function resolveSlot(slot: ItemSlot, items: ReadonlyMap<number, InvItem>): LiveItem | null {
   const live = liveItems(items)
   const byName = live.find(l => slotName(l.item.name) === slot.name)
   if (byName) return byName
@@ -189,15 +248,47 @@ export function itemTile(loader: TileLoader | null, item: InvItem, scale = 1): H
   return renderTiles(loader, refs, scale)
 }
 
+// Ability menu rows → entries. Rows without a hotkey are headers.
+export function parseAbilityItems(items: ReadonlyArray<{ level: number; text?: string; colour?: number; hotkeys?: number[]; tiles?: TileRef[] }> | undefined): AbilityEntry[] {
+  const out: AbilityEntry[] = []
+  for (const it of items ?? []) {
+    if (it.level !== 2 || !it.hotkeys?.length) continue
+    const plain = stripDcss(it.text ?? '').replace(/^\s*\S+\s*[-+]\s*/, '')
+    const name = plain.slice(0, 32).trim() || plain.trim()
+    if (!name) continue
+    out.push({
+      letter: String.fromCharCode(it.hotkeys[0]),
+      name,
+      cost: plain.slice(32, 64).trim(),
+      fail: plain.slice(64).trim(),
+      tiles: it.tiles ?? [],
+      colour: it.colour,
+    })
+  }
+  return out
+}
+
+// The spell or ability's current letter: by name in the known list, else
+// the one it was pinned with (the list may not be loaded yet).
+export function resolveNamed(slot: SpellSlot | AbilitySlot, known: ReadonlyArray<{ letter: string; name: string }>): string {
+  const hit = known.find(k => k.name.toLowerCase() === slot.name.toLowerCase())
+  return hit ? hit.letter : slot.letter
+}
+
 export function loadSlots(): (QuickSlot | null)[] {
   let raw: unknown = null
   try { raw = JSON.parse(localStorage.getItem(STORAGE_KEY) ?? 'null') } catch { /* empty */ }
   const out: (QuickSlot | null)[] = Array.from({ length: QUICKSLOT_COUNT }, () => null)
   if (!Array.isArray(raw)) return out
   for (let i = 0; i < QUICKSLOT_COUNT; i++) {
-    const s = raw[i] as Partial<QuickSlot> | null
-    if (s && typeof s.name === 'string' && typeof s.letter === 'string') {
-      out[i] = { name: s.name, letter: s.letter, base: s.base, sub: s.sub }
+    const s = raw[i] as Record<string, unknown> | null
+    if (!s || typeof s.name !== 'string' || typeof s.letter !== 'string') continue
+    if (s.type === 'spell' && typeof s.tile === 'number') {
+      out[i] = { type: 'spell', name: s.name, letter: s.letter, tile: s.tile }
+    } else if (s.type === 'ability') {
+      out[i] = { type: 'ability', name: s.name, letter: s.letter, tiles: Array.isArray(s.tiles) ? s.tiles as TileRef[] : [] }
+    } else {
+      out[i] = { name: s.name, letter: s.letter, base: s.base as number | undefined, sub: s.sub as number | undefined }
     }
   }
   return out
