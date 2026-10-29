@@ -2151,7 +2151,9 @@ describe('ui-push / ui-pop overlay stack', () => {
       }
     }
     expect(placements).toBeGreaterThan(500)
-  })
+    // Brute force (500+ push/pop renders): over vitest's 5 s default on a
+    // loaded CI runner.
+  }, 15000)
 
   it('lifts the search highlight for label matching in describe-item bodies only', () => {
     const rows = [
