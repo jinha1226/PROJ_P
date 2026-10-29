@@ -25,7 +25,7 @@ const KO: Record<string, string> = {
   fail: '실패',
   Drink: '마시기', Read: '읽기', Evoke: '발동', Throw: '던지기', Equip: '장착', Use: '사용', Cast: '시전',
   // Indicators, hero window
-  'Pick up': '줍기', 'Hostiles in view': '보이는 적', Attack: '공격',
+  'Pick up': '줍기', miss: '빗나감', hit: '명중', 'Hostiles in view': '보이는 적', Attack: '공격',
   Status: '상태', Skills: '스킬', Memorise: '암기', Traits: '특성', Hero: '영웅', Close: '닫기',
 }
 

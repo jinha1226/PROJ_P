@@ -7118,6 +7118,10 @@ html.map-hold, html.map-hold * {
 }
 .spd-hp-num.loss { color: #ff5a5a; }
 .spd-hp-num.gain { color: #5ee07a; }
+.spd-hp-num.dmg { color: #ffb347; }
+.spd-hp-num.hit { color: #f2f2f2; font-size: 0.8rem; }
+.spd-hp-num.miss { color: #9d9f99; font-size: 0.8rem; font-style: italic; }
+.spd-hp-num.kill { color: #ff8a3d; }
 @keyframes spd-hp-rise {
   0% { opacity: 0; transform: translate(-50%, -30%) scale(0.8); }
   15% { opacity: 1; transform: translate(-50%, -80%) scale(1.15); }

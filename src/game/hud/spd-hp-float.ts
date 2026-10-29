@@ -6,7 +6,7 @@
 // visual: pointer-events none, nothing waits on it.
 
 const LIFETIME_MS = 1100
-const MAX_LIVE = 6
+const MAX_LIVE = 10
 // Regeneration trickles +1 most turns; SPD-style noise without information.
 const MIN_GAIN = 2
 
@@ -35,10 +35,15 @@ export class SpdHpFloat {
   // `at`: client point of the player's cell centre.
   show(delta: number, at: { x: number; y: number }): void {
     if (!delta) return
+    this.showText(delta < 0 ? `−${-delta}` : `+${delta}`, at, delta < 0 ? 'loss' : 'gain')
+  }
+
+  // Any floating label (spd-combat-fx.ts: monster hits) — `cls` styles it.
+  showText(text: string, at: { x: number; y: number }, cls: string): void {
     while (this.element.childElementCount >= MAX_LIVE) this.element.firstElementChild?.remove()
     const n = document.createElement('span')
-    n.className = `spd-hp-num ${delta < 0 ? 'loss' : 'gain'}`
-    n.textContent = delta < 0 ? `−${-delta}` : `+${delta}`
+    n.className = `spd-hp-num ${cls}`
+    n.textContent = text
     n.style.left = `${at.x}px`
     n.style.top = `${at.y}px`
     this.element.appendChild(n)

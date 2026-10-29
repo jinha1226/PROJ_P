@@ -66,6 +66,7 @@ import { ioHook } from '../dwem/io-hook'
 import { SpdPortrait } from '../game/hud/spd-portrait'
 import { SpdBuffs } from '../game/hud/spd-buffs'
 import { SpdHpFloat, hpChange, type HpSnapshot } from '../game/hud/spd-hp-float'
+import { SpdCombatFx } from '../game/hud/spd-combat-fx'
 import { parseAbilityItems, type AbilityEntry } from '../game/hud/spd-quickslots'
 import { loadSession, saveSession } from '../auth/session'
 import { stripDcss } from './overlay-body'
@@ -988,8 +989,18 @@ export function buildGameView(opts: GameViewOptions): HTMLElement {
     }
     if (m.msg !== 'msgs' || !spdLayout) return
     const lines = (m as MsgOf<'msgs'>).messages ?? []
-    for (const line of lines) spdIndicators.onMessage(stripDcss(String(line.text ?? '')))
+    for (const line of lines) {
+      const text = stripDcss(String(line.text ?? ''))
+      spdIndicators.onMessage(text)
+      spdCombatFx.onLine(text)
+    }
   }, 100)
+  // Estimated hits on monsters (spd-combat-fx.ts), on the same float layer.
+  const spdCombatFx = new SpdCombatFx({
+    cellPoint: (x, y) => mapView.cellClientCenter(x, y),
+    playerPos: () => store.playerPos,
+    show: (text, at, cls) => spdHpFloat.showText(text, at, cls),
+  })
   function updateSpdIndicators(): void {
     if (!spdLayout) return
     spdIndicators.update(store, loader, renderMode === 'tiles')
@@ -1707,6 +1718,7 @@ export function buildGameView(opts: GameViewOptions): HTMLElement {
     advisory.onMap()
     if (msg.clear) {
       setTouchCursor(null)
+      spdCombatFx.reset()
       store.clear()
       touchPanned = false
       // `[`/`]` in the level map arrive as a cleared map (tile_new_level
@@ -1765,6 +1777,7 @@ export function buildGameView(opts: GameViewOptions): HTMLElement {
     monsterListView.update(store.getMonsters())
     if (monsterPanelOpen) monsterPanel.update(store.getMonsters())
     updateSpdIndicators()
+    if (spdLayout) spdCombatFx.onMonsters(store.getMonsters(), (x, y) => store.get(x, y)?.fg)
     minimaps.scheduleRepaint()
     record.captureAvatar(store.get(store.playerPos.x, store.playerPos.y), loader)
   }
