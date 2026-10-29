@@ -908,6 +908,7 @@ export function buildGameView(opts: GameViewOptions): HTMLElement {
   let spdKeysOpen = movementMode === 'keypad'
   const spdToolbar = new SpdToolbar({
     inventory: inventoryStore,
+    loader: () => loader,
     send: dispatchTouchInput,
     canAct: () => idleAtCommandPrompt(),
     toggleKeys: () => {
@@ -1002,7 +1003,7 @@ export function buildGameView(opts: GameViewOptions): HTMLElement {
     spdIndicators.element.style.display = spdLayout && playfield ? '' : 'none'
     view.classList.toggle('spd-bar-on', spdBar)
     view.classList.toggle('spd-ui', spdLayout)
-    if (!spdBar) spdToolbar.closePicker()
+    if (!spdBar) spdToolbar.closeSheets()
     touchControls.setOverlayMode(overlayMode !== 'none')
     // The bar REPLACES the touch panel. Portrait gets that from the inline
     // hide on #touch-controls, but landscape forces the controls back to
@@ -1569,6 +1570,9 @@ export function buildGameView(opts: GameViewOptions): HTMLElement {
     if (abandoningResume && msg.msg !== 'go_lobby' && msg.msg !== 'close') return
     // Unhandled types are dropped: the lobby's messages reach the game view
     // in the same batch as its exit (game_ended, go_lobby, lobby list).
+    if (msg.msg === 'msgs' && spdLayout) {
+      for (const m of msg.messages ?? []) spdIndicators.onMessage(stripDcss(String(m.text ?? '')))
+    }
     dispatch(handlers, msg)
     if (currentInputMode === 1) scheduleSpellHarvest()
     heroTabs.afterMessage(msg)
@@ -1619,6 +1623,7 @@ export function buildGameView(opts: GameViewOptions): HTMLElement {
     // starts painting.
     const l = getTileLoader(conn.httpBase, msg.version)
     adoptLoader(l)
+    spdToolbar.refresh()
     // Offline games only (httpBase '' → the same-origin pack): refresh
     // the pack's layout fingerprint so record.captureAvatar can stamp it on
     // captures synchronously and eager-bake against it. Forced because

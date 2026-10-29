@@ -1114,18 +1114,46 @@ describe('SPD layout toolbar', () => {
     expect(h.send).not.toHaveBeenCalled()
   })
 
-  it('uses a quickslot by its current letter', () => {
+  // Item index 53 sits on letter d: the key must come from the wire letter.
+  const POTIONS = { 53: { base_type: 7, quantity: 2, letter: 100, name: '2 potions of curing', col: 7, action_verb: 'Drink' } }
+
+  it('uses a quickslot by the item\'s own letter', () => {
     const h = playing()
-    h.dispatch({ msg: 'player', inv: { 4: { name: '2 potions of curing', col: 7 } } })
+    h.dispatch({ msg: 'player', inv: POTIONS })
     const slot = bar(h).querySelector<HTMLButtonElement>('.spd-slot')!
-    slot.click()  // empty slot: opens the picker
-    const row = document.querySelector<HTMLButtonElement>('.spd-sheet-row')!
-    expect(row.textContent).toContain('potions of curing')
-    row.click()
+    slot.click()  // empty slot: opens the bag in pick mode
+    const cell = document.querySelector<HTMLButtonElement>('.spd-bag-cell')!
+    expect(cell.title).toBe('2 potions of curing')
+    cell.click()
     expect(document.querySelector('.spd-sheet')).toBeNull()
     h.send.mockClear()
     slot.click()
-    expect(h.send.mock.calls.map(c => c[0])).toEqual([{ msg: 'input', text: 'qe' }])
+    expect(h.send.mock.calls.map(c => c[0])).toEqual([{ msg: 'input', text: 'qd' }])
+  })
+
+  it('opens the bag and drinks from its action row', () => {
+    const h = playing()
+    h.dispatch({ msg: 'player', inv: POTIONS })
+    btn(h, 'spd-bag').click()
+    expect(h.send).not.toHaveBeenCalled()
+    document.querySelector<HTMLButtonElement>('.spd-bag-cell')!.click()
+    const primary = document.querySelector<HTMLButtonElement>('.spd-bag-actions .primary')!
+    expect(primary.textContent).toBe('Drink')
+    primary.click()
+    expect(h.send.mock.calls.map(c => c[0])).toEqual([{ msg: 'input', text: 'qd' }])
+    expect(document.querySelector('.spd-sheet')).toBeNull()
+  })
+
+  it('offers pick-up while something lies underfoot', () => {
+    const h = playing()
+    const loot = () => h.view.querySelector<HTMLButtonElement>('.spd-loot')!
+    h.dispatch({ msg: 'msgs', messages: [{ text: '<lightgrey>You see here a +0 dagger.</lightgrey>' }] })
+    flushMicrotasks()
+    expect(loot().hidden).toBe(false)
+    loot().click()
+    expect(h.send.mock.calls.map(c => c[0])).toEqual([{ msg: 'input', text: 'g' }])
+    h.dispatch({ msg: 'player', pos: { x: 3, y: 2 } })
+    expect(loot().hidden).toBe(true)
   })
 
   it('keeps the keypad strip when the pref is off', () => {

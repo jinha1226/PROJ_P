@@ -363,7 +363,7 @@ export interface PlayerMsg {
   equip?: Record<string, number>
   offhand_weapon?: number
   quiver_desc?: string
-  inv?: Record<string, { name?: string; col?: number }>
+  inv?: Record<string, Partial<import('../game/inventory-store').InvItem>>
   time_last_input?: number
 }
 

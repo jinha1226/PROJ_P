@@ -1,46 +1,68 @@
 import { describe, expect, it } from 'vitest'
-import { indexLetter, itemCount, itemKind, resolveSlot, shortLabel, slotName, useKeys } from './spd-quickslots'
-import { attackInput, nearestHostile } from './spd-indicators'
+import type { InvItem } from '../inventory-store'
+import {
+  indexLetter, itemCount, itemKind, liveItems, makeSlot, resolveSlot, shortLabel, slotName, useKeys,
+} from './spd-quickslots'
+import { attackInput, lootSignal, nearestHostile } from './spd-indicators'
 import type { MonsterCell } from '../map/map-store'
 
+const L = (c: string) => c.charCodeAt(0)
+
+// Shapes recorded from a live server (src/golden fixtures): the map key is
+// the engine's item index, the letter its own field.
+const MAGIC: InvItem = {
+  base_type: 7, quantity: 1, sub_type: 20, letter: L('g'), name: 'potion of magic',
+  col: 14, tile: [4279, 4317], action_verb: 'Drink',
+}
+const BLACK: InvItem = {
+  base_type: 7, quantity: 2, sub_type: 3, letter: L('d'), name: '2 black potions',
+  col: 9, tile: [4276], action_verb: 'Drink',
+}
+const SCROLLS: InvItem = {
+  base_type: 5, quantity: 2, sub_type: 26, letter: L('h'), name: '2 scrolls labelled BAYMNICI ZEASE',
+  col: 9, tile: [4124], action_verb: 'Read',
+}
+const ROBE: InvItem = { base_type: 2, quantity: 1, sub_type: 0, letter: L('a'), name: '+0 robe', col: 10 }
+const EMPTIED: InvItem = { base_type: 100, quantity: 0, name: 'potion of curing', col: 7 }
+
 describe('spd quickslots', () => {
-  it('maps inventory indices to letters', () => {
-    expect(indexLetter(0)).toBe('a')
-    expect(indexLetter(25)).toBe('z')
+  it('uses the wire letter, not the item index', () => {
+    const items = new Map([[52, MAGIC], [53, BLACK], [0, ROBE]])
+    expect(liveItems(items).map(l => l.letter)).toEqual(['a', 'd', 'g'])
     expect(indexLetter(26)).toBe('A')
   })
 
-  it('classifies items and picks the verb', () => {
-    expect(useKeys('3 potions of curing', 'c')).toBe('qc')
-    expect(useKeys('a scroll labelled XOBIQ', 'd')).toBe('rd')
-    expect(useKeys('a wand of flame (5)', 'e')).toBe('Ve')
-    expect(useKeys('a phial of floods', 'f')).toBe('Vf')
-    expect(useKeys('12 darts', 'g')).toBe('Fg')
-    expect(useKeys('a +0 dagger (weapon)', 'a')).toBe('ca')
-    expect(useKeys('a +0 dagger', 'a')).toBe('ea')
-    expect(useKeys('a book of Fire', 'h')).toBe('ih')
-    expect(itemKind('a stone of tremors')).toBe('evoke')
+  it('drops emptied slots that keep a stale name', () => {
+    expect(liveItems(new Map([[4, EMPTIED]]))).toEqual([])
   })
 
-  it('normalizes names across stack size and inscription', () => {
+  it('picks the verb from the engine, then the class', () => {
+    expect(useKeys(MAGIC, 'g')).toBe('qg')
+    expect(useKeys(SCROLLS, 'h')).toBe('rh')
+    expect(useKeys(ROBE, 'a')).toBe('ea')
+    expect(useKeys({ name: 'a wand of flame (5)', col: 7, base_type: 3 }, 'e')).toBe('Ve')
+    expect(useKeys({ name: '12 darts', col: 7, base_type: 1 }, 'f')).toBe('Ff')
+    expect(useKeys({ name: 'a book of Fire', col: 7, base_type: 8 }, 'b')).toBe('ib')
+    expect(useKeys({ name: 'a potion of curing', col: 7 }, 'c')).toBe('qc')
+    expect(itemKind({ name: 'a stone of tremors' })).toBe('evoke')
+  })
+
+  it('normalizes names and counts stacks', () => {
     expect(slotName('3 potions of curing {@q1}')).toBe('potion of curing')
-    expect(slotName('a potion of curing')).toBe('potion of curing')
-    expect(itemCount('3 potions of curing')).toBe(3)
-    expect(itemCount('a potion of curing')).toBe(1)
+    expect(itemCount(BLACK)).toBe(2)
+    expect(itemCount({ name: '3 potions of curing', col: 7 })).toBe(3)
     expect(shortLabel('2 scrolls of teleportation')).toBe('telepor…')
   })
 
-  it('resolves by name first, then by letter within the same class', () => {
-    const items = new Map([
-      [0, { name: 'a +0 dagger (weapon)', col: 7 }],
-      [2, { name: '2 potions of curing', col: 7 }],
-      [3, { name: '', col: 7 }],
-    ])
-    expect(resolveSlot({ name: 'potion of curing', letter: 'z' }, items)?.letter).toBe('c')
-    // Identified since assignment: same letter, still a potion.
-    expect(resolveSlot({ name: 'bubbling potion', letter: 'c' }, items)?.letter).toBe('c')
-    expect(resolveSlot({ name: 'bubbling potion', letter: 'a' }, items)).toBeNull()
-    expect(resolveSlot({ name: 'scroll of fog', letter: 'd' }, items)).toBeNull()
+  it('follows an item across letter changes and identification', () => {
+    const slot = makeSlot({ index: 53, letter: 'd', item: BLACK })
+    // Moved letter: found by name.
+    expect(resolveSlot(slot, new Map([[53, { ...BLACK, letter: L('k') }]]))?.letter).toBe('k')
+    // Identified: same class and subtype.
+    const ided = { ...BLACK, name: '2 potions of curing' }
+    expect(resolveSlot(slot, new Map([[53, ided]]))?.letter).toBe('d')
+    // Used up.
+    expect(resolveSlot(slot, new Map([[53, EMPTIED]]))).toBeNull()
   })
 })
 
@@ -63,5 +85,12 @@ describe('spd indicators', () => {
     expect(attackInput({ x: 2, y: 1 }, { x: 1, y: 1 })).toEqual({ msg: 'input', text: 'l' })
     expect(attackInput({ x: 0, y: 0 }, { x: 1, y: 1 })).toEqual({ msg: 'input', text: 'y' })
     expect(attackInput({ x: 4, y: 1 }, { x: 1, y: 1 })).toEqual({ msg: 'key', keycode: 9 })
+  })
+
+  it('reads underfoot items from the log', () => {
+    expect(lootSignal('You see here a +0 dagger.')).toBe('here')
+    expect(lootSignal('There are several objects here.')).toBe('here')
+    expect(lootSignal('d - 2 potions of curing')).toBe('gone')
+    expect(lootSignal('You hit the rat.')).toBeNull()
   })
 })

@@ -1,5 +1,6 @@
 // SPD-style map-edge indicators (the "SPD layout" pref), after Shattered
-// Pixel Dungeon's DangerIndicator and AttackIndicator:
+// Pixel Dungeon's DangerIndicator, AttackIndicator and LootIndicator:
+//   - loot: something lies underfoot; tap picks it up (`g`).
 //   - danger: how many hostiles are in view; tap opens the monster panel.
 //   - attack: the nearest hostile's portrait; tap attacks it — a direction
 //     key when adjacent (deterministic: always that monster), else Tab,
@@ -28,6 +29,7 @@ const DIR_KEYS: Record<string, string> = {
   '-1,1': 'b', '0,1': 'j', '1,1': 'n',
 }
 const TAB_KEYCODE = 9
+const PENDING = '?'
 
 export function nearestHostile(
   monsters: ReadonlyMap<string, MonsterCell>, from: { x: number; y: number },
@@ -51,10 +53,25 @@ export function attackInput(target: { x: number; y: number }, from: { x: number;
   return dir ? { msg: 'input', text: dir } : { msg: 'key', keycode: TAB_KEYCODE }
 }
 
+// Whether a log line says items lie underfoot ('here'), or that they're
+// gone ('gone' — picked up, or nothing left). The map can't tell: the
+// player's own cell carries the player sprite, not the floor items under it.
+export function lootSignal(text: string): 'here' | 'gone' | null {
+  const t = text.trim()
+  if (/^You see here /.test(t) || /^There are (several|many) (objects|items) here/.test(t)
+    || /^Things that are here:/.test(t)) return 'here'
+  if (/^[a-zA-Z] - /.test(t) || /^You (now have|pick up) /.test(t)
+    || /^There (are no objects|is nothing) /.test(t)) return 'gone'
+  return null
+}
+
 export class SpdIndicators {
   readonly element: HTMLElement
   private readonly danger: HTMLButtonElement
   private readonly attack: HTMLButtonElement
+  private readonly loot: HTMLButtonElement
+  private lootHere = false
+  private lootPos = ''
   private target: MonsterCell | null = null
   private from = { x: 0, y: 0 }
   private shownKey = ''
@@ -81,16 +98,54 @@ export class SpdIndicators {
       deps.send(attackInput(this.target, this.from))
     })
 
+    this.loot = document.createElement('button')
+    this.loot.type = 'button'
+    this.loot.className = 'spd-ind spd-loot'
+    this.loot.title = 'Pick up'
+    this.loot.innerHTML = '<span class="spd-ind-icon">✋</span><span>Pick up</span>'
+    bindPressedClass(this.loot)
+    this.loot.addEventListener('click', () => {
+      if (!deps.canAct()) return
+      deps.send({ msg: 'input', text: 'g' })
+    })
+
+    root.appendChild(this.loot)
     root.appendChild(this.danger)
     root.appendChild(this.attack)
-    root.hidden = true
+    this.sync()
+  }
+
+  // One log line (markup stripped). The line may precede the move that
+  // put the player there within one server batch, so the spot is pinned at
+  // the batch's end (a microtask, after the batch's update() calls); any
+  // later move clears it.
+  onMessage(text: string): void {
+    const sig = lootSignal(text)
+    if (!sig) return
+    this.lootHere = sig === 'here'
+    this.lootPos = PENDING
+    queueMicrotask(() => {
+      if (this.lootPos !== PENDING) return
+      this.lootPos = `${this.from.x},${this.from.y}`
+      this.sync()
+    })
+    this.sync()
+  }
+
+  private sync(): void {
+    const posKey = `${this.from.x},${this.from.y}`
+    if (this.lootHere && this.lootPos !== PENDING && posKey !== this.lootPos) this.lootHere = false
+    this.loot.hidden = !this.lootHere
+    this.danger.hidden = !this.target
+    this.attack.hidden = !this.target
+    this.element.hidden = !this.lootHere && !this.target
   }
 
   update(store: MapStore, loader: TileLoader | null, tiles: boolean): void {
     this.from = store.playerPos
     const { target, count } = nearestHostile(store.getMonsters(), this.from)
     this.target = target
-    this.element.hidden = !target
+    this.sync()
     if (!target) { this.shownKey = ''; return }
 
     this.danger.innerHTML = `<span class="spd-ind-icon">☠</span><span class="spd-ind-count">${count}</span>`

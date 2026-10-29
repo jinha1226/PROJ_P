@@ -10,37 +10,60 @@
 
 import type { ClientMsg } from '../../ws/types'
 import type { InventoryStore } from '../inventory-store'
+import type { TileLoader } from '../tiles/tile-loader'
 import { escHtml } from '../dcss-colors'
-import { LONG_PRESS_MS } from '../input/map-tap'
 import { bindPressedClass } from '../input/touch'
+import { SpdBag } from './spd-bag'
 import {
-  KIND_GLYPH, QUICKSLOT_COUNT, indexLetter, itemCount, itemKind, loadSlots, resolveSlot,
-  saveSlots, shortLabel, slotName, useKeys, type QuickSlot,
+  KIND_GLYPH, QUICKSLOT_COUNT, itemCount, itemKind, itemTile, loadSlots, makeSlot, nameKindGlyph,
+  resolveSlot, saveSlots, shortLabel, useKeys, type QuickSlot,
 } from './spd-quickslots'
+
+// Hold to rest / to repick a slot. Longer than the map's describe hold: on
+// a button a slow tap must stay a tap.
+const HOLD_MS = 500
 
 export interface SpdToolbarDeps {
   inventory: InventoryStore
+  loader(): TileLoader | null
   send(msg: ClientMsg): void
   // At the command prompt with nothing modal up.
   canAct(): boolean
   toggleKeys(): void
-  // Host for the quickslot picker sheet.
+  // Host for the bag sheet.
   sheetHost(): HTMLElement
 }
 
 export class SpdToolbar {
   readonly element: HTMLElement
+  readonly bag: SpdBag
   private readonly slots: (QuickSlot | null)[] = loadSlots()
   private readonly slotEls: HTMLButtonElement[] = []
   private readonly keysBtn: HTMLButtonElement
-  private sheet: HTMLElement | null = null
 
   constructor(private readonly deps: SpdToolbarDeps) {
+    this.bag = new SpdBag({
+      inventory: deps.inventory,
+      loader: deps.loader,
+      send: deps.send,
+      canAct: deps.canAct,
+      host: deps.sheetHost,
+      assignSlot: (i, live) => {
+        this.slots[i] = live ? makeSlot(live) : null
+        saveSlots(this.slots)
+        this.refresh()
+      },
+      slotFilled: (i) => this.slots[i] !== null,
+    })
+
     const bar = document.createElement('div')
     bar.id = 'spd-toolbar'
     this.element = bar
 
-    bar.appendChild(this.actionButton('spd-bag', '🎒', 'Bag', 'Inventory', () => this.key('i')))
+    bar.appendChild(this.actionButton('spd-bag', '🎒', 'Bag', 'Backpack', () => {
+      if (!deps.canAct()) return false
+      this.bag.open()
+    }))
     bar.appendChild(this.actionButton('spd-wait', '⏳', 'Wait', 'Wait a turn — hold to rest',
       () => this.key('s'), () => this.key('5')))
     bar.appendChild(this.actionButton('spd-explore', '🧭', 'Explore', 'Auto-explore', () => this.key('o')))
@@ -51,7 +74,7 @@ export class SpdToolbar {
       const b = document.createElement('button')
       b.type = 'button'
       b.className = 'spd-btn spd-slot'
-      this.bindPress(b, () => this.useSlot(i), () => this.openPicker(i))
+      this.bindPress(b, () => this.useSlot(i), () => this.bag.open(i))
       this.slotEls.push(b)
       slotRow.appendChild(b)
     }
@@ -65,22 +88,28 @@ export class SpdToolbar {
   // Re-resolve the slot faces against the current inventory.
   refresh(): void {
     const items = this.deps.inventory.items
+    const loader = this.deps.loader()
     this.slots.forEach((slot, i) => {
       const el = this.slotEls[i]
       const hit = slot ? resolveSlot(slot, items) : null
       el.classList.toggle('empty', !slot)
       el.classList.toggle('missing', !!slot && !hit)
+      el.textContent = ''
       if (!slot) {
         el.innerHTML = '<span class="spd-plus">+</span>'
         el.title = 'Empty quickslot — tap to assign'
         return
       }
+      const tile = hit ? itemTile(loader, hit.item) : null
+      if (tile) el.appendChild(tile)
+      else {
+        const glyph = hit ? KIND_GLYPH[itemKind(hit.item)] : nameKindGlyph(slot)
+        el.insertAdjacentHTML('beforeend', `<span class="spd-glyph fg${hit?.item.col ?? 8}">${escHtml(glyph)}</span>`)
+      }
       const name = hit ? hit.item.name : slot.name
-      const n = hit ? itemCount(hit.item.name) : 0
-      const col = hit?.item.col ?? 8
-      el.innerHTML = `<span class="spd-glyph fg${col}">${escHtml(KIND_GLYPH[itemKind(name)])}</span>`
-        + `<span class="spd-cap">${escHtml(shortLabel(name))}</span>`
-        + (n > 1 ? `<span class="spd-qty">${n}</span>` : '')
+      if (!tile) el.insertAdjacentHTML('beforeend', `<span class="spd-cap">${escHtml(shortLabel(name))}</span>`)
+      const n = hit ? itemCount(hit.item) : 0
+      if (n > 1) el.insertAdjacentHTML('beforeend', `<span class="spd-qty">${n}</span>`)
       el.title = `${name} — hold to change`
       if (hit) slot.letter = hit.letter
     })
@@ -88,6 +117,10 @@ export class SpdToolbar {
 
   setKeysOpen(open: boolean): void {
     this.keysBtn.classList.toggle('active', open)
+  }
+
+  closeSheets(): boolean {
+    return this.bag.close()
   }
 
   private key(text: string): boolean {
@@ -98,10 +131,13 @@ export class SpdToolbar {
 
   private useSlot(i: number): boolean {
     const slot = this.slots[i]
-    if (!slot) { this.openPicker(i); return true }
+    if (!slot) {
+      this.bag.open(i)
+      return true
+    }
     const hit = resolveSlot(slot, this.deps.inventory.items)
     if (!hit) return false
-    return this.key(useKeys(hit.item.name, hit.letter))
+    return this.key(useKeys(hit.item, hit.letter))
   }
 
   private actionButton(
@@ -133,7 +169,7 @@ export class SpdToolbar {
     b.addEventListener('pointerdown', () => {
       held = false
       if (!hold) return
-      timer = window.setTimeout(() => { held = true; run(hold) }, LONG_PRESS_MS)
+      timer = window.setTimeout(() => { held = true; run(hold) }, HOLD_MS)
     })
     const cancel = (): void => { if (timer !== undefined) clearTimeout(timer); timer = undefined }
     b.addEventListener('pointerup', cancel)
@@ -145,82 +181,5 @@ export class SpdToolbar {
       if (held) { held = false; return }
       run(tap)
     })
-  }
-
-  // --- quickslot picker -----------------------------------------------------
-
-  closePicker(): boolean {
-    if (!this.sheet) return false
-    this.sheet.remove()
-    this.sheet = null
-    return true
-  }
-
-  private openPicker(i: number): void {
-    this.closePicker()
-    const sheet = document.createElement('div')
-    sheet.className = 'spd-sheet'
-    sheet.addEventListener('click', (e) => { if (e.target === sheet) this.closePicker() })
-    const card = document.createElement('div')
-    card.className = 'spd-sheet-card'
-    const title = document.createElement('div')
-    title.className = 'spd-sheet-title'
-    title.textContent = `Quickslot ${i + 1}`
-    card.appendChild(title)
-
-    const list = document.createElement('div')
-    list.className = 'spd-sheet-list'
-    const entries = [...this.deps.inventory.items.entries()]
-      .filter(([, it]) => it.name)
-      .sort(([a], [b]) => a - b)
-    for (const [idx, item] of entries) {
-      const letter = indexLetter(idx)
-      const row = document.createElement('button')
-      row.type = 'button'
-      row.className = 'spd-sheet-row'
-      row.innerHTML = `<span class="spd-glyph fg${item.col}">${escHtml(KIND_GLYPH[itemKind(item.name)])}</span>`
-        + `<span class="spd-row-letter">${letter}</span>`
-        + `<span class="spd-row-name fg${item.col}">${escHtml(item.name)}</span>`
-      row.addEventListener('click', () => {
-        this.slots[i] = { name: slotName(item.name), letter }
-        this.commit()
-      })
-      list.appendChild(row)
-    }
-    if (entries.length === 0) {
-      const none = document.createElement('div')
-      none.className = 'spd-sheet-empty'
-      none.textContent = 'Your pack is empty.'
-      list.appendChild(none)
-    }
-    card.appendChild(list)
-
-    const foot = document.createElement('div')
-    foot.className = 'spd-sheet-foot'
-    if (this.slots[i]) {
-      const clear = document.createElement('button')
-      clear.type = 'button'
-      clear.className = 'spd-sheet-btn'
-      clear.textContent = 'Clear slot'
-      clear.addEventListener('click', () => { this.slots[i] = null; this.commit() })
-      foot.appendChild(clear)
-    }
-    const cancel = document.createElement('button')
-    cancel.type = 'button'
-    cancel.className = 'spd-sheet-btn'
-    cancel.textContent = 'Cancel'
-    cancel.addEventListener('click', () => this.closePicker())
-    foot.appendChild(cancel)
-    card.appendChild(foot)
-
-    sheet.appendChild(card)
-    this.deps.sheetHost().appendChild(sheet)
-    this.sheet = sheet
-  }
-
-  private commit(): void {
-    saveSlots(this.slots)
-    this.closePicker()
-    this.refresh()
   }
 }

@@ -7144,6 +7144,7 @@ html.map-hold, html.map-hold * {
   border-radius: 0.75rem 0.75rem 0 0;
   padding: 0.6rem 0.6rem calc(0.6rem + var(--safe-bottom));
   font-family: var(--font-mono);
+  color: var(--text);
 }
 .spd-sheet-title { color: var(--accent); font-size: 0.9rem; margin-bottom: 0.4rem; }
 .spd-sheet-list { overflow-y: auto; display: flex; flex-direction: column; gap: 0.2rem; }
@@ -7174,6 +7175,77 @@ html.map-hold, html.map-hold * {
   font: inherit;
   font-size: 0.8rem;
 }
+
+/* Loot indicator (spd-indicators.ts): above danger/attack. */
+.spd-loot {
+  gap: 0.25rem;
+  height: 1.9rem;
+  padding: 0 0.6rem;
+  border-radius: 0.95rem;
+  border-color: var(--accent);
+  color: var(--accent);
+  font-size: 0.8rem;
+}
+.spd-ind[hidden] { display: none; }
+
+/* Item sprites in quickslots and the bag: the 32px tile, centred. */
+.spd-slot .tile-stack, .spd-bag-cell .tile-stack { position: relative; flex: 0 0 auto; }
+
+/* Bag (spd-bag.ts): SPD's WndBag grid plus the WndUseItem action row. */
+.spd-sheet-title { display: flex; align-items: center; justify-content: space-between; }
+.spd-sheet-x {
+  width: 2rem;
+  height: 2rem;
+  background: none;
+  border: none;
+  color: var(--text-dim);
+  font-size: 1.2rem;
+}
+.spd-bag-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(3.1rem, 1fr));
+  gap: 0.3rem;
+  overflow-y: auto;
+  min-height: 0;
+}
+.spd-bag-cell {
+  position: relative;
+  aspect-ratio: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  background: #1c1d1a;
+  border: 1px solid var(--border);
+  border-radius: 0.4rem;
+  color: inherit;
+  font: inherit;
+  touch-action: manipulation;
+}
+.spd-bag-cell:active { background: var(--press); }
+.spd-bag-cell.selected { border-color: var(--accent); background: var(--surface2); }
+.spd-bag-letter {
+  position: absolute;
+  top: 0.1rem;
+  left: 0.25rem;
+  font-size: 0.6rem;
+  color: var(--text-faint);
+}
+.spd-bag-detail {
+  margin-top: 0.5rem;
+  padding-top: 0.5rem;
+  border-top: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+.spd-bag-name { font-size: 0.85rem; overflow-wrap: anywhere; }
+.spd-bag-hint { font-size: 0.75rem; color: var(--text-dim); }
+.spd-bag-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 0.35rem; }
+.spd-bag-actions .spd-sheet-btn { flex: 1 0 auto; }
+.spd-bag-slots .spd-sheet-btn { flex: 0 0 2.4rem; }
+.spd-sheet-btn.primary { border-color: var(--accent); color: var(--accent); }
+.spd-sheet-card.refused { animation: spd-shake 0.25s; }
 
 /* Hero portrait (spd-portrait.ts): left of the HUD stats, SPD's status
    pane picture with its level badge. */
