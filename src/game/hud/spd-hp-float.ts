@@ -38,7 +38,7 @@ export class SpdHpFloat {
     this.showText(delta < 0 ? `−${-delta}` : `+${delta}`, at, delta < 0 ? 'loss' : 'gain')
   }
 
-  // Any floating label (spd-combat-fx.ts: monster hits) — `cls` styles it.
+  // A floating label; `cls` styles it.
   showText(text: string, at: { x: number; y: number }, cls: string): void {
     while (this.element.childElementCount >= MAX_LIVE) this.element.firstElementChild?.remove()
     const n = document.createElement('span')

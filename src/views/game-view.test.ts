@@ -265,6 +265,7 @@ describe('map movement modes', () => {
   })
 
   it.each([2, 3, 4])('aims and fires a Touch tap in targeting mode %s', mode => {
+    setPref('spdLayout', false)  // SPD aims first: its own case below
     const h = touchGame()
     h.dispatch({ msg: 'input_mode', mode })
     pointer(h, 'pointerdown')
@@ -457,7 +458,21 @@ describe('map movement modes', () => {
     expect(sent(h)).toEqual([{ msg: 'click_cell', x: 2, y: 3, button: 1 }])
   })
 
+  it('SPD layout: a targeting tap aims there, a tap on the aimed cell fires', () => {
+    const h = touchGame()
+    h.dispatch({ msg: 'input_mode', mode: 4 })
+    pointer(h, 'pointerdown')
+    pointer(h, 'pointerup')
+    expect(sent(h)).toEqual([{ msg: 'target_cursor', x: 2, y: 3 }])
+    h.send.mockClear()
+    h.dispatch({ msg: 'cursor', id: 0, loc: { x: 2, y: 3 } })
+    pointer(h, 'pointerdown')
+    pointer(h, 'pointerup')
+    expect(sent(h)).toEqual([{ msg: 'click_cell', x: 2, y: 3, button: 1 }])
+  })
+
   it.each([2, 3, 4])('keeps self-targeting in mode %s instead of using terrain or items', mode => {
+    setPref('spdLayout', false)
     const h = touchGame()
     h.dispatch({ msg: 'player', pos: { x: 2, y: 3 } })
     h.dispatch({ msg: 'map', cells: [{ x: 2, y: 3, f: 40, t: { fg: FG_S_UNDER } }] })
@@ -1102,11 +1117,13 @@ describe('SPD layout toolbar', () => {
     h.dispatch({ msg: 'cursor', id: 0, loc: { x: 3, y: 4 } })
     expect(touch(h).style.display).toBe('none')
     expect(bar(h).classList.contains('targeting')).toBe(true)
+    btn(h, 'spd-tgt-prev').click()
     btn(h, 'spd-tgt-next').click()
     btn(h, 'spd-tgt-fire').click()
     btn(h, 'spd-tgt-cancel').click()
     expect(h.send.mock.calls.map(c => c[0])).toEqual([
-      { msg: 'input', text: '+' }, { msg: 'input', text: '.' }, { msg: 'key', keycode: 27 },
+      { msg: 'input', text: '-' }, { msg: 'input', text: '+' },
+      { msg: 'key', keycode: 13 }, { msg: 'key', keycode: 27 },
     ])
     h.dispatch({ msg: 'cursor', id: 0 })
     expect(bar(h).classList.contains('targeting')).toBe(false)

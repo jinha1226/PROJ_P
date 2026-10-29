@@ -24,15 +24,17 @@ import {
   resolveNamed, resolveSlot, saveSlots, shortLabel, useMsg, type AbilityEntry, type QuickSlot,
   type SpellInfo,
 } from './spd-quickslots'
-import { tr } from './spd-i18n'
+import { tr, trText, trTitle } from './spd-i18n'
 
 // Hold to rest / to repick a slot. Longer than the map's describe hold: on
 // a button a slow tap must stay a tap.
 const HOLD_MS = 500
 
-// Direction-chooser keys (directn.cc): fire at the cursor, cycle targets.
-const FIRE = '.'
+// Direction-chooser keys (cmd-keys.h): Enter is CMD_TARGET_SELECT (`.` is
+// SELECT_ENDPOINT, a different thing), + / - cycle the targets.
+const ENTER = 13
 const NEXT_TARGET = '+'
+const PREV_TARGET = '-'
 const ESC = 27
 
 export interface SpdToolbarDeps {
@@ -55,6 +57,7 @@ export class SpdToolbar {
   private readonly slots: (QuickSlot | null)[] = loadSlots()
   private readonly slotEls: HTMLButtonElement[] = []
   private readonly keysBtn: HTMLButtonElement
+  private readonly aimLabel: HTMLElement
 
   constructor(private readonly deps: SpdToolbarDeps) {
     this.bag = new SpdBag({
@@ -78,13 +81,13 @@ export class SpdToolbar {
     bar.id = 'spd-toolbar'
     this.element = bar
 
-    bar.appendChild(this.actionButton('spd-bag', '🎒', tr('Bag'), tr('Backpack'), () => {
+    bar.appendChild(this.actionButton('spd-bag', '🎒', 'Bag', 'Backpack', () => {
       if (!deps.canAct()) return false
       this.bag.open()
     }))
-    bar.appendChild(this.actionButton('spd-wait', '⏳', tr('Wait'), tr('Wait a turn — hold to rest'),
+    bar.appendChild(this.actionButton('spd-wait', '⏳', 'Wait', 'Wait a turn — hold to rest',
       () => this.key('s'), () => this.key('5')))
-    bar.appendChild(this.actionButton('spd-explore', '🧭', tr('Explore'), tr('Auto-explore'), () => this.key('o')))
+    bar.appendChild(this.actionButton('spd-explore', '🧭', 'Explore', 'Auto-explore', () => this.key('o')))
 
     // Pages of QUICKSLOT_PAGE, side by side in a snapping scroller: swipe
     // for the next page; the dots show which one is up.
@@ -121,17 +124,27 @@ export class SpdToolbar {
     slotRow.append(pages, dots)
     bar.appendChild(slotRow)
 
-    this.keysBtn = this.actionButton('spd-keys', '⌨', tr('Keys'), tr('Show the keypad'), () => deps.toggleKeys())
+    this.keysBtn = this.actionButton('spd-keys', '⌨', 'Keys', 'Show the keypad', () => deps.toggleKeys())
     bar.appendChild(this.keysBtn)
 
     // The aim row (CSS swaps it in under .targeting).
-    bar.appendChild(this.actionButton('spd-tgt spd-tgt-cancel', '✕', tr('Cancel'), tr('Cancel targeting'),
+    bar.appendChild(this.actionButton('spd-tgt spd-tgt-cancel', '✕', 'Cancel', 'Cancel targeting',
       () => deps.send({ msg: 'key', keycode: ESC })))
-    bar.appendChild(this.actionButton('spd-tgt spd-tgt-next', '⟳', tr('Next'), tr('Next target'),
+    bar.appendChild(this.actionButton('spd-tgt spd-tgt-prev', '◀', 'Prev', 'Previous target',
+      () => deps.send({ msg: 'input', text: PREV_TARGET })))
+    this.aimLabel = document.createElement('div')
+    this.aimLabel.className = 'spd-tgt spd-tgt-label'
+    bar.appendChild(this.aimLabel)
+    bar.appendChild(this.actionButton('spd-tgt spd-tgt-next', '▶', 'Next', 'Next target',
       () => deps.send({ msg: 'input', text: NEXT_TARGET })))
-    bar.appendChild(this.actionButton('spd-tgt spd-tgt-fire', '◎', tr('Fire'), tr('Fire at the target'),
-      () => deps.send({ msg: 'input', text: FIRE })))
+    bar.appendChild(this.actionButton('spd-tgt spd-tgt-fire', '◎', 'Fire', 'Fire at the target',
+      () => deps.send({ msg: 'key', keycode: ENTER })))
     this.refresh()
+  }
+
+  // What the aim cursor is on (a monster's name), or null for a bare cell.
+  setAimTarget(name: string | null): void {
+    this.aimLabel.textContent = name ? `🎯 ${name}` : '🎯'
   }
 
   setTargeting(on: boolean): void {
@@ -221,9 +234,11 @@ export class SpdToolbar {
     const b = document.createElement('button')
     b.type = 'button'
     b.className = `spd-btn ${cls}`
-    b.title = title
-    b.setAttribute('aria-label', title)
-    b.innerHTML = `<span class="spd-icon">${icon}</span><span class="spd-cap">${label}</span>`
+    trTitle(b, title)
+    b.innerHTML = `<span class="spd-icon">${icon}</span>`
+    const cap = document.createElement('span')
+    cap.className = 'spd-cap'
+    b.appendChild(trText(cap, label))
     this.bindPress(b, tap, hold)
     return b
   }

@@ -3,6 +3,10 @@ import { rcManager } from './rc-manager'
 import { TranslationDataManager } from './translation/data-manager'
 import { applySpecialPatterns, Translator, type TranslationMatcher } from './translation/translator'
 
+// Fired on window when a game's translation turns on or off, so client
+// chrome that follows the game's language (spd-i18n.ts) can relabel.
+export const TRANSLATION_CHANGED_EVENT = 'pocketzot:translation-changed'
+
 interface TranslationConfig {
   language?: string
   translationLanguage?: string
@@ -99,6 +103,7 @@ export class TranslationModule {
       if (this.config.language && this.config.language !== 'en') {
         this.sendMessage(`<cyan>[TranslationModule]</cyan> <red>Do not use language = ${this.config.language} together with translation_language.</red>`)
       }
+      window.dispatchEvent(new Event(TRANSLATION_CHANGED_EVENT))
       const stamp = new Date(build.time).toLocaleString()
       this.sendMessage(`<cyan>[TranslationModule]</cyan> ${build.matchers.length} matcher data loaded successfully. (${stamp}) / Thanks to ${build.messages[0] ?? 'contributors'}`)
 

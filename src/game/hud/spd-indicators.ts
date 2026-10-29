@@ -15,7 +15,7 @@ import { appendMonsterActor } from '../tiles/tile-view'
 import { ATTITUDE_CLASSES, isExcluded, nameColor } from './monster-style'
 import { escHtml } from '../dcss-colors'
 import { bindPressedClass } from '../input/touch'
-import { tr } from './spd-i18n'
+import { tr, trText, trTitle } from './spd-i18n'
 
 export interface SpdIndicatorDeps {
   send(msg: ClientMsg): void
@@ -85,7 +85,7 @@ export class SpdIndicators {
     this.danger = document.createElement('button')
     this.danger.type = 'button'
     this.danger.className = 'spd-ind spd-danger'
-    this.danger.title = tr('Hostiles in view')
+    trTitle(this.danger, 'Hostiles in view')
     bindPressedClass(this.danger)
     this.danger.addEventListener('click', () => deps.openMonsters())
 
@@ -102,8 +102,9 @@ export class SpdIndicators {
     this.loot = document.createElement('button')
     this.loot.type = 'button'
     this.loot.className = 'spd-ind spd-loot'
-    this.loot.title = tr('Pick up')
-    this.loot.innerHTML = `<span class="spd-ind-icon">✋</span><span>${escHtml(tr('Pick up'))}</span>`
+    trTitle(this.loot, 'Pick up')
+    this.loot.innerHTML = '<span class="spd-ind-icon">✋</span>'
+    this.loot.appendChild(trText(document.createElement('span'), 'Pick up'))
     bindPressedClass(this.loot)
     this.loot.addEventListener('click', () => {
       if (!deps.canAct()) return

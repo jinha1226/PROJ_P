@@ -20,7 +20,7 @@ import type { GameConnection } from '../ws/connection'
 import type { ClientMsg, ServerMsg, GameExit } from '../ws/types'
 import { combineHandlers, dispatch, type MsgOf } from '../ws/dispatcher'
 import { registerViewDispose } from './view-dispose'
-import { MapStore } from '../game/map/map-store'
+import { MapStore, cellKey } from '../game/map/map-store'
 import { MapView } from '../game/map/map-view'
 import { TileMapView } from '../game/map/tile-map-view'
 import { animOptionsFrom, type AnimOptions } from '../game/tiles/tile-anim'
@@ -63,10 +63,11 @@ import { SpdToolbar } from '../game/hud/spd-toolbar'
 import { SpdIndicators } from '../game/hud/spd-indicators'
 import { SpdHeroTabs } from '../game/hud/spd-hero-tabs'
 import { ioHook } from '../dwem/io-hook'
+import { TRANSLATION_CHANGED_EVENT } from '../dwem/translation-module'
+import { relabel } from '../game/hud/spd-i18n'
 import { SpdPortrait } from '../game/hud/spd-portrait'
 import { SpdBuffs } from '../game/hud/spd-buffs'
 import { SpdHpFloat, hpChange, type HpSnapshot } from '../game/hud/spd-hp-float'
-import { SpdCombatFx } from '../game/hud/spd-combat-fx'
 import { parseAbilityItems, type AbilityEntry } from '../game/hud/spd-quickslots'
 import { loadSession, saveSession } from '../auth/session'
 import { stripDcss } from './overlay-body'
@@ -675,6 +676,13 @@ export function buildGameView(opts: GameViewOptions): HTMLElement {
           const key = selfTapKey(store.get(cell.x, cell.y))
           if (key) { send({ msg: 'input', text: key }); return }
         }
+        // SPD layout, aiming: the first tap moves the aim there; a tap on
+        // the aimed cell fires (the aim row's Fire does too).
+        const aim = cursors[0]
+        if (spdLayout && canHover(currentInputMode) && !(aim && aim.x === cell.x && aim.y === cell.y)) {
+          conn.send({ msg: 'target_cursor', x: cell.x, y: cell.y })
+          return
+        }
         conn.send({ msg: 'click_cell', x: cell.x, y: cell.y, button: 1 })
         return
       }
@@ -989,18 +997,13 @@ export function buildGameView(opts: GameViewOptions): HTMLElement {
     }
     if (m.msg !== 'msgs' || !spdLayout) return
     const lines = (m as MsgOf<'msgs'>).messages ?? []
-    for (const line of lines) {
-      const text = stripDcss(String(line.text ?? ''))
-      spdIndicators.onMessage(text)
-      spdCombatFx.onLine(text)
-    }
+    for (const line of lines) spdIndicators.onMessage(stripDcss(String(line.text ?? '')))
   }, 100)
-  // Estimated hits on monsters (spd-combat-fx.ts), on the same float layer.
-  const spdCombatFx = new SpdCombatFx({
-    cellPoint: (x, y) => mapView.cellClientCenter(x, y),
-    playerPos: () => store.playerPos,
-    show: (text, at, cls) => spdHpFloat.showText(text, at, cls),
-  })
+  function updateAimTarget(): void {
+    const c = cursors[0]
+    const mon = c ? store.getMonsters().get(cellKey(c.x, c.y)) : undefined
+    spdToolbar.setAimTarget(mon?.mon.name ?? null)
+  }
   function updateSpdIndicators(): void {
     if (!spdLayout) return
     spdIndicators.update(store, loader, renderMode === 'tiles')
@@ -1360,6 +1363,14 @@ export function buildGameView(opts: GameViewOptions): HTMLElement {
   }
   window.addEventListener(SPD_LAYOUT_CHANGED_EVENT, onSpdLayoutPref)
 
+  // The game's translation loads after this view is built: relabel the
+  // SPD chrome into its language once it does.
+  function onTranslationChanged(): void {
+    relabel(view)
+    spdToolbar.refresh()
+  }
+  window.addEventListener(TRANSLATION_CHANGED_EVENT, onTranslationChanged)
+
   // Same live-apply for the monster-list mode (the in-game chevron writes the
   // pref too, but setListMode no-ops when the value matches).
   function onMonsterListModePref(): void {
@@ -1718,7 +1729,6 @@ export function buildGameView(opts: GameViewOptions): HTMLElement {
     advisory.onMap()
     if (msg.clear) {
       setTouchCursor(null)
-      spdCombatFx.reset()
       store.clear()
       touchPanned = false
       // `[`/`]` in the level map arrive as a cleared map (tile_new_level
@@ -1777,7 +1787,7 @@ export function buildGameView(opts: GameViewOptions): HTMLElement {
     monsterListView.update(store.getMonsters())
     if (monsterPanelOpen) monsterPanel.update(store.getMonsters())
     updateSpdIndicators()
-    if (spdLayout) spdCombatFx.onMonsters(store.getMonsters(), (x, y) => store.get(x, y)?.fg)
+    if (spdLayout && cursors[0]) updateAimTarget()
     minimaps.scheduleRepaint()
     record.captureAvatar(store.get(store.playerPos.x, store.playerPos.y), loader)
   }
@@ -2030,7 +2040,10 @@ export function buildGameView(opts: GameViewOptions): HTMLElement {
     // paths that leave X without a cursor-clear (exit-for-text-input)
     // must not strand this one.
     touchControls.setCursorMode(!!cursors[0])
-    if (spdLayout) applyLayout()
+    if (spdLayout) {
+      applyLayout()
+      updateAimTarget()
+    }
     // X mode follows id 2 only. While a text input has X stepped aside,
     // close_input re-enters it — a resent id 2 must not do it early.
     if (id === 2) {
@@ -2505,6 +2518,7 @@ export function buildGameView(opts: GameViewOptions): HTMLElement {
     window.removeEventListener(RENDER_MODE_CHANGED_EVENT, onRenderModePref)
     window.removeEventListener(MOVEMENT_MODE_CHANGED_EVENT, onMovementModePref)
     window.removeEventListener(SPD_LAYOUT_CHANGED_EVENT, onSpdLayoutPref)
+    window.removeEventListener(TRANSLATION_CHANGED_EVENT, onTranslationChanged)
     ioHook.handle_message.before.removeHandler('spd-raw')
     window.removeEventListener(MONSTER_LIST_MODE_CHANGED_EVENT, onMonsterListModePref)
     closeWatcher?.destroy()
