@@ -1,6 +1,8 @@
-// SPD-style bag (the "SPD layout" pref): Shattered Pixel Dungeon's WndBag —
-// the pack as a grid of item cells under category tabs — and WndUseItem,
-// the action row that tapping one opens. A client sheet over the game,
+// SPD-style bag (the "SPD layout" pref): Shattered Pixel Dungeon's WndBag
+// categories as tabs, but a list rather than SPD's grid — a DCSS pack is
+// bigger and its unidentified items look alike, so names must show. Each
+// row carries its use button (one tap to drink); tapping the row opens the
+// rest, SPD's WndUseItem: info, take off, quickslot. A client sheet over the game,
 // built from the inventory the `player` messages carry; every action is a
 // keystroke pair sent at the command prompt (spd-quickslots.ts useKeys),
 // and "Info" opens the engine's own describe screen, which lists whatever
@@ -19,7 +21,7 @@ import { TEX, type TileLoader } from '../tiles/tile-loader'
 import { renderTiles } from '../tiles/tile-view'
 import { escHtml } from '../dcss-colors'
 import {
-  KIND_GLYPH, QUICKSLOT_COUNT, describeMsg, itemCount, itemKind, itemTab, itemTile, makeSlot,
+  KIND_GLYPH, QUICKSLOT_COUNT, describeMsg, itemKind, itemTab, itemTile, makeSlot,
   sortedItems, useLabel, useMsg, type AbilityEntry, type BagTab, type LiveItem, type QuickSlot, type SpellInfo,
 } from './spd-quickslots'
 
@@ -35,6 +37,20 @@ export interface SpdBagDeps {
   host(): HTMLElement
   assignSlot(i: number, slot: QuickSlot | null): void
   slotFilled(i: number): boolean
+}
+
+const TAB_KEY = 'pocketzot:spd-bag-tab'
+
+// The last tab, so the bag reopens where the player was (per device).
+function loadTab(): BagTab {
+  try {
+    const t = localStorage.getItem(TAB_KEY)
+    if (t && TABS.some(x => x.tab === t)) return t as BagTab
+  } catch { /* private mode */ }
+  return 'all'
+}
+function saveTab(t: BagTab): void {
+  try { localStorage.setItem(TAB_KEY, t) } catch { /* private mode */ }
 }
 
 const TABS: ReadonlyArray<{ tab: BagTab; label: string }> = [
@@ -59,7 +75,7 @@ export class SpdBag {
   private detail: HTMLElement | null = null
   private tabsEl: HTMLElement | null = null
   private selected: string | null = null
-  private tab: BagTab = 'all'
+  private tab: BagTab = loadTab()
   private pickFor: number | undefined
 
   constructor(private readonly deps: SpdBagDeps) {}
@@ -93,6 +109,7 @@ export class SpdBag {
     for (const { tab: t, label } of TABS) {
       const b = this.button(label, 'spd-bag-tab', () => {
         this.tab = t
+        saveTab(t)
         this.selected = null
         this.renderBody()
       })
@@ -103,7 +120,7 @@ export class SpdBag {
     this.tabsEl = tabs
 
     this.grid = document.createElement('div')
-    this.grid.className = 'spd-bag-grid'
+    this.grid.className = 'spd-bag-list'
     card.appendChild(this.grid)
 
     this.detail = document.createElement('div')
@@ -174,51 +191,72 @@ export class SpdBag {
   }
 
   private cell(e: Entry): HTMLElement {
-    const b = document.createElement('button')
-    b.type = 'button'
-    b.className = 'spd-bag-cell'
-    b.dataset.key = e.key
+    const row = document.createElement('div')
+    row.className = 'spd-bag-row'
+    row.dataset.key = e.key
+    row.setAttribute('role', 'button')
     const loader = this.deps.loader()
     let face: HTMLElement | null = null
     let glyph = '*'
     let col = 7
-    let corner = ''
-    let count = 0
+    let letter = ''
+    let name = ''
+    let sub = ''
+    let use: { label: string; run: () => void } | null = null
     if (e.kind === 'item') {
-      const { item, letter } = e.live
-      b.title = item.name
+      const { item } = e.live
       face = itemTile(loader, item)
       glyph = KIND_GLYPH[itemKind(item)]
       col = item.col
-      corner = letter
-      count = itemCount(item)
+      letter = e.live.letter
+      name = item.name
+      if (itemKind(item) !== 'other') use = { label: useLabel(item), run: () => this.act(useMsg(e.live)) }
     } else if (e.kind === 'spell') {
-      b.title = e.spell.title
       face = loader ? renderTiles(loader, [{ t: e.spell.tile, tex: TEX.GUI }], 1) : null
       glyph = '✦'
-      corner = e.spell.letter
+      letter = e.spell.letter
+      name = e.spell.title
+      sub = e.spell.fail ? `${e.spell.fail} fail` : ''
+      use = { label: 'Cast', run: () => this.act('z' + e.spell.letter) }
     } else {
-      b.title = e.ability.name
-      face = loader && e.ability.tiles.length ? renderTiles(loader, e.ability.tiles, 1) : null
+      const a = e.ability
+      face = loader && a.tiles.length ? renderTiles(loader, a.tiles, 1) : null
       glyph = '★'
-      col = e.ability.colour ?? 7
-      corner = e.ability.letter
+      col = a.colour ?? 7
+      letter = a.letter
+      name = a.name
+      sub = [a.cost, a.fail].filter(Boolean).join(' · ')
+      use = { label: 'Use', run: () => this.act('a' + a.letter) }
     }
-    if (face) b.appendChild(face)
-    else b.insertAdjacentHTML('beforeend', `<span class="spd-glyph fg${col}">${escHtml(glyph)}</span>`)
-    b.insertAdjacentHTML('beforeend', `<span class="spd-bag-letter">${escHtml(corner)}</span>`)
-    if (count > 1) b.insertAdjacentHTML('beforeend', `<span class="spd-qty">${count}</span>`)
-    if (e.kind !== 'item') b.insertAdjacentHTML('beforeend', `<span class="spd-bag-cap">${escHtml(b.title)}</span>`)
-    b.addEventListener('click', () => {
+    row.title = name
+
+    const icon = document.createElement('span')
+    icon.className = 'spd-bag-icon'
+    if (face) icon.appendChild(face)
+    else icon.innerHTML = `<span class="spd-glyph fg${col}">${escHtml(glyph)}</span>`
+    row.appendChild(icon)
+    row.insertAdjacentHTML('beforeend', `<span class="spd-bag-letter">${escHtml(letter)}</span>`)
+    const text = document.createElement('span')
+    text.className = 'spd-bag-text'
+    text.innerHTML = `<span class="spd-bag-name fg${col}">${escHtml(name)}</span>`
+      + (sub ? `<span class="spd-bag-sub">${escHtml(sub)}</span>` : '')
+    row.appendChild(text)
+
+    if (this.pickFor === undefined && use) {
+      const b = this.button(use.label, 'spd-sheet-btn primary spd-bag-use', use.run)
+      b.addEventListener('click', (ev) => ev.stopPropagation())
+      row.appendChild(b)
+    }
+    row.addEventListener('click', () => {
       if (this.pickFor !== undefined) {
         this.deps.assignSlot(this.pickFor, this.slotFor(e))
         this.close()
         return
       }
-      this.selected = e.key
+      this.selected = this.selected === e.key ? null : e.key
       this.renderDetail()
     })
-    return b
+    return row
   }
 
   private slotFor(e: Entry): QuickSlot {
@@ -230,18 +268,20 @@ export class SpdBag {
   private renderDetail(): void {
     const detail = this.detail
     if (!detail) return
-    this.grid?.querySelectorAll<HTMLElement>('.spd-bag-cell').forEach(c =>
+    this.grid?.querySelectorAll<HTMLElement>('.spd-bag-row').forEach(c =>
       c.classList.toggle('selected', c.dataset.key === this.selected))
     detail.textContent = ''
+    detail.hidden = false
     if (this.pickFor !== undefined) {
-      detail.innerHTML = '<div class="spd-bag-hint">Tap to pin it to the slot.</div>'
+      detail.innerHTML = '<div class="spd-bag-hint">Tap one to pin it to the slot.</div>'
       return
     }
     const e = this.selected ? this.entries(this.tab).find(x => x.key === this.selected) : undefined
     if (!e) {
-      detail.innerHTML = '<div class="spd-bag-hint">Tap an entry.</div>'
+      detail.hidden = true
       return
     }
+    detail.hidden = false
     const name = document.createElement('div')
     name.className = 'spd-bag-name'
     const row = document.createElement('div')
@@ -251,21 +291,18 @@ export class SpdBag {
       name.classList.add(`fg${item.col}`)
       name.textContent = `${letter} - ${item.name}`
       const kind = itemKind(item)
-      if (kind !== 'other') row.appendChild(this.button(useLabel(item), 'spd-sheet-btn primary', () => this.act(useMsg(e.live))))
       if (kind === 'equip') row.appendChild(this.button('Take off', 'spd-sheet-btn', () => this.act('c' + letter)))
       // Drop and the rest live on the engine's describe screen: a `d`
       // letter can't tell a trunk scroll c from a ring c.
       row.appendChild(this.button('Info / more', 'spd-sheet-btn', () => this.act(describeMsg(e.live))))
     } else if (e.kind === 'spell') {
       name.textContent = `${e.spell.letter} - ${e.spell.title}${e.spell.fail ? ` (${e.spell.fail} fail)` : ''}`
-      row.appendChild(this.button('Cast', 'spd-sheet-btn primary', () => this.act('z' + e.spell.letter)))
     } else {
       const a = e.ability
       name.textContent = `${a.letter} - ${a.name}${a.cost ? ` · ${a.cost}` : ''}${a.fail ? ` · ${a.fail}` : ''}`
-      row.appendChild(this.button('Use', 'spd-sheet-btn primary', () => this.act('a' + a.letter)))
     }
     detail.appendChild(name)
-    detail.appendChild(row)
+    if (row.childElementCount) detail.appendChild(row)
 
     const slots = document.createElement('div')
     slots.className = 'spd-bag-actions spd-bag-slots'

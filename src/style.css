@@ -7249,6 +7249,61 @@ html.map-hold, html.map-hold * {
 .spd-sheet-btn.primary { border-color: var(--accent); color: var(--accent); }
 .spd-sheet-card.refused { animation: spd-shake 0.25s; }
 
+/* Bag list rows (spd-bag.ts): icon, letter, name, inline use button. */
+.spd-bag-list {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+.spd-bag-row {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  min-height: 2.6rem;
+  padding: 0.15rem 0.3rem;
+  background: #1c1d1a;
+  border: 1px solid var(--border);
+  border-radius: 0.4rem;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+.spd-bag-row:active { background: var(--press); }
+.spd-bag-row.selected { border-color: var(--accent); background: var(--surface2); }
+.spd-bag-icon {
+  flex: 0 0 2rem;
+  width: 2rem;
+  height: 2rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+.spd-bag-icon .tile-stack { position: relative; }
+.spd-bag-row .spd-bag-letter {
+  position: static;
+  flex: 0 0 auto;
+  font-size: 0.75rem;
+  color: var(--text-faint);
+}
+.spd-bag-text {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+.spd-bag-text .spd-bag-name {
+  font-size: 0.8rem;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.spd-bag-sub { font-size: 0.65rem; color: var(--text-dim); }
+.spd-bag-use { flex: 0 0 auto; padding: 0.35rem 0.6rem; }
+.spd-bag-detail[hidden] { display: none; }
+
 /* Aim row (spd-toolbar.ts setTargeting): replaces the bar's buttons while
    a targeting cursor is up. */
 .spd-tgt { display: none; }

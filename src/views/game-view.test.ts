@@ -1140,7 +1140,7 @@ describe('SPD layout toolbar', () => {
     h.dispatch({ msg: 'player', inv: POTIONS })
     const slot = bar(h).querySelector<HTMLButtonElement>('.spd-slot')!
     slot.click()  // empty slot: opens the bag in pick mode
-    const cell = document.querySelector<HTMLButtonElement>('.spd-bag-cell')!
+    const cell = document.querySelector<HTMLButtonElement>('.spd-bag-row')!
     expect(cell.title).toBe('2 potions of curing')
     cell.click()
     expect(document.querySelector('.spd-sheet')).toBeNull()
@@ -1149,17 +1149,26 @@ describe('SPD layout toolbar', () => {
     expect(h.send.mock.calls.map(c => c[0])).toEqual([{ msg: 'inv_item_action', slot: 53 }])
   })
 
-  it('opens the bag and drinks from its action row', () => {
+  it('drinks from the bag list in one tap on the row\'s button', () => {
     const h = playing()
     h.dispatch({ msg: 'player', inv: POTIONS })
     btn(h, 'spd-bag').click()
     expect(h.send).not.toHaveBeenCalled()
-    document.querySelector<HTMLButtonElement>('.spd-bag-cell')!.click()
-    const primary = document.querySelector<HTMLButtonElement>('.spd-bag-actions .primary')!
-    expect(primary.textContent).toBe('Drink')
-    primary.click()
+    const use = document.querySelector<HTMLButtonElement>('.spd-bag-row .spd-bag-use')!
+    expect(use.textContent).toBe('Drink')
+    use.click()
     expect(h.send.mock.calls.map(c => c[0])).toEqual([{ msg: 'inv_item_action', slot: 53 }])
     expect(document.querySelector('.spd-sheet')).toBeNull()
+  })
+
+  it('reopens the bag on the last tab', () => {
+    const h = playing()
+    h.dispatch({ msg: 'player', inv: POTIONS })
+    btn(h, 'spd-bag').click()
+    document.querySelector<HTMLButtonElement>('.spd-bag-tab[data-tab="potions"]')!.click()
+    document.querySelector<HTMLButtonElement>('.spd-sheet-x')!.click()
+    btn(h, 'spd-bag').click()
+    expect(document.querySelector('.spd-bag-tab.active')?.getAttribute('data-tab')).toBe('potions')
   })
 
   it('tells apart a trunk scroll and a gear item on the same letter', () => {
@@ -1169,15 +1178,15 @@ describe('SPD layout toolbar', () => {
       54: { base_type: 5, quantity: 1, letter: 99, name: 'scroll of fog', col: 7, action_verb: 'Read' },
     } })
     btn(h, 'spd-bag').click()
-    const cells = [...document.querySelectorAll<HTMLButtonElement>('.spd-bag-cell')]
+    const cells = [...document.querySelectorAll<HTMLButtonElement>('.spd-bag-row')]
     cells.find(c => c.title === 'scroll of fog')!.click()
-    expect(document.querySelectorAll('.spd-bag-cell.selected')).toHaveLength(1)
-    document.querySelector<HTMLButtonElement>('.spd-bag-actions .primary')!.click()
+    expect(document.querySelectorAll('.spd-bag-row.selected')).toHaveLength(1)
+    document.querySelector<HTMLButtonElement>('.spd-bag-row.selected .spd-bag-use')!.click()
     expect(h.send.mock.calls.map(c => c[0])).toEqual([{ msg: 'inv_item_action', slot: 54 }])
     btn(h, 'spd-bag').click()
-    ;[...document.querySelectorAll<HTMLButtonElement>('.spd-bag-cell')].find(c => c.title.startsWith('+6'))!.click()
+    ;[...document.querySelectorAll<HTMLButtonElement>('.spd-bag-row')].find(c => c.title.startsWith('+6'))!.click()
     h.send.mockClear()
-    document.querySelector<HTMLButtonElement>('.spd-bag-actions .primary')!.click()
+    document.querySelector<HTMLButtonElement>('.spd-bag-row.selected .spd-bag-use')!.click()
     expect(h.send.mock.calls.map(c => c[0])).toEqual([{ msg: 'input', text: 'ec' }])
   })
 
@@ -1189,7 +1198,7 @@ describe('SPD layout toolbar', () => {
       7: { base_type: 5, quantity: 1, letter: 98, name: 'scroll of fog', col: 7 },
     } })
     btn(h, 'spd-bag').click()
-    const titles = () => [...document.querySelectorAll<HTMLElement>('.spd-bag-cell')].map(c => c.title)
+    const titles = () => [...document.querySelectorAll<HTMLElement>('.spd-bag-row')].map(c => c.title)
     expect(titles()).toEqual(['+0 robe', '2 potions of curing', 'scroll of fog'])
     document.querySelector<HTMLButtonElement>('.spd-bag-tab[data-tab="potions"]')!.click()
     expect(titles()).toEqual(['2 potions of curing'])
@@ -1212,7 +1221,7 @@ describe('SPD layout toolbar', () => {
     // Never rendered; the close is swallowed and the bag is back.
     expect(isHidden(h.view.querySelector<HTMLElement>('#ui-overlay')!)).toBe(true)
     h.dispatch({ msg: 'close_menu' })
-    const cell = document.querySelector<HTMLButtonElement>('.spd-bag-cell')!
+    const cell = document.querySelector<HTMLButtonElement>('.spd-bag-row')!
     expect(cell.title).toBe('Recall Undead')
     cell.click()
     h.send.mockClear()
