@@ -13,6 +13,7 @@
 // drop; class+subtype and then the letter cover a name change (identifying
 // a potion turns "black potion" into "potion of curing").
 
+import type { ClientMsg } from '../../ws/types'
 import type { InvItem } from '../inventory-store'
 import { TEX, type TileLoader } from '../tiles/tile-loader'
 import { renderTiles, type TileRef } from '../tiles/tile-view'
@@ -26,6 +27,7 @@ export interface ItemSlot {
   type?: 'item'
   name: string       // normalized (slotName)
   letter: string     // inventory letter when assigned / last resolved
+  index?: number     // engine inventory index when assigned / last resolved
   base?: number      // base_type
   sub?: number       // sub_type
 }
@@ -82,8 +84,15 @@ const BASE_KIND: Record<number, ItemKind> = {
   [OBJ.TALISMANS]: 'evoke',
 }
 
-// Inventory index → letter, as the engine's index_to_letter (a–z, A–Z).
-// Only a fallback: the wire's `letter` is authoritative.
+// The wire's inventory is the engine's you.inv array. Before the trunk
+// inventory split that is 52 slots, index i on letter index_to_letter(i);
+// trunk (ENDOFPACK 127, MAX_GEAR 52) keeps gear in 0–51 and consumables in
+// 52–126, each part lettering itself — a scroll and a ring can both be `c`.
+// So an item is identified by its index, and `letter` (the item's own slot
+// letter) is only what a class menu (q, r, e, …) answers to.
+//
+// Inventory index → letter, as the engine's index_to_letter (a–z, A–Z):
+// the fallback for an item whose `letter` hasn't arrived.
 export function indexLetter(index: number): string {
   if (index < 26) return String.fromCharCode(97 + index)
   return String.fromCharCode(65 + index - 26)
@@ -178,6 +187,24 @@ export function useKeys(item: InvItem, letter: string): string {
   return (verb ?? KIND_KEYS[itemKind(item)]) + letter
 }
 
+// The message that uses an item. Where the engine names a verb it has an
+// action for the slot (tileweb.cc inv_item_action → quiver
+// action_cycler::set_from_slot: quaff, read, evoke, throw — targeted ones
+// enter the direction chooser), so send that by index. Gear has no such
+// action: its letter in the e menu, which lists gear only, is unambiguous.
+export function useMsg(live: LiveItem): ClientMsg {
+  const { item, letter, index } = live
+  if (itemKind(item) !== 'equip' && item.action_verb) return { msg: 'inv_item_action', slot: index }
+  return { msg: 'input', text: useKeys(item, letter) }
+}
+
+// The engine's describe screen for the item (its own action buttons:
+// drop, inscribe, …). By index where the engine is new enough to name verbs.
+export function describeMsg(live: LiveItem): ClientMsg {
+  if (live.item.action_verb !== undefined) return { msg: 'inv_item_describe', slot: live.index }
+  return { msg: 'input', text: 'i' + live.letter }
+}
+
 // The verb's display name for the bag's primary button.
 export function useLabel(item: InvItem): string {
   if (item.action_verb) return item.action_verb
@@ -222,7 +249,10 @@ export function shortLabel(name: string): string {
 }
 
 export function makeSlot(live: LiveItem): ItemSlot {
-  return { name: slotName(live.item.name), letter: live.letter, base: live.item.base_type, sub: live.item.sub_type }
+  return {
+    name: slotName(live.item.name), letter: live.letter, index: live.index,
+    base: live.item.base_type, sub: live.item.sub_type,
+  }
 }
 
 // Where the slot's item is now, or null when it's gone.
@@ -236,7 +266,9 @@ export function resolveSlot(slot: ItemSlot, items: ReadonlyMap<number, InvItem>)
   }
   const kind = slot.base !== undefined ? BASE_KIND[slot.base] ?? 'other' : nameKind(slot.name)
   if (kind === 'other') return null
-  return live.find(l => l.letter === slot.letter && itemKind(l.item) === kind) ?? null
+  const same = (l: LiveItem) => itemKind(l.item) === kind
+  if (slot.index !== undefined) return live.find(l => l.index === slot.index && same(l)) ?? null
+  return live.find(l => l.letter === slot.letter && same(l)) ?? null
 }
 
 // The item's sprite (main atlas, base + overlays), or null without tiles.
@@ -288,7 +320,10 @@ export function loadSlots(): (QuickSlot | null)[] {
     } else if (s.type === 'ability') {
       out[i] = { type: 'ability', name: s.name, letter: s.letter, tiles: Array.isArray(s.tiles) ? s.tiles as TileRef[] : [] }
     } else {
-      out[i] = { name: s.name, letter: s.letter, base: s.base as number | undefined, sub: s.sub as number | undefined }
+      out[i] = {
+        name: s.name, letter: s.letter, index: s.index as number | undefined,
+        base: s.base as number | undefined, sub: s.sub as number | undefined,
+      }
     }
   }
   return out

@@ -382,6 +382,12 @@ export type ClientMsg =
   | { msg: 'go_lobby' }
   | { msg: 'input'; text: string }
   | { msg: 'key'; keycode: number }
+  // The reference action panel's item messages (tileweb.cc): use or
+  // describe the item in engine inventory slot `slot` — unambiguous where
+  // letters are not (trunk letters gear and consumables separately).
+  // Honoured only at the command prompt (MOUSE_MODE_COMMAND).
+  | { msg: 'inv_item_action'; slot: number }
+  | { msg: 'inv_item_describe'; slot: number }
   | { msg: 'chat_msg'; text: string }
   | { msg: 'pong' }
   | { msg: 'ui_state_sync'; widget_id: string; text?: string; cursor?: number; checked?: boolean; generation_id: number }

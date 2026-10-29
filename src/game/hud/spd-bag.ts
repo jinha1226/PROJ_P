@@ -19,8 +19,8 @@ import { TEX, type TileLoader } from '../tiles/tile-loader'
 import { renderTiles } from '../tiles/tile-view'
 import { escHtml } from '../dcss-colors'
 import {
-  KIND_GLYPH, QUICKSLOT_COUNT, itemCount, itemKind, itemTab, itemTile, makeSlot, sortedItems,
-  useKeys, useLabel, type AbilityEntry, type BagTab, type LiveItem, type QuickSlot, type SpellInfo,
+  KIND_GLYPH, QUICKSLOT_COUNT, describeMsg, itemCount, itemKind, itemTab, itemTile, makeSlot,
+  sortedItems, useLabel, useMsg, type AbilityEntry, type BagTab, type LiveItem, type QuickSlot, type SpellInfo,
 } from './spd-quickslots'
 
 export interface SpdBagDeps {
@@ -141,7 +141,7 @@ export class SpdBag {
     if (tab === 'abilities') return (this.deps.abilities() ?? []).map(ability => ({ kind: 'ability', key: `a${ability.letter}`, ability }))
     return sortedItems(this.deps.inventory.items)
       .filter(live => tab === 'all' || itemTab(live.item) === tab)
-      .map(live => ({ kind: 'item', key: `i${live.letter}`, live }))
+      .map(live => ({ kind: 'item', key: `i${live.index}`, live }))
   }
 
   private renderBody(): void {
@@ -251,10 +251,11 @@ export class SpdBag {
       name.classList.add(`fg${item.col}`)
       name.textContent = `${letter} - ${item.name}`
       const kind = itemKind(item)
-      if (kind !== 'other') row.appendChild(this.button(useLabel(item), 'spd-sheet-btn primary', () => this.act(useKeys(item, letter))))
+      if (kind !== 'other') row.appendChild(this.button(useLabel(item), 'spd-sheet-btn primary', () => this.act(useMsg(e.live))))
       if (kind === 'equip') row.appendChild(this.button('Take off', 'spd-sheet-btn', () => this.act('c' + letter)))
-      row.appendChild(this.button('Drop', 'spd-sheet-btn', () => this.act('d' + letter)))
-      row.appendChild(this.button('Info', 'spd-sheet-btn', () => this.act('i' + letter)))
+      // Drop and the rest live on the engine's describe screen: a `d`
+      // letter can't tell a trunk scroll c from a ring c.
+      row.appendChild(this.button('Info / more', 'spd-sheet-btn', () => this.act(describeMsg(e.live))))
     } else if (e.kind === 'spell') {
       name.textContent = `${e.spell.letter} - ${e.spell.title}${e.spell.fail ? ` (${e.spell.fail} fail)` : ''}`
       row.appendChild(this.button('Cast', 'spd-sheet-btn primary', () => this.act('z' + e.spell.letter)))
@@ -281,11 +282,11 @@ export class SpdBag {
     detail.appendChild(slots)
   }
 
-  // Send `keys` and close, unless the prompt is busy (then shake the sheet).
-  private act(keys: string): void {
+  // Send and close, unless the prompt is busy (then shake the sheet).
+  private act(what: string | ClientMsg): void {
     if (!this.deps.canAct()) { this.shake(); return }
     this.close()
-    this.deps.send({ msg: 'input', text: keys })
+    this.deps.send(typeof what === 'string' ? { msg: 'input', text: what } : what)
   }
 
   private shake(): void {

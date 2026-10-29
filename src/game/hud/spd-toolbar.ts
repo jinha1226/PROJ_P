@@ -21,7 +21,7 @@ import { bindPressedClass } from '../input/touch'
 import { SpdBag } from './spd-bag'
 import {
   KIND_GLYPH, QUICKSLOT_COUNT, itemCount, itemKind, itemTile, loadSlots, nameKindGlyph,
-  resolveNamed, resolveSlot, saveSlots, shortLabel, useKeys, type AbilityEntry, type QuickSlot,
+  resolveNamed, resolveSlot, saveSlots, shortLabel, useMsg, type AbilityEntry, type QuickSlot,
   type SpellInfo,
 } from './spd-quickslots'
 
@@ -152,7 +152,7 @@ export class SpdToolbar {
       const n = hit ? itemCount(hit.item) : 0
       if (n > 1) el.insertAdjacentHTML('beforeend', `<span class="spd-qty">${n}</span>`)
       el.title = `${name} — hold to change`
-      if (hit) slot.letter = hit.letter
+      if (hit) { slot.letter = hit.letter; slot.index = hit.index }
     })
   }
 
@@ -185,7 +185,9 @@ export class SpdToolbar {
     }
     const hit = resolveSlot(slot, this.deps.inventory.items)
     if (!hit) return false
-    return this.key(useKeys(hit.item, hit.letter))
+    if (!this.deps.canAct()) return false
+    this.deps.send(useMsg(hit))
+    return true
   }
 
   private actionButton(

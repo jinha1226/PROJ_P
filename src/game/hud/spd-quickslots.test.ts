@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import type { InvItem } from '../inventory-store'
 import {
-  indexLetter, itemCount, itemKind, liveItems, makeSlot, resolveSlot, shortLabel, slotName, useKeys,
+  describeMsg, indexLetter, itemCount, itemKind, liveItems, makeSlot, resolveSlot, shortLabel, slotName,
+  useKeys, useMsg,
 } from './spd-quickslots'
 import { attackInput, lootSignal, nearestHostile } from './spd-indicators'
 import type { MonsterCell } from '../map/map-store'
@@ -30,6 +31,16 @@ describe('spd quickslots', () => {
     const items = new Map([[52, MAGIC], [53, BLACK], [0, ROBE]])
     expect(liveItems(items).map(l => l.letter)).toEqual(['a', 'd', 'g'])
     expect(indexLetter(26)).toBe('A')
+  })
+
+  it('uses consumables by index, gear by its e-menu letter', () => {
+    expect(useMsg({ index: 53, letter: 'd', item: BLACK })).toEqual({ msg: 'inv_item_action', slot: 53 })
+    expect(describeMsg({ index: 53, letter: 'd', item: BLACK })).toEqual({ msg: 'inv_item_describe', slot: 53 })
+    expect(useMsg({ index: 0, letter: 'a', item: ROBE })).toEqual({ msg: 'input', text: 'ea' })
+    // An engine without action verbs: keys.
+    const old = { name: '2 potions of curing', col: 7, base_type: 7 }
+    expect(useMsg({ index: 2, letter: 'c', item: old })).toEqual({ msg: 'input', text: 'qc' })
+    expect(describeMsg({ index: 2, letter: 'c', item: old })).toEqual({ msg: 'input', text: 'ic' })
   })
 
   it('drops emptied slots that keep a stale name', () => {

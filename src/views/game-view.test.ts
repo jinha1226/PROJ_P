@@ -1131,10 +1131,11 @@ describe('SPD layout toolbar', () => {
     expect(h.send).not.toHaveBeenCalled()
   })
 
-  // Item index 53 sits on letter d: the key must come from the wire letter.
+  // Trunk consumable: engine index 53, its own letter d (gear d is a
+  // different item). Used by index through the action-panel message.
   const POTIONS = { 53: { base_type: 7, quantity: 2, letter: 100, name: '2 potions of curing', col: 7, action_verb: 'Drink' } }
 
-  it('uses a quickslot by the item\'s own letter', () => {
+  it('uses a quickslot item by its engine index', () => {
     const h = playing()
     h.dispatch({ msg: 'player', inv: POTIONS })
     const slot = bar(h).querySelector<HTMLButtonElement>('.spd-slot')!
@@ -1145,7 +1146,7 @@ describe('SPD layout toolbar', () => {
     expect(document.querySelector('.spd-sheet')).toBeNull()
     h.send.mockClear()
     slot.click()
-    expect(h.send.mock.calls.map(c => c[0])).toEqual([{ msg: 'input', text: 'qd' }])
+    expect(h.send.mock.calls.map(c => c[0])).toEqual([{ msg: 'inv_item_action', slot: 53 }])
   })
 
   it('opens the bag and drinks from its action row', () => {
@@ -1157,8 +1158,27 @@ describe('SPD layout toolbar', () => {
     const primary = document.querySelector<HTMLButtonElement>('.spd-bag-actions .primary')!
     expect(primary.textContent).toBe('Drink')
     primary.click()
-    expect(h.send.mock.calls.map(c => c[0])).toEqual([{ msg: 'input', text: 'qd' }])
+    expect(h.send.mock.calls.map(c => c[0])).toEqual([{ msg: 'inv_item_action', slot: 53 }])
     expect(document.querySelector('.spd-sheet')).toBeNull()
+  })
+
+  it('tells apart a trunk scroll and a gear item on the same letter', () => {
+    const h = playing()
+    h.dispatch({ msg: 'player', inv: {
+      2: { base_type: 6, quantity: 1, letter: 99, name: '+6 ring of dexterity', col: 7 },
+      54: { base_type: 5, quantity: 1, letter: 99, name: 'scroll of fog', col: 7, action_verb: 'Read' },
+    } })
+    btn(h, 'spd-bag').click()
+    const cells = [...document.querySelectorAll<HTMLButtonElement>('.spd-bag-cell')]
+    cells.find(c => c.title === 'scroll of fog')!.click()
+    expect(document.querySelectorAll('.spd-bag-cell.selected')).toHaveLength(1)
+    document.querySelector<HTMLButtonElement>('.spd-bag-actions .primary')!.click()
+    expect(h.send.mock.calls.map(c => c[0])).toEqual([{ msg: 'inv_item_action', slot: 54 }])
+    btn(h, 'spd-bag').click()
+    ;[...document.querySelectorAll<HTMLButtonElement>('.spd-bag-cell')].find(c => c.title.startsWith('+6'))!.click()
+    h.send.mockClear()
+    document.querySelector<HTMLButtonElement>('.spd-bag-actions .primary')!.click()
+    expect(h.send.mock.calls.map(c => c[0])).toEqual([{ msg: 'input', text: 'ec' }])
   })
 
   it('files the pack under category tabs, sorted by class', () => {
