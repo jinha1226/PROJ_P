@@ -8,6 +8,7 @@ import type { MapStore } from '../map/map-store'
 import type { TileLoader } from '../tiles/tile-loader'
 import { appendMonsterActor } from '../tiles/tile-view'
 import { bindPressedClass } from '../input/touch'
+import { tr } from './spd-i18n'
 
 export class SpdPortrait {
   readonly element: HTMLButtonElement
@@ -19,8 +20,8 @@ export class SpdPortrait {
     const b = document.createElement('button')
     b.type = 'button'
     b.id = 'spd-portrait'
-    b.title = 'Hero'
-    b.setAttribute('aria-label', 'Hero')
+    b.title = tr('Hero')
+    b.setAttribute('aria-label', tr('Hero'))
     bindPressedClass(b)
     b.addEventListener('click', (e) => {
       // The HUD's own tap handler would open the window a second time.

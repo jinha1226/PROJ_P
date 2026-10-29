@@ -18,6 +18,7 @@ import type { InvItem } from '../inventory-store'
 import { TEX, type TileLoader } from '../tiles/tile-loader'
 import { renderTiles, type TileRef } from '../tiles/tile-view'
 import { stripDcss } from '../dcss-colors'
+import { tr } from './spd-i18n'
 
 // An item (the original, untyped shape — stored slots predate `type`), a
 // memorised spell (cast with z) or an ability, god powers included (a).
@@ -207,15 +208,16 @@ export function describeMsg(live: LiveItem): ClientMsg {
 
 // The verb's display name for the bag's primary button.
 export function useLabel(item: InvItem): string {
+  // DWEM translates action_verb on the wire along with the item name.
   if (item.action_verb) return item.action_verb
   switch (itemKind(item)) {
-    case 'potion': return 'Drink'
-    case 'scroll': return 'Read'
+    case 'potion': return tr('Drink')
+    case 'scroll': return tr('Read')
     case 'wand':
-    case 'evoke': return 'Evoke'
-    case 'missile': return 'Throw'
-    case 'equip': return 'Equip'
-    default: return 'Use'
+    case 'evoke': return tr('Evoke')
+    case 'missile': return tr('Throw')
+    case 'equip': return tr('Equip')
+    default: return tr('Use')
   }
 }
 

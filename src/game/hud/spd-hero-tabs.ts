@@ -12,6 +12,7 @@
 
 import type { ClientMsg, ServerMsg } from '../../ws/types'
 import { bindPressedClass } from '../input/touch'
+import { tr } from './spd-i18n'
 
 export interface HeroTab { key: string; label: string }
 
@@ -50,12 +51,12 @@ export class SpdHeroTabs {
   constructor(private readonly deps: HeroTabsDeps) {
     const strip = document.createElement('nav')
     strip.id = 'spd-hero-tabs'
-    strip.setAttribute('aria-label', 'Hero')
+    strip.setAttribute('aria-label', tr('Hero'))
     for (const tab of HERO_TABS) {
       const b = document.createElement('button')
       b.type = 'button'
       b.className = 'spd-hero-tab'
-      b.textContent = tab.label
+      b.textContent = tr(tab.label)
       b.dataset.key = tab.key
       bindPressedClass(b)
       b.addEventListener('click', () => this.select(tab.key))
@@ -66,7 +67,7 @@ export class SpdHeroTabs {
     close.type = 'button'
     close.className = 'spd-hero-tab spd-hero-close'
     close.textContent = '×'
-    close.setAttribute('aria-label', 'Close')
+    close.setAttribute('aria-label', tr('Close'))
     close.addEventListener('click', () => this.close())
     strip.appendChild(close)
     this.element = strip

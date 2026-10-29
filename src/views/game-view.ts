@@ -62,6 +62,7 @@ import { getPref, setPref, MONSTER_LIST_MODE_CHANGED_EVENT, RENDER_MODE_CHANGED_
 import { SpdToolbar } from '../game/hud/spd-toolbar'
 import { SpdIndicators } from '../game/hud/spd-indicators'
 import { SpdHeroTabs } from '../game/hud/spd-hero-tabs'
+import { ioHook } from '../dwem/io-hook'
 import { SpdPortrait } from '../game/hud/spd-portrait'
 import { parseAbilityItems, type AbilityEntry } from '../game/hud/spd-quickslots'
 import { loadSession, saveSession } from '../auth/session'
@@ -967,6 +968,14 @@ export function buildGameView(opts: GameViewOptions): HTMLElement {
   statsView.setOnHeroTap(() => {
     if (spdLayout) heroTabs.open()
   })
+  // Underfoot items are read off the log before DWEM's translation
+  // (priority 0) rewrites it: the loot indicator matches the engine's
+  // English. Higher priority runs first (io-hook.ts HandlerList).
+  ioHook.handle_message.before.addHandler('spd-loot', (m) => {
+    if (m.msg !== 'msgs' || !spdLayout) return
+    const lines = (m as MsgOf<'msgs'>).messages ?? []
+    for (const line of lines) spdIndicators.onMessage(stripDcss(String(line.text ?? '')))
+  }, 100)
   function updateSpdIndicators(): void {
     if (!spdLayout) return
     spdIndicators.update(store, loader, renderMode === 'tiles')
@@ -1610,9 +1619,6 @@ export function buildGameView(opts: GameViewOptions): HTMLElement {
     // The probe's `a` answered with a message only (no abilities): back at
     // the prompt with no menu.
     if (abilityProbe && msg.msg === 'input_mode' && msg.mode === 1) endAbilityProbe([])
-    if (msg.msg === 'msgs' && spdLayout) {
-      for (const m of msg.messages ?? []) spdIndicators.onMessage(stripDcss(String(m.text ?? '')))
-    }
     dispatch(handlers, msg)
     if (currentInputMode === 1) scheduleSpellHarvest()
     heroTabs.afterMessage(msg)
@@ -2461,6 +2467,7 @@ export function buildGameView(opts: GameViewOptions): HTMLElement {
     window.removeEventListener(RENDER_MODE_CHANGED_EVENT, onRenderModePref)
     window.removeEventListener(MOVEMENT_MODE_CHANGED_EVENT, onMovementModePref)
     window.removeEventListener(SPD_LAYOUT_CHANGED_EVENT, onSpdLayoutPref)
+    ioHook.handle_message.before.removeHandler('spd-loot')
     window.removeEventListener(MONSTER_LIST_MODE_CHANGED_EVENT, onMonsterListModePref)
     closeWatcher?.destroy()
     closeWatcher = null

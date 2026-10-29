@@ -62,6 +62,11 @@ export class TranslationModule {
   private installed = false
   private debugReloadTimer: number | null = null
 
+  // The RC's translation_language while a translation is loaded, else null.
+  get activeLanguage(): string | null {
+    return this.translator ? this.config?.translationLanguage ?? null : null
+  }
+
   onLoad(): void {
     if (this.installed) return
     this.installed = true

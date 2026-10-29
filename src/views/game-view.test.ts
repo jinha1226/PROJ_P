@@ -1,6 +1,7 @@
 // @vitest-environment happy-dom
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { ioHook, type IncomingMessage } from '../dwem/io-hook'
 import { buildGameView, type SpectateTarget } from './game-view'
 import { disposeView } from './view-dispose'
 import { unwrapHangingIndents } from './overlay-body'
@@ -1232,7 +1233,11 @@ describe('SPD layout toolbar', () => {
   it('offers pick-up while something lies underfoot', () => {
     const h = playing()
     const loot = () => h.view.querySelector<HTMLButtonElement>('.spd-loot')!
-    h.dispatch({ msg: 'msgs', messages: [{ text: '<lightgrey>You see here a +0 dagger.</lightgrey>' }] })
+    // The real path: the IOHook chain (where the indicator reads the log
+    // ahead of translation), then the view.
+    const line = { msg: 'msgs', messages: [{ text: '<lightgrey>You see here a +0 dagger.</lightgrey>' }] } as const
+    ioHook.handleMessage({ ...line } as unknown as IncomingMessage)
+    h.dispatch(line)
     flushMicrotasks()
     expect(loot().hidden).toBe(false)
     loot().click()

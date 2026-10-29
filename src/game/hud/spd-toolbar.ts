@@ -24,6 +24,7 @@ import {
   resolveNamed, resolveSlot, saveSlots, shortLabel, useMsg, type AbilityEntry, type QuickSlot,
   type SpellInfo,
 } from './spd-quickslots'
+import { tr } from './spd-i18n'
 
 // Hold to rest / to repick a slot. Longer than the map's describe hold: on
 // a button a slow tap must stay a tap.
@@ -77,13 +78,13 @@ export class SpdToolbar {
     bar.id = 'spd-toolbar'
     this.element = bar
 
-    bar.appendChild(this.actionButton('spd-bag', '🎒', 'Bag', 'Backpack', () => {
+    bar.appendChild(this.actionButton('spd-bag', '🎒', tr('Bag'), tr('Backpack'), () => {
       if (!deps.canAct()) return false
       this.bag.open()
     }))
-    bar.appendChild(this.actionButton('spd-wait', '⏳', 'Wait', 'Wait a turn — hold to rest',
+    bar.appendChild(this.actionButton('spd-wait', '⏳', tr('Wait'), tr('Wait a turn — hold to rest'),
       () => this.key('s'), () => this.key('5')))
-    bar.appendChild(this.actionButton('spd-explore', '🧭', 'Explore', 'Auto-explore', () => this.key('o')))
+    bar.appendChild(this.actionButton('spd-explore', '🧭', tr('Explore'), tr('Auto-explore'), () => this.key('o')))
 
     const slotRow = document.createElement('div')
     slotRow.className = 'spd-slots'
@@ -97,15 +98,15 @@ export class SpdToolbar {
     }
     bar.appendChild(slotRow)
 
-    this.keysBtn = this.actionButton('spd-keys', '⌨', 'Keys', 'Show the keypad', () => deps.toggleKeys())
+    this.keysBtn = this.actionButton('spd-keys', '⌨', tr('Keys'), tr('Show the keypad'), () => deps.toggleKeys())
     bar.appendChild(this.keysBtn)
 
     // The aim row (CSS swaps it in under .targeting).
-    bar.appendChild(this.actionButton('spd-tgt spd-tgt-cancel', '✕', 'Cancel', 'Cancel targeting',
+    bar.appendChild(this.actionButton('spd-tgt spd-tgt-cancel', '✕', tr('Cancel'), tr('Cancel targeting'),
       () => deps.send({ msg: 'key', keycode: ESC })))
-    bar.appendChild(this.actionButton('spd-tgt spd-tgt-next', '⟳', 'Next', 'Next target',
+    bar.appendChild(this.actionButton('spd-tgt spd-tgt-next', '⟳', tr('Next'), tr('Next target'),
       () => deps.send({ msg: 'input', text: NEXT_TARGET })))
-    bar.appendChild(this.actionButton('spd-tgt spd-tgt-fire', '◎', 'Fire', 'Fire at the target',
+    bar.appendChild(this.actionButton('spd-tgt spd-tgt-fire', '◎', tr('Fire'), tr('Fire at the target'),
       () => deps.send({ msg: 'input', text: FIRE })))
     this.refresh()
   }
@@ -126,7 +127,7 @@ export class SpdToolbar {
       if (!slot) {
         el.classList.add('empty')
         el.innerHTML = '<span class="spd-plus">+</span>'
-        el.title = 'Empty quickslot — tap to assign'
+        el.title = tr('Empty quickslot — tap to assign')
         return
       }
       if (slot.type === 'spell' || slot.type === 'ability') {
@@ -136,7 +137,7 @@ export class SpdToolbar {
         if (tile) el.appendChild(tile)
         else el.insertAdjacentHTML('beforeend', `<span class="spd-glyph">${slot.type === 'spell' ? '✦' : '★'}</span>`)
         el.insertAdjacentHTML('beforeend', `<span class="spd-cap">${escHtml(shortLabel(slot.name))}</span>`)
-        el.title = `${slot.name} — hold to change`
+        el.title = `${slot.name} — ${tr('hold to change')}`
         return
       }
       const hit = resolveSlot(slot, items)
@@ -151,7 +152,7 @@ export class SpdToolbar {
       if (!tile) el.insertAdjacentHTML('beforeend', `<span class="spd-cap">${escHtml(shortLabel(name))}</span>`)
       const n = hit ? itemCount(hit.item) : 0
       if (n > 1) el.insertAdjacentHTML('beforeend', `<span class="spd-qty">${n}</span>`)
-      el.title = `${name} — hold to change`
+      el.title = `${name} — ${tr('hold to change')}`
       if (hit) { slot.letter = hit.letter; slot.index = hit.index }
     })
   }

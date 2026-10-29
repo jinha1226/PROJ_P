@@ -24,6 +24,7 @@ import {
   KIND_GLYPH, QUICKSLOT_COUNT, describeMsg, itemKind, itemTab, itemTile, makeSlot,
   sortedItems, useLabel, useMsg, type AbilityEntry, type BagTab, type LiveItem, type QuickSlot, type SpellInfo,
 } from './spd-quickslots'
+import { tr } from './spd-i18n'
 
 export interface SpdBagDeps {
   inventory: InventoryStore
@@ -53,15 +54,15 @@ function saveTab(t: BagTab): void {
   try { localStorage.setItem(TAB_KEY, t) } catch { /* private mode */ }
 }
 
-const TABS: ReadonlyArray<{ tab: BagTab; label: string }> = [
-  { tab: 'all', label: 'All' },
-  { tab: 'gear', label: '[ Gear' },
-  { tab: 'potions', label: '! Potions' },
-  { tab: 'scrolls', label: '? Scrolls' },
-  { tab: 'wands', label: '/ Wands' },
-  { tab: 'misc', label: '* Misc' },
-  { tab: 'spells', label: '✦ Spells' },
-  { tab: 'abilities', label: '★ Abilities' },
+const TABS: ReadonlyArray<{ tab: BagTab; icon: string; label: string }> = [
+  { tab: 'all', icon: '', label: 'All' },
+  { tab: 'gear', icon: '[', label: 'Gear' },
+  { tab: 'potions', icon: '!', label: 'Potions' },
+  { tab: 'scrolls', icon: '?', label: 'Scrolls' },
+  { tab: 'wands', icon: '/', label: 'Wands' },
+  { tab: 'misc', icon: '*', label: 'Misc' },
+  { tab: 'spells', icon: '✦', label: 'Spells' },
+  { tab: 'abilities', icon: '★', label: 'Abilities' },
 ]
 
 type Entry =
@@ -97,17 +98,17 @@ export class SpdBag {
     const head = document.createElement('div')
     head.className = 'spd-sheet-title'
     const title = document.createElement('span')
-    title.textContent = pickFor === undefined ? 'Backpack' : `Quickslot ${pickFor + 1} — pick one`
+    title.textContent = pickFor === undefined ? tr('Backpack') : `${tr('Quickslot')} ${pickFor + 1} — ${tr('pick one')}`
     head.appendChild(title)
     const x = this.button('×', 'spd-sheet-x', () => this.close())
-    x.setAttribute('aria-label', 'Close')
+    x.setAttribute('aria-label', tr('Close'))
     head.appendChild(x)
     card.appendChild(head)
 
     const tabs = document.createElement('div')
     tabs.className = 'spd-bag-tabs'
-    for (const { tab: t, label } of TABS) {
-      const b = this.button(label, 'spd-bag-tab', () => {
+    for (const { tab: t, icon, label } of TABS) {
+      const b = this.button(`${icon} ${tr(label)}`.trim(), 'spd-bag-tab', () => {
         this.tab = t
         saveTab(t)
         this.selected = null
@@ -130,13 +131,13 @@ export class SpdBag {
     const foot = document.createElement('div')
     foot.className = 'spd-sheet-foot'
     if (pickFor !== undefined && this.deps.slotFilled(pickFor)) {
-      foot.appendChild(this.button('Clear slot', 'spd-sheet-btn', () => {
+      foot.appendChild(this.button(tr('Clear slot'), 'spd-sheet-btn', () => {
         this.deps.assignSlot(pickFor, null)
         this.close()
       }))
     }
     if (pickFor === undefined) {
-      foot.appendChild(this.button('Full list', 'spd-sheet-btn', () => this.act('i')))
+      foot.appendChild(this.button(tr('Full list'), 'spd-sheet-btn', () => this.act('i')))
     }
     card.appendChild(foot)
 
@@ -176,13 +177,13 @@ export class SpdBag {
     if (entries.length === 0) {
       const none = document.createElement('div')
       none.className = 'spd-sheet-empty'
-      none.textContent = this.tab === 'spells' ? 'No spells memorised.'
+      none.textContent = tr(this.tab === 'spells' ? 'No spells memorised.'
         : this.tab === 'abilities' ? (this.deps.abilities() ? 'No abilities.' : 'Abilities not loaded yet.')
-        : 'Nothing here.'
+        : 'Nothing here.')
       grid.appendChild(none)
     }
     if (this.tab === 'abilities') {
-      const load = this.button(this.deps.abilities() ? '↻ Reload abilities' : 'Load abilities', 'spd-sheet-btn spd-bag-load', () => {
+      const load = this.button(tr(this.deps.abilities() ? '↻ Reload abilities' : 'Load abilities'), 'spd-sheet-btn spd-bag-load', () => {
         if (!this.deps.loadAbilities(this.pickFor)) this.shake()
       })
       grid.appendChild(load)
@@ -216,8 +217,8 @@ export class SpdBag {
       glyph = '✦'
       letter = e.spell.letter
       name = e.spell.title
-      sub = e.spell.fail ? `${e.spell.fail} fail` : ''
-      use = { label: 'Cast', run: () => this.act('z' + e.spell.letter) }
+      sub = e.spell.fail ? `${e.spell.fail} ${tr('fail')}` : ''
+      use = { label: tr('Cast'), run: () => this.act('z' + e.spell.letter) }
     } else {
       const a = e.ability
       face = loader && a.tiles.length ? renderTiles(loader, a.tiles, 1) : null
@@ -226,7 +227,7 @@ export class SpdBag {
       letter = a.letter
       name = a.name
       sub = [a.cost, a.fail].filter(Boolean).join(' · ')
-      use = { label: 'Use', run: () => this.act('a' + a.letter) }
+      use = { label: tr('Use'), run: () => this.act('a' + a.letter) }
     }
     row.title = name
 
@@ -273,7 +274,7 @@ export class SpdBag {
     detail.textContent = ''
     detail.hidden = false
     if (this.pickFor !== undefined) {
-      detail.innerHTML = '<div class="spd-bag-hint">Tap one to pin it to the slot.</div>'
+      detail.innerHTML = `<div class="spd-bag-hint">${escHtml(tr('Tap one to pin it to the slot.'))}</div>`
       return
     }
     const e = this.selected ? this.entries(this.tab).find(x => x.key === this.selected) : undefined
@@ -291,12 +292,12 @@ export class SpdBag {
       name.classList.add(`fg${item.col}`)
       name.textContent = `${letter} - ${item.name}`
       const kind = itemKind(item)
-      if (kind === 'equip') row.appendChild(this.button('Take off', 'spd-sheet-btn', () => this.act('c' + letter)))
+      if (kind === 'equip') row.appendChild(this.button(tr('Take off'), 'spd-sheet-btn', () => this.act('c' + letter)))
       // Drop and the rest live on the engine's describe screen: a `d`
       // letter can't tell a trunk scroll c from a ring c.
-      row.appendChild(this.button('Info / more', 'spd-sheet-btn', () => this.act(describeMsg(e.live))))
+      row.appendChild(this.button(tr('Info / more'), 'spd-sheet-btn', () => this.act(describeMsg(e.live))))
     } else if (e.kind === 'spell') {
-      name.textContent = `${e.spell.letter} - ${e.spell.title}${e.spell.fail ? ` (${e.spell.fail} fail)` : ''}`
+      name.textContent = `${e.spell.letter} - ${e.spell.title}${e.spell.fail ? ` (${e.spell.fail} ${tr('fail')})` : ''}`
     } else {
       const a = e.ability
       name.textContent = `${a.letter} - ${a.name}${a.cost ? ` · ${a.cost}` : ''}${a.fail ? ` · ${a.fail}` : ''}`
@@ -308,7 +309,7 @@ export class SpdBag {
     slots.className = 'spd-bag-actions spd-bag-slots'
     const label = document.createElement('span')
     label.className = 'spd-bag-hint'
-    label.textContent = 'Quickslot'
+    label.textContent = tr('Quickslot')
     slots.appendChild(label)
     for (let i = 0; i < QUICKSLOT_COUNT; i++) {
       slots.appendChild(this.button(String(i + 1), 'spd-sheet-btn', () => {
