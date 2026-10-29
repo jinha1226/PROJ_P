@@ -2227,13 +2227,14 @@ button.lobby-account-chip:active { background: var(--press); }
      matters: an auto-placed sheet migrates into whichever row a full-screen
      overlay happens to have display:none'd (empty cells attract
      auto-placement), reordering the footer per screen. */
-  grid-template-rows: 1fr auto auto auto auto;
+  grid-template-rows: 1fr auto auto auto auto auto;
   grid-template-columns: minmax(0, 1fr);
   grid-template-areas:
     "map"
     "hud"
     "chat"
     "touch"
+    "spd"
     "menu";
   overflow: hidden;
   outline: none;
@@ -6996,4 +6997,185 @@ html.map-hold, html.map-hold * {
   line-height: 1.3;
   white-space: pre;
   color: var(--text);
+}
+
+/* --- SPD layout (spd-toolbar.ts / spd-indicators.ts) ---------------------
+   Shattered Pixel Dungeon's bottom toolbar and map-edge indicators. Portrait
+   only: landscape keeps its sidebar panel (the toolbar hides there, the
+   indicators still float on the map). The toolbar is the bottom-most bar
+   while it shows, so it takes over the home-indicator clearance from the
+   keypad strip above it. */
+#spd-toolbar {
+  grid-area: spd;
+  display: flex;
+  align-items: stretch;
+  gap: 0.25rem;
+  padding: 0.25rem 0.3rem calc(0.25rem + var(--safe-bottom));
+  background: var(--bg);
+  border-top: 1px solid var(--border);
+}
+#game-view.spd-bar-on #touch-controls {
+  padding-bottom: 0.1rem;
+  max-height: calc(var(--tc-dpad) * 3 + 4px + 0.4rem);
+}
+.spd-slots {
+  display: flex;
+  flex: 1 1 auto;
+  gap: 0.25rem;
+  min-width: 0;
+}
+.spd-btn {
+  position: relative;
+  flex: 1 1 0;
+  min-width: 2.6rem;
+  height: 3.1rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.1rem;
+  padding: 0.15rem;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 0.45rem;
+  color: var(--text);
+  font-family: var(--font-mono);
+  touch-action: manipulation;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+  cursor: pointer;
+}
+.spd-btn:active, .spd-btn.pressed { background: var(--press); }
+.spd-btn.active { border-color: var(--accent); }
+.spd-bag, .spd-wait, .spd-explore, .spd-keys { flex: 0 0 auto; width: 3rem; }
+.spd-keys { width: 2.4rem; }
+.spd-icon { font-size: 1.25rem; line-height: 1; }
+.spd-cap {
+  font-size: 0.6rem;
+  line-height: 1;
+  opacity: 0.8;
+  max-width: 100%;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.spd-slot { background: #1c1d1a; border-style: solid; }
+.spd-slot.empty { border-style: dashed; opacity: 0.6; }
+.spd-slot.missing { opacity: 0.4; }
+.spd-plus { font-size: 1.2rem; opacity: 0.6; }
+.spd-glyph { font-size: 1.3rem; line-height: 1; font-weight: bold; }
+.spd-qty {
+  position: absolute;
+  top: 0.1rem;
+  right: 0.25rem;
+  font-size: 0.6rem;
+  color: var(--accent);
+}
+.spd-btn.refused { animation: spd-shake 0.25s; }
+@keyframes spd-shake {
+  25% { transform: translateX(-3px); }
+  75% { transform: translateX(3px); }
+}
+
+/* Indicators: a column on the map's right edge, above the floating log. */
+#spd-indicators {
+  grid-area: map;
+  position: absolute;
+  right: calc(0.35rem + var(--safe-right));
+  bottom: calc(var(--msglog-box-h, var(--msglog-h)) + 0.6rem);
+  z-index: var(--z-map-float);
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.35rem;
+  pointer-events: none;
+}
+#spd-indicators[hidden] { display: none !important; }
+.spd-ind {
+  pointer-events: auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(20, 20, 18, 0.85);
+  border: 1px solid var(--border);
+  color: var(--text);
+  font-family: var(--font-mono);
+  touch-action: manipulation;
+  cursor: pointer;
+}
+.spd-ind.pressed, .spd-ind:active { background: var(--press); }
+.spd-danger {
+  gap: 0.2rem;
+  height: 1.7rem;
+  padding: 0 0.5rem;
+  border-radius: 0.85rem;
+  border-color: var(--danger);
+  color: #fca5a5;
+  font-size: 0.85rem;
+}
+.spd-ind-icon { font-size: 0.9rem; }
+.spd-attack {
+  width: 3.2rem;
+  height: 3.2rem;
+  border-radius: 0.5rem;
+  border: 2px solid #7f1d1d;
+}
+.spd-attack.adjacent { border-color: #ef4444; box-shadow: 0 0 6px rgba(239, 68, 68, 0.6); }
+.spd-attack-face { position: relative; width: 40px; height: 40px; display: flex; align-items: center; justify-content: center; }
+.spd-attack-face span { font-size: 1.6rem; font-weight: bold; }
+
+/* Quickslot picker: a bottom sheet over the game view. */
+.spd-sheet {
+  position: fixed;
+  inset: 0;
+  z-index: var(--z-game-panel);
+  background: rgba(0, 0, 0, 0.55);
+  display: flex;
+  align-items: flex-end;
+}
+.spd-sheet-card {
+  width: 100%;
+  max-height: 70%;
+  display: flex;
+  flex-direction: column;
+  background: var(--surface, #1f201d);
+  border-top: 1px solid var(--accent);
+  border-radius: 0.75rem 0.75rem 0 0;
+  padding: 0.6rem 0.6rem calc(0.6rem + var(--safe-bottom));
+  font-family: var(--font-mono);
+}
+.spd-sheet-title { color: var(--accent); font-size: 0.9rem; margin-bottom: 0.4rem; }
+.spd-sheet-list { overflow-y: auto; display: flex; flex-direction: column; gap: 0.2rem; }
+.spd-sheet-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.45rem 0.4rem;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 0.35rem;
+  color: inherit;
+  font: inherit;
+  font-size: 0.8rem;
+  text-align: left;
+}
+.spd-sheet-row:active { background: var(--press); }
+.spd-row-letter { opacity: 0.6; }
+.spd-row-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.spd-sheet-empty { opacity: 0.6; font-size: 0.8rem; padding: 0.5rem; }
+.spd-sheet-foot { display: flex; justify-content: flex-end; gap: 0.4rem; margin-top: 0.5rem; }
+.spd-sheet-btn {
+  padding: 0.4rem 0.8rem;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 0.35rem;
+  color: inherit;
+  font: inherit;
+  font-size: 0.8rem;
+}
+
+@media (orientation: landscape) {
+  #spd-toolbar { display: none !important; }
+  #spd-indicators { bottom: 0.6rem; }
 }

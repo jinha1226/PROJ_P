@@ -376,7 +376,7 @@ function renderControlsSection(body: HTMLElement): void {
 // Segmented radio bound to an enum- or bool-valued pref. setPref fires the
 // pref's live-apply event itself (prefs.ts PREF_EVENTS), so a mounted
 // game/login view picks the change up immediately.
-function segPref<K extends 'mapRenderMode' | 'movementMode' | 'monsterListMode' | 'loginSprites'>(
+function segPref<K extends 'mapRenderMode' | 'movementMode' | 'monsterListMode' | 'loginSprites' | 'spdLayout'>(
   ariaLabel: string,
   prefKey: K,
   options: ReadonlyArray<{ value: Prefs[K]; label: string }>,
@@ -595,6 +595,10 @@ function renderMovementSection(body: HTMLElement): void {
   section(body, 'Movement', { bare: true }).appendChild(segPref('Movement', 'movementMode', [
     { value: 'touch', label: 'Touch' },
     { value: 'keypad', label: 'Keypad' },
+  ]))
+  section(body, 'Play controls', { bare: true }).appendChild(segPref('Play controls', 'spdLayout', [
+    { value: true, label: 'SPD toolbar' },
+    { value: false, label: 'Keypad strip' },
   ]))
 }
 

@@ -13,6 +13,7 @@ import {
 import {
   getPref, LOGIN_SPRITES_CHANGED_EVENT, MONSTER_LIST_MODE_CHANGED_EVENT,
   RENDER_MODE_CHANGED_EVENT, MOVEMENT_MODE_CHANGED_EVENT, UI_SCALE_CHANGED_EVENT,
+  setPref,
 } from '../prefs'
 import { DPAD_STOPS, MSGLOG_FONT_STOPS, MSGLOG_LINE_STOPS } from '../ui-scale'
 
@@ -486,7 +487,7 @@ describe('settings sub-page navigation', () => {
     openSettings()
     const headings = $$('.settings-h').map(h => h.textContent)
     expect(headings).toEqual([
-      'Movement', 'Map display', 'Monster list', 'Message log', 'D-pad', 'Control sets',
+      'Movement', 'Play controls', 'Map display', 'Monster list', 'Message log', 'D-pad', 'Control sets',
       'Character sprites', 'Help', 'Screen',
     ])
   })
@@ -515,10 +516,20 @@ describe('settings sub-page navigation', () => {
     }
   })
 
+  it('switches Play controls between the SPD toolbar and the keypad strip', () => {
+    openSettings()
+    const group = segGroup('Play controls')
+    expect(findButton('SPD toolbar', group).getAttribute('aria-checked')).toBe('true')
+    findButton('Keypad strip', group).click()
+    expect(getPref('spdLayout')).toBe(false)
+  })
+
   it('switches Movement between Touch and Keypad with a persistent live preference', () => {
     const fired = vi.fn()
     window.addEventListener(MOVEMENT_MODE_CHANGED_EVENT, fired)
     try {
+      setPref('movementMode', 'keypad')
+      fired.mockClear()
       openSettings()
       const group = segGroup('Movement')
       const touch = findButton('Touch', group)
@@ -736,7 +747,7 @@ describe('floating size palette', () => {
     openSettings()
     const headings = $$('.settings-h').map(h => h.textContent)
     expect(headings).toEqual([
-      'Movement', 'Map display', 'Monster list', 'D-pad and message log', 'Control sets',
+      'Movement', 'Play controls', 'Map display', 'Monster list', 'D-pad and message log', 'Control sets',
       'Character sprites', 'Help', 'Screen',
     ])
     // no sliders or previews on the card — the palette is the in-game surface

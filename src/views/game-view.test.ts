@@ -198,6 +198,11 @@ describe('map movement modes', () => {
     setPref('movementMode', 'touch')
     return setupAtCommand(spectating)
   }
+  // The pre-SPD default, which the Keypad cases below exercise.
+  function keypadGame(spectating?: SpectateTarget): Harness {
+    setPref('movementMode', 'keypad')
+    return setupAtCommand(spectating)
+  }
   const map = () => (window as unknown as { __dcssMapView: MapView }).__dcssMapView
   const center = () => map().getViewCenter()
   function drag(h: Harness): void {
@@ -207,7 +212,7 @@ describe('map movement modes', () => {
   }
 
   it('leaves Keypad taps inert and opens X on a drag as before', () => {
-    const h = setupAtCommand()
+    const h = keypadGame()
     pointer(h, 'pointerdown')
     pointer(h, 'pointerup')
     expect(h.send).not.toHaveBeenCalled()
@@ -475,7 +480,7 @@ describe('map movement modes', () => {
   })
 
   it('leaves a Keypad self tap inert on interactive terrain', () => {
-    const h = setupAtCommand()
+    const h = keypadGame()
     h.dispatch({ msg: 'map', cells: [{ x: 2, y: 3, f: 40, t: { fg: FG_S_UNDER } }] })
     h.dispatch({ msg: 'player', pos: { x: 2, y: 3 } })
     pointer(h, 'pointerdown')
@@ -579,7 +584,7 @@ describe('map movement modes', () => {
   it('keeps the two-finger renderer toggle available in Keypad', () => {
     const ctx = new Proxy({}, { get: () => () => {}, set: () => true }) as CanvasRenderingContext2D
     vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(ctx)
-    const h = setupAtCommand()
+    const h = keypadGame()
     touch(h, 'touchstart', [0, 100])
     vi.advanceTimersByTime(450)
     expect(getPref('mapRenderMode')).toBe('tiles')
@@ -1067,6 +1072,67 @@ describe('cursor-mode d-pad state class (x examine / targeting)', () => {
     h.dispatch({ msg: 'cursor', id: 2, loc: { x: 3, y: 4 } })
     expect(touch(h).classList.contains('cursor-mode')).toBe(false)
     expect(touch(h).classList.contains('x-mode')).toBe(true)
+  })
+})
+
+describe('SPD layout toolbar', () => {
+  const touch = (h: Harness) => h.view.querySelector<HTMLElement>('#touch-controls')!
+  const bar = (h: Harness) => h.view.querySelector<HTMLElement>('#spd-toolbar')!
+  const btn = (h: Harness, cls: string) => bar(h).querySelector<HTMLButtonElement>(`.${cls}`)!
+  function playing(): Harness {
+    const h = setupAtCommand()
+    h.dispatch({ msg: 'player', hp: 10, hp_max: 10, pos: { x: 2, y: 2 } })
+    h.send.mockClear()
+    return h
+  }
+
+  it('replaces the keypad strip during play, which ⌨ brings back', () => {
+    const h = playing()
+    expect(bar(h).style.display).toBe('')
+    expect(touch(h).style.display).toBe('none')
+    btn(h, 'spd-keys').click()
+    expect(touch(h).style.display).toBe('')
+    btn(h, 'spd-keys').click()
+    expect(touch(h).style.display).toBe('none')
+  })
+
+  it('shows the keypad while a targeting cursor is up', () => {
+    const h = playing()
+    h.dispatch({ msg: 'cursor', id: 0, loc: { x: 3, y: 4 } })
+    expect(touch(h).style.display).toBe('')
+    h.dispatch({ msg: 'cursor', id: 0 })
+    expect(touch(h).style.display).toBe('none')
+  })
+
+  it('sends explore at the command prompt only', () => {
+    const h = playing()
+    btn(h, 'spd-explore').click()
+    expect(h.send.mock.calls.map(c => c[0])).toEqual([{ msg: 'input', text: 'o' }])
+    h.send.mockClear()
+    h.dispatch({ msg: 'input_mode', mode: 0 })
+    btn(h, 'spd-explore').click()
+    expect(h.send).not.toHaveBeenCalled()
+  })
+
+  it('uses a quickslot by its current letter', () => {
+    const h = playing()
+    h.dispatch({ msg: 'player', inv: { 4: { name: '2 potions of curing', col: 7 } } })
+    const slot = bar(h).querySelector<HTMLButtonElement>('.spd-slot')!
+    slot.click()  // empty slot: opens the picker
+    const row = document.querySelector<HTMLButtonElement>('.spd-sheet-row')!
+    expect(row.textContent).toContain('potions of curing')
+    row.click()
+    expect(document.querySelector('.spd-sheet')).toBeNull()
+    h.send.mockClear()
+    slot.click()
+    expect(h.send.mock.calls.map(c => c[0])).toEqual([{ msg: 'input', text: 'qe' }])
+  })
+
+  it('keeps the keypad strip when the pref is off', () => {
+    setPref('spdLayout', false)
+    const h = playing()
+    expect(bar(h).style.display).toBe('none')
+    expect(touch(h).style.display).toBe('')
   })
 })
 

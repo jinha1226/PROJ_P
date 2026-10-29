@@ -81,6 +81,8 @@ describe('screen traces', () => {
     it(`${name} — ${fx.description}`, async () => {
       vi.stubGlobal('localStorage', fakeStorage())
       setPref('mapRenderMode', 'ascii')
+      // Pinned to the keypad-strip layout these traces were recorded on.
+      setPref('spdLayout', false)
       await expect(await trace(fx)).toMatchFileSnapshot(`./__traces__/${name}.trace`)
     })
   }

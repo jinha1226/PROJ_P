@@ -58,7 +58,9 @@ import { VersionAdvisory } from './version-advisory'
 import { MessageLog } from './message-log'
 import { MenuModel, isPromptFamily, type MenuMsg } from '../game/menu-model'
 import { compactPlace } from '../game/char-label'
-import { getPref, setPref, MONSTER_LIST_MODE_CHANGED_EVENT, RENDER_MODE_CHANGED_EVENT, MOVEMENT_MODE_CHANGED_EVENT } from '../prefs'
+import { getPref, setPref, MONSTER_LIST_MODE_CHANGED_EVENT, RENDER_MODE_CHANGED_EVENT, MOVEMENT_MODE_CHANGED_EVENT, SPD_LAYOUT_CHANGED_EVENT } from '../prefs'
+import { SpdToolbar } from '../game/hud/spd-toolbar'
+import { SpdIndicators } from '../game/hud/spd-indicators'
 import { loadSession, saveSession } from '../auth/session'
 import { stripDcss } from './overlay-body'
 import { SpellHarvester, type SpellEntry } from '../game/spell-harvest'
@@ -892,6 +894,34 @@ export function buildGameView(opts: GameViewOptions): HTMLElement {
     // badges to their force-cast form ("za" → "Za") while it's engaged.
     onShiftChange: on => view.classList.toggle('shift-on', on),
   })
+  // SPD layout (spd-toolbar.ts / spd-indicators.ts): the toolbar replaces
+  // the keypad strip during plain play; spdKeysOpen is the ⌨ toggle that
+  // brings the strip back above it. Keypad movement needs the d-pad, so it
+  // starts open there.
+  let spdLayout = !spectating && getPref('spdLayout')
+  let spdKeysOpen = movementMode === 'keypad'
+  const spdToolbar = new SpdToolbar({
+    inventory: inventoryStore,
+    send: dispatchTouchInput,
+    canAct: () => idleAtCommandPrompt(),
+    toggleKeys: () => {
+      spdKeysOpen = !spdKeysOpen
+      applyLayout()
+    },
+    sheetHost: () => view,
+  })
+  const spdIndicators = new SpdIndicators({
+    send: dispatchTouchInput,
+    canAct: () => idleAtCommandPrompt(),
+    openMonsters: () => {
+      if (serverPromptActive() || monsterPanelOpen) return
+      openMonsterPanel()
+    },
+  })
+  function updateSpdIndicators(): void {
+    if (spdLayout) spdIndicators.update(store, loader, renderMode === 'tiles')
+  }
+
   const minimaps = new MinimapHosts({
     store,
     spectating: !!spectating,
@@ -945,7 +975,16 @@ export function buildGameView(opts: GameViewOptions): HTMLElement {
     messageLog.element.style.display = playfield ? '' : 'none'
     // Hidden until the first `player` message (hudRevealed).
     hud.style.display = playfield && hudRevealed ? '' : 'none'
-    touchControls.element.style.display = touchHidden && !stashPreview ? 'none' : ''
+    // SPD layout: the keypad strip only when asked for (⌨) or when a mode
+    // needs its keys — X map, a targeting cursor, any overlay.
+    const spdBar = spdLayout && playfield && hudRevealed && overlayMode === 'none'
+    const keysWanted = !spdBar || spdKeysOpen || !!cursors[0]
+    touchControls.element.style.display = (touchHidden && !stashPreview) || !keysWanted ? 'none' : ''
+    spdToolbar.element.style.display = spdBar ? '' : 'none'
+    spdToolbar.setKeysOpen(spdKeysOpen)
+    spdIndicators.element.style.display = spdLayout && playfield ? '' : 'none'
+    view.classList.toggle('spd-bar-on', spdBar)
+    if (!spdBar) spdToolbar.closePicker()
     touchControls.setOverlayMode(overlayMode !== 'none')
     // The bar REPLACES the touch panel. Portrait gets that from the inline
     // hide on #touch-controls, but landscape forces the controls back to
@@ -1078,6 +1117,8 @@ export function buildGameView(opts: GameViewOptions): HTMLElement {
     chatView.chip.classList.add('chat-chip-float')
     view.appendChild(chatView.chip)
     view.appendChild(touchControls.element)
+    view.appendChild(spdToolbar.element)
+    view.appendChild(spdIndicators.element)
     view.appendChild(menuControls)
   }
   // Both roles: spectators share the watched player's screens too.
@@ -1218,6 +1259,14 @@ export function buildGameView(opts: GameViewOptions): HTMLElement {
     scheduleFit()
   }
   window.addEventListener(MOVEMENT_MODE_CHANGED_EVENT, onMovementModePref)
+
+  function onSpdLayoutPref(): void {
+    spdLayout = !spectating && getPref('spdLayout')
+    applyLayout()
+    updateSpdIndicators()
+    scheduleFit()
+  }
+  window.addEventListener(SPD_LAYOUT_CHANGED_EVENT, onSpdLayoutPref)
 
   // Same live-apply for the monster-list mode (the in-game chevron writes the
   // pref too, but setListMode no-ops when the value matches).
@@ -1629,6 +1678,7 @@ export function buildGameView(opts: GameViewOptions): HTMLElement {
     animateTiles()
     monsterListView.update(store.getMonsters())
     if (monsterPanelOpen) monsterPanel.update(store.getMonsters())
+    updateSpdIndicators()
     minimaps.scheduleRepaint()
     record.captureAvatar(store.get(store.playerPos.x, store.playerPos.y), loader)
   }
@@ -1657,6 +1707,8 @@ export function buildGameView(opts: GameViewOptions): HTMLElement {
     if (msg.mp_max !== undefined) playerStats.mp_max = msg.mp_max
     mapView.setPlayerStats(playerStats)
     inventoryStore.update(msg.inv)
+    if (msg.inv) spdToolbar.refresh()
+    if (msg.pos) updateSpdIndicators()
     statsView.update(msg)
     if (msg.status !== undefined) statusView.update(msg.status)
     if (msg.time !== undefined) messageLog.markLast('turn')
@@ -1858,6 +1910,7 @@ export function buildGameView(opts: GameViewOptions): HTMLElement {
     // paths that leave X without a cursor-clear (exit-for-text-input)
     // must not strand this one.
     touchControls.setCursorMode(!!cursors[0])
+    if (spdLayout) applyLayout()
     // X mode follows id 2 only. While a text input has X stepped aside,
     // close_input re-enters it — a resent id 2 must not do it early.
     if (id === 2) {
@@ -2330,6 +2383,7 @@ export function buildGameView(opts: GameViewOptions): HTMLElement {
     disposed = true
     window.removeEventListener(RENDER_MODE_CHANGED_EVENT, onRenderModePref)
     window.removeEventListener(MOVEMENT_MODE_CHANGED_EVENT, onMovementModePref)
+    window.removeEventListener(SPD_LAYOUT_CHANGED_EVENT, onSpdLayoutPref)
     window.removeEventListener(MONSTER_LIST_MODE_CHANGED_EVENT, onMonsterListModePref)
     closeWatcher?.destroy()
     closeWatcher = null
