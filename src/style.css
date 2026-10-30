@@ -7244,7 +7244,7 @@ html.map-hold, html.map-hold * {
 }
 
 /* Loot indicator (spd-indicators.ts): above danger/attack. */
-.spd-loot {
+.spd-loot, .spd-stairs {
   gap: 0.25rem;
   height: 1.9rem;
   padding: 0 0.6rem;
@@ -7548,3 +7548,94 @@ html.map-hold, html.map-hold * {
 /* SPD layout with Touch movement: the map tap walks and aims, so the
    keypad drops its d-pad and keeps only the keys. */
 .spd-ui.touch-movement .tc-dpad { display: none; }
+
+/* SPD log (Shattered Pixel Dungeon's GameLog): three lines over the map
+   with no scrim; each line fades out a few seconds after it lands, and the
+   log lets taps through to the map. The --more-- pager, a live prompt and
+   a text input stay solid and tappable. 📜 opens the full log (Ctrl-P). */
+#game-view.spd-ui {
+  --msglog-h: calc(3 * var(--msglog-font) * var(--msglog-line));
+}
+#game-view.spd-ui #game-messages {
+  background: transparent;
+  pointer-events: none;
+  cursor: default;
+}
+#game-view.spd-ui #game-messages .game-msg {
+  animation: spd-log-fade 0.8s ease-in 5s forwards;
+}
+#game-view.spd-ui #game-messages :is(.prompt-live, .game-text-input-row, #msg-more) {
+  animation: none;
+  pointer-events: auto;
+}
+#game-view.spd-ui.more-active #game-messages {
+  pointer-events: auto;
+  background: var(--msglog-bg);
+}
+#game-view.spd-ui.more-active #game-messages .game-msg { animation: none; }
+@keyframes spd-log-fade { to { opacity: 0; } }
+
+#spd-log-btn { display: none; }
+#game-view.spd-ui #spd-log-btn {
+  display: flex;
+  grid-area: map;
+  position: absolute;
+  left: 0.3rem;
+  bottom: calc(var(--msglog-h) + 0.4rem);
+  z-index: var(--z-map-float);
+  align-items: center;
+  justify-content: center;
+  width: 2.2rem;
+  height: 2.2rem;
+  padding: 0;
+  font-size: 1.1rem;
+  background: rgba(20, 20, 18, 0.7);
+  border: 1px solid var(--border);
+  border-radius: 0.5rem;
+  touch-action: manipulation;
+}
+#game-view.spd-ui #spd-log-btn.pressed { background: var(--press); }
+#game-view.newgame #spd-log-btn { display: none; }
+#game-view.spd-ui.spell-row #spd-log-btn { bottom: calc(var(--msglog-h) + var(--spell-rail-h) + 0.4rem); }
+
+/* SPD status pane: the hero's experience strip under the portrait, and HP
+   over MP as stacked bars with the figures inside them. */
+.spd-portrait-xp {
+  position: absolute;
+  left: 2px;
+  right: 2px;
+  bottom: 2px;
+  height: 3px;
+  background: rgba(0, 0, 0, 0.6);
+  border-radius: 2px;
+  overflow: hidden;
+}
+.spd-portrait-xp > span {
+  display: block;
+  height: 100%;
+  width: 0;
+  background: #e5c63b;
+}
+#game-view.spd-ui .hg-bar-pair {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0.15rem;
+  margin-bottom: 0.1rem;
+}
+#game-view.spd-ui .hg-bar-pair :is(.hg-hp, .hg-mp) {
+  flex: none;
+  position: relative;
+}
+#game-view.spd-ui .hg-hp .hg-bar-cell { height: 0.95rem; border-radius: 0.2rem; }
+#game-view.spd-ui .hg-mp .hg-bar-cell { height: 0.6rem; border-radius: 0.2rem; }
+#game-view.spd-ui .hg-bar-pair .hg-bar-val {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: bold;
+  text-shadow: 0 0 2px #000, 0 0 2px #000, 0 0 3px #000;
+  pointer-events: none;
+}
+#game-view.spd-ui .hg-mp .hg-bar-val { font-size: 0.55rem; }

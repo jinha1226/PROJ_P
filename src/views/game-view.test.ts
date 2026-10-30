@@ -1149,6 +1149,18 @@ describe('SPD layout toolbar', () => {
     expect(h.send).not.toHaveBeenCalled()
   })
 
+  it('offers the stairs the player stands on', () => {
+    const h = playing()
+    const stairs = () => h.view.querySelector<HTMLButtonElement>('.spd-stairs')!
+    h.dispatch({ msg: 'player', pos: { x: 2, y: 3 } })
+    h.dispatch({ msg: 'map', cells: [{ x: 2, y: 3, f: 42, g: '@' }] })
+    expect(stairs().hidden).toBe(false)
+    stairs().click()
+    expect(h.send.mock.calls.map(c => c[0])).toEqual([{ msg: 'input', text: '>' }])
+    h.dispatch({ msg: 'map', cells: [{ x: 2, y: 3, f: 1, g: '@' }] })
+    expect(stairs().hidden).toBe(true)
+  })
+
   it('travels to a level on a held explore button', () => {
     const h = playing()
     const b = btn(h, 'spd-explore')

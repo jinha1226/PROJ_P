@@ -19,6 +19,7 @@ import { ATTITUDE_CLASSES, isExcluded, nameColor } from './monster-style'
 import { escHtml } from '../dcss-colors'
 import { bindPressedClass } from '../input/touch'
 import { tr, trText, trTitle } from './spd-i18n'
+import { standingFeature } from '../input/map-self-tap'
 
 export interface SpdIndicatorDeps {
   send(msg: ClientMsg): void
@@ -93,6 +94,8 @@ export class SpdIndicators {
   private readonly attack: HTMLButtonElement
   private readonly loot: HTMLButtonElement
   private readonly fire: HTMLButtonElement
+  private readonly stairs: HTMLButtonElement
+  private feature: ReturnType<typeof standingFeature> = null
   private quiver = ''
   private launcher = false
   private lootHere = false
@@ -177,6 +180,18 @@ export class SpdIndicators {
       deps.send({ msg: 'input', text: this.launcher ? 'v' : 'f' })
     })
 
+    // SPD's stairs: what the player stands on (stairs, shop, altar),
+    // taken with < or > like a tap on the player.
+    this.stairs = document.createElement('button')
+    this.stairs.type = 'button'
+    this.stairs.className = 'spd-ind spd-stairs'
+    bindPressedClass(this.stairs)
+    this.stairs.addEventListener('click', () => {
+      if (!this.feature || !deps.canAct()) return
+      deps.send({ msg: 'input', text: this.feature.key })
+    })
+
+    root.appendChild(this.stairs)
     root.appendChild(this.loot)
     root.appendChild(this.danger)
     root.appendChild(this.fire)
@@ -213,6 +228,18 @@ export class SpdIndicators {
     this.sync()
   }
 
+  private setFeature(f: ReturnType<typeof standingFeature>): void {
+    const was = this.feature
+    this.feature = f
+    if (was?.kind === f?.kind && was?.key === f?.key) return
+    if (!f) return
+    const icon = f.kind === 'up' ? '⬆' : f.kind === 'down' ? '⬇' : f.kind === 'shop' ? '🛒' : '🙏'
+    const label = f.kind === 'up' ? 'Upstairs' : f.kind === 'down' ? 'Downstairs' : f.kind === 'shop' ? 'Shop' : 'Altar'
+    this.stairs.innerHTML = `<span class="spd-ind-icon">${icon}</span>`
+    this.stairs.appendChild(trText(document.createElement('span'), label))
+    trTitle(this.stairs, label)
+  }
+
   // Lock onto this monster (a map tap on a hostile).
   lockOn(id: number | null | undefined): void {
     if (id == null) return
@@ -244,16 +271,18 @@ export class SpdIndicators {
     const posKey = `${this.from.x},${this.from.y}`
     if (this.lootHere && this.lootPos !== PENDING && posKey !== this.lootPos) this.lootHere = false
     this.loot.hidden = !this.lootHere
+    this.stairs.hidden = !this.feature
     this.danger.hidden = !this.target
     this.attack.hidden = !this.target
     this.attack.classList.toggle('locked', !!this.target && this.target.mon.id === this.lockId)
     this.fire.hidden = !this.target || (!this.launcher && !this.hasQuiver())
     if (!this.fire.hidden) this.fire.title = this.launcher ? tr('Fire') : `${tr('Fire')}: ${this.quiver}`
-    this.element.hidden = !this.lootHere && !this.target
+    this.element.hidden = !this.lootHere && !this.target && !this.feature
   }
 
   update(store: MapStore, loader: TileLoader | null, tiles: boolean): void {
     this.from = store.playerPos
+    this.setFeature(standingFeature(store.get(this.from.x, this.from.y)))
     this.onCycle = () => this.update(store, loader, tiles)
     this.hostiles = hostilesByDistance(store.getMonsters(), this.from)
     const count = this.hostiles.length

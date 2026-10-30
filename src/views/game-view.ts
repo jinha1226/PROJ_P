@@ -31,7 +31,7 @@ import { MonsterListView } from '../game/hud/monster-list'
 import { MonsterPanelView } from '../game/hud/monster-panel'
 import { MinimapHosts } from './minimap-hosts'
 import { InventoryStore } from '../game/inventory-store'
-import { buildTouchControls } from '../game/input/touch'
+import { bindPressedClass, buildTouchControls } from '../game/input/touch'
 import type { TouchControls } from '../game/input/touch'
 import { openSettings } from './settings-view'
 import { isOverlayOpen, closeTopOverlay } from './overlay'
@@ -64,7 +64,7 @@ import { SpdIndicators, isHostile, isLauncherName } from '../game/hud/spd-indica
 import { SpdHeroTabs } from '../game/hud/spd-hero-tabs'
 import { ioHook } from '../dwem/io-hook'
 import { TRANSLATION_CHANGED_EVENT } from '../dwem/translation-module'
-import { relabel } from '../game/hud/spd-i18n'
+import { relabel, trTitle } from '../game/hud/spd-i18n'
 import { SpdPortrait } from '../game/hud/spd-portrait'
 import { SpdHpFloat, hpChange, type HpSnapshot } from '../game/hud/spd-hp-float'
 import { parseAbilityItems, parseEquipped, type AbilityEntry, type EquipState } from '../game/hud/spd-quickslots'
@@ -553,6 +553,18 @@ export function buildGameView(opts: GameViewOptions): HTMLElement {
 
   // The message log, --more--, prompt rows and the X-describe strip
   // (./message-log.ts).
+  // SPD layout: the log fades and lets taps through to the map, so the
+  // full log (Ctrl-P) gets its own button.
+  const spdLogBtn = document.createElement('button')
+  spdLogBtn.type = 'button'
+  spdLogBtn.id = 'spd-log-btn'
+  spdLogBtn.textContent = '📜'
+  trTitle(spdLogBtn, 'Message log')
+  bindPressedClass(spdLogBtn)
+  spdLogBtn.addEventListener('click', () => {
+    if (!idleAtCommandPrompt()) return
+    send({ msg: 'key', keycode: 16 })
+  })
   const messageLog = new MessageLog({
     view,
     send,
@@ -1105,6 +1117,7 @@ export function buildGameView(opts: GameViewOptions): HTMLElement {
     uiOverlay.style.display = overlayShown ? '' : 'none'
     mapView.element.style.display = overlayMode === 'full' && !stashPreview ? 'none' : ''
     messageLog.element.style.display = playfield ? '' : 'none'
+    spdLogBtn.style.display = playfield ? '' : 'none'
     // Hidden until the first `player` message (hudRevealed).
     hud.style.display = playfield && hudRevealed ? '' : 'none'
     // SPD layout: the keypad strip only when asked for (⌨) or when a mode
@@ -1221,6 +1234,7 @@ export function buildGameView(opts: GameViewOptions): HTMLElement {
   view.appendChild(monsterListView.element)
   view.appendChild(minimaps.sidebarSlot)
   view.appendChild(messageLog.element)
+  view.appendChild(spdLogBtn)
   view.appendChild(messageLog.xdescStrip)
   view.appendChild(spellRail.element)
   view.appendChild(messageLog.moreButton)
@@ -1867,6 +1881,7 @@ export function buildGameView(opts: GameViewOptions): HTMLElement {
     inventoryStore.update(msg.inv)
     if (msg.inv) spdToolbar.refresh()
     if (msg.xl !== undefined) spdPortrait.setLevel(msg.xl)
+    if (msg.progress !== undefined) spdPortrait.setProgress(msg.progress)
     if (msg.pos) updateSpdIndicators()
     statsView.update(msg)
     if (msg.status !== undefined) statusView.update(msg.status)

@@ -186,6 +186,7 @@ export class MessageLog {
       } else if (!inX && m.channel === 2
           && (PROMPT_TRIGGER_RE.test(m.text) || isKeyHintsLine(m.text))) {
         const row = this.promptRow(m.text)
+        row.classList.add('prompt-live')
         this.livePrompt.push(row)
         this.pushRow(row)
       } else {
@@ -274,6 +275,7 @@ export class MessageLog {
   disablePrompt(): void {
     for (const el of this.livePrompt) {
       el.querySelectorAll('button').forEach(b => { (b as HTMLButtonElement).disabled = true })
+      el.classList.remove('prompt-live')
     }
     this.livePrompt = []
   }

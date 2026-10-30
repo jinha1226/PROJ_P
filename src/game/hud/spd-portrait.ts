@@ -14,6 +14,7 @@ export class SpdPortrait {
   readonly element: HTMLButtonElement
   private readonly face: HTMLElement
   private readonly badge: HTMLElement
+  private readonly xp: HTMLElement
   private shownKey = ''
 
   constructor(onTap: () => void) {
@@ -31,12 +32,22 @@ export class SpdPortrait {
     this.face.className = 'spd-portrait-face'
     this.badge = document.createElement('span')
     this.badge.className = 'spd-portrait-xl'
-    b.append(this.face, this.badge)
+    // SPD's experience bar, as a strip along the picture's bottom edge.
+    const xpBar = document.createElement('span')
+    xpBar.className = 'spd-portrait-xp'
+    this.xp = document.createElement('span')
+    xpBar.appendChild(this.xp)
+    b.append(this.face, xpBar, this.badge)
     this.element = b
   }
 
   setLevel(xl: number): void {
     this.badge.textContent = String(xl)
+  }
+
+  // Progress to the next level, 0–100.
+  setProgress(pct: number): void {
+    this.xp.style.width = `${Math.max(0, Math.min(100, pct))}%`
   }
 
   update(store: MapStore, loader: TileLoader | null): void {

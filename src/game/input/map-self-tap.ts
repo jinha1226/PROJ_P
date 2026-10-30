@@ -40,6 +40,22 @@ const DOWN: ReadonlyArray<readonly [number, number]> = [
   [195, 195], // Ignis altar
 ]
 
+const SHOP = 40
+const ALTARS: ReadonlyArray<readonly [number, number]> = [
+  [103, 121], [160, 162], [165, 168], [170, 170], [195, 195],
+]
+
+// What the player stands on, for the SPD stairs button: its key and what
+// to draw. Null off any usable feature.
+export function standingFeature(cell: Cell | undefined): { key: '<' | '>'; kind: 'up' | 'down' | 'shop' | 'altar' } | null {
+  const key = selfTapKey(cell)
+  if (key !== '<' && key !== '>') return null
+  const f = cell!.f!
+  if (f === SHOP) return { key, kind: 'shop' }
+  if (ALTARS.some(([lo, hi]) => f >= lo && f <= hi)) return { key, kind: 'altar' }
+  return { key, kind: key === '<' ? 'up' : 'down' }
+}
+
 // Called only for a tap on the player at the command prompt. Terrain takes
 // priority over items; send just the command, leaving confirmations to Crawl.
 export function selfTapKey(cell: Cell | undefined): '<' | '>' | ',' | null {
