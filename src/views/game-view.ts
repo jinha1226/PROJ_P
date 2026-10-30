@@ -67,7 +67,7 @@ import { TRANSLATION_CHANGED_EVENT } from '../dwem/translation-module'
 import { relabel } from '../game/hud/spd-i18n'
 import { SpdPortrait } from '../game/hud/spd-portrait'
 import { SpdHpFloat, hpChange, type HpSnapshot } from '../game/hud/spd-hp-float'
-import { parseAbilityItems, type AbilityEntry } from '../game/hud/spd-quickslots'
+import { parseAbilityItems, parseEquipped, type AbilityEntry, type EquipState } from '../game/hud/spd-quickslots'
 import { loadSession, saveSession } from '../auth/session'
 import { stripDcss } from './overlay-body'
 import { SpellHarvester, type SpellEntry } from '../game/spell-harvest'
@@ -937,7 +937,7 @@ export function buildGameView(opts: GameViewOptions): HTMLElement {
   let abilityProbe: { pickFor: number | undefined; timer: number } | null = null
   let abilityProbeClosing = false
   function probeAbilities(pickFor: number | undefined): boolean {
-    if (abilityProbe || !idleAtCommandPrompt()) return false
+    if (abilityProbe || equipProbe !== null || !idleAtCommandPrompt()) return false
     spdToolbar.bag.close()
     abilityProbe = {
       pickFor,
@@ -957,12 +957,34 @@ export function buildGameView(opts: GameViewOptions): HTMLElement {
     spdToolbar.bag.open(pickFor, 'abilities')
   }
 
+  // Equip states for the bag (letter → state): the engine's `i` menu is
+  // the only place trunk says what is worn. Read unseen each time the bag
+  // opens, like the ability probe; `closing` swallows its close_menu.
+  let spdEquipped = new Map<string, EquipState>()
+  let equipProbe: number | null = null
+  let equipProbeClosing = false
+  function probeEquipped(): void {
+    if (equipProbe !== null || abilityProbe || !idleAtCommandPrompt()) return
+    equipProbe = window.setTimeout(endEquipProbe, 3000)
+    send({ msg: 'input', text: 'i' })
+  }
+  function endEquipProbe(): void {
+    if (equipProbe === null) return
+    clearTimeout(equipProbe)
+    equipProbe = null
+    spdToolbar.bag.refresh()
+  }
+
   const spdToolbar = new SpdToolbar({
     inventory: inventoryStore,
     loader: () => loader,
     spells: () => harvester.spells.map(sp => ({ letter: sp.letter, title: sp.title, tile: sp.tile, fail: sp.fail })),
     abilities: () => spdAbilities,
     loadAbilities: probeAbilities,
+    // Trunk: gear (indices below 52) and consumables letter separately;
+    // only gear is ever equipped. Older servers have one letter space.
+    equipped: (index, letter) => (index < 52 ? spdEquipped.get(letter) : undefined) ?? null,
+    bagOpened: probeEquipped,
     send: dispatchTouchInput,
     canAct: () => idleAtCommandPrompt(),
     toggleKeys: () => {
@@ -1001,6 +1023,10 @@ export function buildGameView(opts: GameViewOptions): HTMLElement {
   const rawInvNames = new Map<number, string>()
   let rawWeapon = -1
   ioHook.handle_message.before.addHandler('spd-raw', (m) => {
+    if (m.msg === 'menu' && equipProbe !== null) {
+      spdEquipped = parseEquipped((m as MsgOf<'menu'>).items)
+      return
+    }
     if (m.msg === 'player') {
       const p = m as MsgOf<'player'>
       if (p.quiver_desc !== undefined) spdIndicators.setQuiver(stripDcss(p.quiver_desc))
@@ -1674,6 +1700,11 @@ export function buildGameView(opts: GameViewOptions): HTMLElement {
     // The probe's `a` answered with a message only (no abilities): back at
     // the prompt with no menu.
     if (abilityProbe && msg.msg === 'input_mode' && msg.mode === 1) endAbilityProbe([])
+    // Nothing carried: a message, no menu.
+    if (equipProbe !== null && msg.msg === 'input_mode' && msg.mode === 1) {
+      spdEquipped = new Map()
+      endEquipProbe()
+    }
     dispatch(handlers, msg)
     if (currentInputMode === 1) scheduleSpellHarvest()
     heroTabs.afterMessage(msg)
@@ -1968,6 +1999,13 @@ export function buildGameView(opts: GameViewOptions): HTMLElement {
     // The harvest probe's own spell menu is swallowed, never rendered
     // (../game/spell-harvest onMenu).
     if (harvester.onMenu(msg.tag, titlePlain, msg.items)) return
+    // The equip probe's `i` menu (read raw in the spd-raw handler).
+    if (equipProbe !== null) {
+      equipProbeClosing = true
+      send({ msg: 'key', keycode: 27 })
+      endEquipProbe()
+      return
+    }
     if (msg.tag === 'ability') {
       const found = parseAbilityItems(msg.items)
       if (abilityProbe) {
@@ -2090,6 +2128,7 @@ export function buildGameView(opts: GameViewOptions): HTMLElement {
     // so it can't pop/clear a real overlay underneath.
     if (harvester.consumePendingClose()) return
     if (abilityProbeClosing) { abilityProbeClosing = false; return }
+    if (equipProbeClosing) { equipProbeClosing = false; return }
     // Pops the top frame, whatever its kind (tileweb.cc pop_menu) — a CRT
     // screen ends through this same close_menu. The usual `m` skill
     // screen masks that: main.cc skill_menu() → redraw_screen() →

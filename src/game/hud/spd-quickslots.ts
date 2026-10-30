@@ -304,6 +304,31 @@ export function parseAbilityItems(items: ReadonlyArray<{ level: number; text?: s
   return out
 }
 
+// What each equipped item is doing, from the engine's own `i` menu
+// (DESC_INVENTORY_EQUIP's suffix: "a - a +0 dagger (weapon)"). Trunk
+// sends no worn/equipped state for armour or jewellery on the wire.
+export type EquipState = 'weapon' | 'offhand' | 'worn' | 'installed' | 'haunted' | 'melded'
+const EQUIP_RE = /\((weapon|offhand|worn|installed|haunted|melded)\)/
+
+// Inventory menu rows (untranslated) → letter → equip state.
+export function parseEquipped(items: ReadonlyArray<{ text?: string; hotkeys?: number[] }> | undefined): Map<string, EquipState> {
+  const out = new Map<string, EquipState>()
+  for (const it of items ?? []) {
+    const plain = stripDcss(it.text ?? '')
+    const m = EQUIP_RE.exec(plain)
+    if (!m) continue
+    const letter = it.hotkeys?.length ? String.fromCharCode(it.hotkeys[0]) : /^\s*(\w) [-+] /.exec(plain)?.[1]
+    if (letter) out.set(letter, m[1] as EquipState)
+  }
+  return out
+}
+
+// The equip state label shown in the bag.
+export const EQUIP_LABEL: Record<EquipState, string> = {
+  weapon: 'Wielded', offhand: 'Offhand', worn: 'Equipped',
+  installed: 'Installed', haunted: 'Equipped', melded: 'Melded',
+}
+
 // The spell or ability's current letter: by name in the known list, else
 // the one it was pinned with (the list may not be loaded yet).
 export function resolveNamed(slot: SpellSlot | AbilitySlot, known: ReadonlyArray<{ letter: string; name: string }>): string {

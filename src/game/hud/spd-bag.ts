@@ -22,7 +22,7 @@ import { renderTiles } from '../tiles/tile-view'
 import { escHtml } from '../dcss-colors'
 import {
   KIND_GLYPH, QUICKSLOT_COUNT, describeMsg, itemKind, itemTab, itemTile, makeSlot,
-  sortedItems, useLabel, useMsg, type AbilityEntry, type BagTab, type LiveItem, type QuickSlot, type SpellInfo,
+  sortedItems, useLabel, useMsg, type AbilityEntry, type BagTab, type EquipState, EQUIP_LABEL, type LiveItem, type QuickSlot, type SpellInfo,
 } from './spd-quickslots'
 import { tr } from './spd-i18n'
 
@@ -38,6 +38,10 @@ export interface SpdBagDeps {
   host(): HTMLElement
   assignSlot(i: number, slot: QuickSlot | null): void
   slotFilled(i: number): boolean
+  // An item's equip state, by inventory index (null: not equipped/unknown).
+  equipped(index: number, letter: string): EquipState | null
+  // The bag opened: a chance to refresh the equip states.
+  opened?(): void
 }
 
 const TAB_KEY = 'pocketzot:spd-bag-tab'
@@ -145,6 +149,12 @@ export class SpdBag {
     this.deps.host().appendChild(sheet)
     this.sheet = sheet
     this.renderBody()
+    this.deps.opened?.()
+  }
+
+  // Re-render the open bag (equip states arrived).
+  refresh(): void {
+    if (this.sheet) this.renderBody()
   }
 
   close(): boolean {
@@ -211,6 +221,11 @@ export class SpdBag {
       col = item.col
       letter = e.live.letter
       name = item.name
+      const eq = this.deps.equipped(e.live.index, letter)
+      if (eq) {
+        sub = tr(EQUIP_LABEL[eq])
+        row.classList.add('equipped')
+      }
       if (itemKind(item) !== 'other') use = { label: useLabel(item), run: () => this.act(useMsg(e.live)) }
     } else if (e.kind === 'spell') {
       face = loader ? renderTiles(loader, [{ t: e.spell.tile, tex: TEX.GUI }], 1) : null

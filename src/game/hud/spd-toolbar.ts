@@ -21,7 +21,7 @@ import { bindPressedClass } from '../input/touch'
 import { SpdBag } from './spd-bag'
 import {
   KIND_GLYPH, QUICKSLOT_COUNT, QUICKSLOT_PAGE, itemCount, itemKind, itemTile, loadSlots, nameKindGlyph,
-  resolveNamed, resolveSlot, saveSlots, shortLabel, useMsg, type AbilityEntry, type QuickSlot,
+  resolveNamed, resolveSlot, saveSlots, shortLabel, useMsg, type AbilityEntry, type EquipState, type QuickSlot,
   type SpellInfo,
 } from './spd-quickslots'
 import { tr, trText, trTitle } from './spd-i18n'
@@ -43,6 +43,8 @@ export interface SpdToolbarDeps {
   spells(): SpellInfo[]
   abilities(): AbilityEntry[] | null
   loadAbilities(pickFor: number | undefined): boolean
+  equipped(index: number, letter: string): EquipState | null
+  bagOpened(): void
   send(msg: ClientMsg): void
   // At the command prompt with nothing modal up.
   canAct(): boolean
@@ -66,6 +68,8 @@ export class SpdToolbar {
       spells: deps.spells,
       abilities: deps.abilities,
       loadAbilities: deps.loadAbilities,
+      equipped: deps.equipped,
+      opened: deps.bagOpened,
       send: deps.send,
       canAct: deps.canAct,
       host: deps.sheetHost,

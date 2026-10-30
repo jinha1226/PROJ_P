@@ -1167,11 +1167,41 @@ describe('SPD layout toolbar', () => {
     expect(h.send.mock.calls.map(c => c[0])).toEqual([{ msg: 'inv_item_action', slot: 53 }])
   })
 
+  // Opening the bag reads the `i` menu unseen for equip states; answer it.
+  function settleEquipProbe(h: ReturnType<typeof playing>, items: unknown[] = []): void {
+    expect(h.send.mock.calls.map(c => c[0]).at(-1)).toEqual({ msg: 'input', text: 'i' })
+    const menu = { msg: 'menu', tag: 'inventory', title: { text: 'Inventory' }, items }
+    // The raw read (before translation), then the view's own handling.
+    ioHook.handleMessage(menu as unknown as IncomingMessage)
+    h.dispatch(menu as never)
+    expect(h.send.mock.calls.map(c => c[0]).at(-1)).toEqual({ msg: 'key', keycode: 27 })
+    h.dispatch({ msg: 'close_menu' })
+    h.send.mockClear()
+  }
+
+  it('marks equipped items in the bag from the unseen inventory menu', () => {
+    const h = playing()
+    h.dispatch({ msg: 'player', inv: {
+      0: { base_type: 2, quantity: 1, letter: 97, name: '+0 robe', col: 10 },
+      1: { base_type: 2, quantity: 1, letter: 98, name: '+0 hat', col: 10 },
+      53: { base_type: 8, quantity: 2, letter: 97, name: '2 potions of curing', col: 7 },
+    } })
+    btn(h, 'spd-bag').click()
+    settleEquipProbe(h, [
+      { level: 1, text: 'Armour' },
+      { level: 2, text: 'a - a +0 robe (worn)', hotkeys: [97] },
+      { level: 2, text: 'b - a +0 hat', hotkeys: [98] },
+    ])
+    expect(isHidden(h.view.querySelector<HTMLElement>('#ui-overlay')!)).toBe(true)
+    const equipped = [...document.querySelectorAll<HTMLElement>('.spd-bag-row.equipped')].map(r => r.title)
+    expect(equipped).toEqual(['+0 robe'])
+  })
+
   it('drinks from the bag list in one tap on the row\'s button', () => {
     const h = playing()
     h.dispatch({ msg: 'player', inv: POTIONS })
     btn(h, 'spd-bag').click()
-    expect(h.send).not.toHaveBeenCalled()
+    settleEquipProbe(h)
     const use = document.querySelector<HTMLButtonElement>('.spd-bag-row .spd-bag-use')!
     expect(use.textContent).toBe('Drink')
     use.click()
@@ -1196,12 +1226,15 @@ describe('SPD layout toolbar', () => {
       54: { base_type: 5, quantity: 1, letter: 99, name: 'scroll of fog', col: 7, action_verb: 'Read' },
     } })
     btn(h, 'spd-bag').click()
+    settleEquipProbe(h)
     const cells = [...document.querySelectorAll<HTMLButtonElement>('.spd-bag-row')]
     cells.find(c => c.title === 'scroll of fog')!.click()
     expect(document.querySelectorAll('.spd-bag-row.selected')).toHaveLength(1)
     document.querySelector<HTMLButtonElement>('.spd-bag-row.selected .spd-bag-use')!.click()
     expect(h.send.mock.calls.map(c => c[0])).toEqual([{ msg: 'inv_item_action', slot: 54 }])
+    h.send.mockClear()
     btn(h, 'spd-bag').click()
+    settleEquipProbe(h)
     ;[...document.querySelectorAll<HTMLButtonElement>('.spd-bag-row')].find(c => c.title.startsWith('+6'))!.click()
     h.send.mockClear()
     document.querySelector<HTMLButtonElement>('.spd-bag-row.selected .spd-bag-use')!.click()
@@ -1226,6 +1259,7 @@ describe('SPD layout toolbar', () => {
     const h = playing()
     const slot = bar(h).querySelector<HTMLButtonElement>('.spd-slot')!
     slot.click()
+    settleEquipProbe(h)
     document.querySelector<HTMLButtonElement>('.spd-bag-tab[data-tab="abilities"]')!.click()
     document.querySelector<HTMLButtonElement>('.spd-bag-load')!.click()
     expect(h.send.mock.calls.map(c => c[0])).toEqual([{ msg: 'input', text: 'a' }])
@@ -1235,10 +1269,12 @@ describe('SPD layout toolbar', () => {
       { level: 1, text: 'Invocations' },
       { level: 2, text: ' a - Recall Undead                    2 MP, Piety                       0%', hotkeys: [97] },
     ] })
-    expect(h.send.mock.calls.map(c => c[0])).toEqual([{ msg: 'key', keycode: 27 }])
+    // The menu is Escaped; the reopened bag reads equip states next.
+    expect(h.send.mock.calls.map(c => c[0])).toEqual([{ msg: 'key', keycode: 27 }, { msg: 'input', text: 'i' }])
     // Never rendered; the close is swallowed and the bag is back.
     expect(isHidden(h.view.querySelector<HTMLElement>('#ui-overlay')!)).toBe(true)
     h.dispatch({ msg: 'close_menu' })
+    settleEquipProbe(h)
     const cell = document.querySelector<HTMLButtonElement>('.spd-bag-row')!
     expect(cell.title).toBe('Recall Undead')
     cell.click()

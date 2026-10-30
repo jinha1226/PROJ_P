@@ -23,7 +23,7 @@ const KO: Record<string, string> = {
   'No spells memorised.': '외운 주문이 없어요.', 'No abilities.': '능력이 없어요.',
   'Abilities not loaded yet.': '능력을 아직 불러오지 않았어요.', 'Nothing here.': '비어 있어요.',
   fail: '실패',
-  Drink: '마시기', Read: '읽기', Evoke: '발동', Throw: '던지기', Equip: '장착', Use: '사용', Cast: '시전',
+  Drink: '마시기', Read: '읽기', Evoke: '발동', Throw: '던지기', Equip: '장착', Wielded: '손에 듦', Offhand: '보조손', Equipped: '착용 중', Installed: '설치됨', Melded: '융합됨', Use: '사용', Cast: '시전',
   // Indicators, hero window
   'Pick up': '줍기', 'Hostiles in view': '보이는 적', Attack: '공격',
   Status: '상태', Skills: '스킬', Memorise: '암기', Traits: '특성', Hero: '영웅', Close: '닫기',
