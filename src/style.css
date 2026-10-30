@@ -7519,3 +7519,14 @@ html.map-hold, html.map-hold * {
   #spd-toolbar { display: none !important; }
   #spd-indicators { bottom: 0.6rem; }
 }
+
+/* The bag fills the screen at one fixed size: tabs, filtering and the
+   detail panel scroll the list inside it instead of resizing the card. */
+.spd-bag-card {
+  height: 100%;
+  max-height: none;
+  border-radius: 0;
+  border-top: none;
+  padding-top: calc(0.6rem + var(--safe-top, 0px));
+}
+.spd-bag-card .spd-bag-detail { flex: 0 0 auto; max-height: 45%; overflow-y: auto; }
