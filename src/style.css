@@ -7544,3 +7544,7 @@ html.map-hold, html.map-hold * {
 /* Equipped items in the bag (the `i` menu's "(worn)"/"(weapon)"). */
 .spd-bag-row.equipped { border-left: 3px solid var(--accent); }
 .spd-bag-row.equipped .spd-bag-sub { color: var(--accent); }
+
+/* SPD layout with Touch movement: the map tap walks and aims, so the
+   keypad drops its d-pad and keeps only the keys. */
+.spd-ui.touch-movement .tc-dpad { display: none; }

@@ -1149,6 +1149,19 @@ describe('SPD layout toolbar', () => {
     expect(h.send).not.toHaveBeenCalled()
   })
 
+  it('travels to a level on a held explore button', () => {
+    const h = playing()
+    const b = btn(h, 'spd-explore')
+    vi.useFakeTimers()
+    try {
+      b.dispatchEvent(new Event('pointerdown'))
+      vi.advanceTimersByTime(600)
+      b.dispatchEvent(new Event('pointerup'))
+      b.click()
+    } finally { vi.useRealTimers() }
+    expect(h.send.mock.calls.map(c => c[0])).toEqual([{ msg: 'input', text: 'G' }])
+  })
+
   // Trunk consumable: engine index 53, its own letter d (gear d is a
   // different item). Used by index through the action-panel message.
   const POTIONS = { 53: { base_type: 7, quantity: 2, letter: 100, name: '2 potions of curing', col: 7, action_verb: 'Drink' } }

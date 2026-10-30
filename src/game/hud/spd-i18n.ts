@@ -10,7 +10,7 @@ const KO: Record<string, string> = {
   Bag: '가방', Backpack: '배낭', Wait: '대기', Explore: '탐험', Keys: '키패드',
   Cancel: '취소', Next: '다음', Prev: '이전', Fire: '발사', 'Previous target': '이전 대상',
   'Wait a turn — hold to rest': '한 턴 대기 — 길게 누르면 휴식',
-  'Auto-explore': '자동 탐험', 'Show the keypad': '키패드 보기',
+  'Auto-explore': '자동 탐험', 'Auto-explore — hold to travel to a level': '자동 탐험 — 꾹 누르면 던전 이동', 'Show the keypad': '키패드 보기',
   'Cancel targeting': '조준 취소', 'Next target': '다음 대상', 'Fire at the target': '대상에게 발사',
   'Empty quickslot — tap to assign': '빈 퀵슬롯 — 탭해서 등록',
   'hold to change': '길게 눌러 변경',

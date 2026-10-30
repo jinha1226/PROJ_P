@@ -91,7 +91,9 @@ export class SpdToolbar {
     }))
     bar.appendChild(this.actionButton('spd-wait', '⏳', 'Wait', 'Wait a turn — hold to rest',
       () => this.key('s'), () => this.key('5')))
-    bar.appendChild(this.actionButton('spd-explore', '🧭', 'Explore', 'Auto-explore', () => this.key('o')))
+    // Hold: interlevel travel (G — the engine's branch menu, then a depth line).
+    bar.appendChild(this.actionButton('spd-explore', '🧭', 'Explore', 'Auto-explore — hold to travel to a level',
+      () => this.key('o'), () => this.key('G')))
 
     // Pages of QUICKSLOT_PAGE, side by side in a snapping scroller: swipe
     // for the next page; the dots show which one is up.
