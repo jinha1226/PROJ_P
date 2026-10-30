@@ -7639,3 +7639,52 @@ html.map-hold, html.map-hold * {
   pointer-events: none;
 }
 #game-view.spd-ui .hg-mp .hg-bar-val { font-size: 0.55rem; }
+
+/* SPD item card (layout-view.ts itemCard): the describe-item popup as
+   Shattered's WndItem — tile and name centred on top, the description
+   scrolling, and the engine's actions as a grid of large buttons pinned
+   to the bottom. Unstyled (and the ✕ hidden) outside the SPD layout. */
+.item-card-x { display: none; }
+#game-view.spd-ui .item-card-head {
+  position: relative;
+  flex-direction: column;
+  justify-content: center;
+  text-align: center;
+  gap: 0.35rem;
+  padding: 0.4rem 2.2rem 0.5rem;
+  border-bottom: 1px solid var(--border);
+  font-size: 1rem;
+}
+#game-view.spd-ui .item-card-x {
+  display: flex;
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 2.2rem;
+  height: 2.2rem;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  background: none;
+  border: none;
+  color: var(--text-dim);
+  font-size: 1.2rem;
+}
+#game-view.spd-ui .item-card-body { flex: 1 1 auto; min-height: 0; overflow-y: auto; }
+#game-view.spd-ui .item-card-actions {
+  position: sticky;
+  bottom: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(6.5rem, 1fr));
+  gap: 0.35rem;
+  padding: 0.5rem 0 calc(0.2rem + var(--safe-bottom));
+  background: var(--bg);
+  border-top: 1px solid var(--border);
+}
+#game-view.spd-ui .item-card-actions .action-btn {
+  min-height: 2.6rem;
+  font-size: 0.85rem;
+  border: 1px solid var(--border);
+  background: var(--surface2);
+}
+#game-view.spd-ui .item-card-actions > span { grid-column: 1 / -1; font-size: 0.75rem; color: var(--text-dim); }

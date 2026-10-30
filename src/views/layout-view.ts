@@ -296,6 +296,10 @@ export class LayoutView {
       if (msg.actions) {
         overlay.appendChild(this.actionsBar(msg.actions))
       }
+      // Item describe as a card (the SPD layout only): big
+      // tile and name on top, the engine's actions as large buttons along
+      // the bottom, and a close button (Esc) in the corner.
+      if (msg.type === 'describe-item' && overlay.closest('.spd-ui')) this.itemCard(overlay)
     })
     // The share-culture screens — the `%` overview (scroller tag "resists",
     // output.cc), the Ctrl-O dungeon overview (untagged: dgn_overview never
@@ -479,6 +483,24 @@ export class LayoutView {
       return
     }
     el.scrollTop = Math.round(line * lineHeightOf(el))
+  }
+
+  private itemCard(overlay: HTMLElement): void {
+    const head = overlay.querySelector<HTMLElement>('.overlay-title')
+    head?.classList.add('item-card-head')
+    overlay.querySelector('.overlay-body')?.classList.add('item-card-body')
+    overlay.querySelector('.layout-actions')?.classList.add('item-card-actions')
+    if (!head) return
+    const x = document.createElement('button')
+    x.type = 'button'
+    x.className = 'item-card-x'
+    x.textContent = '✕'
+    x.setAttribute('aria-label', 'Close')
+    x.addEventListener('click', () => {
+      this.d.send({ msg: 'key', keycode: 27 })
+      this.d.focusView()
+    })
+    head.appendChild(x)
   }
 
   private actionsBar(actionsText: string): HTMLElement {

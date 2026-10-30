@@ -1149,6 +1149,19 @@ describe('SPD layout toolbar', () => {
     expect(h.send).not.toHaveBeenCalled()
   })
 
+  it('shows an item describe as a card with large actions and a close button', () => {
+    const h = playing()
+    h.dispatch({ msg: 'ui-push', type: 'describe-item', title: 'a wand of flame', body: 'A magical device.',
+      actions: '(e)voke, (d)rop, or (i)nscribe.' })
+    const acts = [...h.view.querySelectorAll<HTMLButtonElement>('.item-card-actions .action-btn')]
+    expect(acts.map(b => b.textContent)).toEqual(['(e)voke', '(d)rop', '(i)nscribe'])
+    acts[0].click()
+    expect(h.send.mock.calls.map(c => c[0])).toEqual([{ msg: 'input', text: 'e' }])
+    h.send.mockClear()
+    h.view.querySelector<HTMLButtonElement>('.item-card-x')!.click()
+    expect(h.send.mock.calls.map(c => c[0])).toEqual([{ msg: 'key', keycode: 27 }])
+  })
+
   it('offers the stairs the player stands on', () => {
     const h = playing()
     const stairs = () => h.view.querySelector<HTMLButtonElement>('.spd-stairs')!
