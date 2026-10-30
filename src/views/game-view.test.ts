@@ -1259,6 +1259,28 @@ describe('SPD layout toolbar', () => {
     expect(fire().hidden).toBe(true)
   })
 
+  it('locks the attack button on a target: hold cycles, a far lock is walked toward', () => {
+    const h = playing()
+    const atk = () => h.view.querySelector<HTMLButtonElement>('.spd-attack')!
+    h.dispatch({ msg: 'map', cells: [
+      { x: 4, y: 2, g: 'g', mon: { id: 7, name: 'goblin', att: 0 } },
+      { x: 8, y: 2, g: 'o', mon: { id: 8, name: 'orc', att: 0 } },
+    ] })
+    expect(atk().title).toContain('goblin')
+    vi.useFakeTimers()
+    try {
+      atk().dispatchEvent(new Event('pointerdown'))
+      vi.advanceTimersByTime(600)
+      atk().dispatchEvent(new Event('pointerup'))
+      atk().click()
+    } finally { vi.useRealTimers() }
+    expect(atk().title).toContain('orc')
+    expect(atk().classList.contains('locked')).toBe(true)
+    expect(h.send).not.toHaveBeenCalled()
+    atk().click()
+    expect(h.send.mock.calls.map(c => c[0])).toEqual([{ msg: 'click_cell', x: 8, y: 2, button: 1 }])
+  })
+
   it('fires a wielded launcher with v, not the quivered ability', () => {
     const h = playing()
     const fire = () => h.view.querySelector<HTMLButtonElement>('.spd-fire')!

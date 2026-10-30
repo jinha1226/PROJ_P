@@ -24,6 +24,9 @@ export interface SpdIndicatorDeps {
   send(msg: ClientMsg): void
   canAct(): boolean
   openMonsters(): void
+  // The fire button was pressed (the locked target is aimed at once the
+  // engine's targeting cursor appears).
+  onFire?(): void
 }
 
 // Vi-keys by (dx, dy), the engine's movement letters.
@@ -34,6 +37,8 @@ const DIR_KEYS: Record<string, string> = {
 }
 const TAB_KEYCODE = 9
 const PENDING = '?'
+// Hold the attack button this long to switch the locked target.
+const HOLD_MS = 500
 // Launcher names across versions (the engine's English item name).
 const LAUNCHER_RE = /\b(short ?bow|long ?bow|bow|crossbow|arbalest|sling|fustibalus|blowgun|hand cannon)\b/i
 
@@ -41,19 +46,26 @@ export function isLauncherName(name: string): boolean {
   return LAUNCHER_RE.test(name)
 }
 
+export function isHostile(m: MonsterCell): boolean {
+  return !isExcluded(m.mon) && ATTITUDE_CLASSES[m.mon.att ?? 0] === 'hostile'
+}
+
+const distance = (a: { x: number; y: number }, b: { x: number; y: number }): number =>
+  Math.max(Math.abs(a.x - b.x), Math.abs(a.y - b.y))
+
+// Hostiles in view, nearest first.
+export function hostilesByDistance(
+  monsters: ReadonlyMap<string, MonsterCell>, from: { x: number; y: number },
+): MonsterCell[] {
+  return [...monsters.values()].filter(isHostile)
+    .sort((a, b) => distance(a, from) - distance(b, from))
+}
+
 export function nearestHostile(
   monsters: ReadonlyMap<string, MonsterCell>, from: { x: number; y: number },
 ): { target: MonsterCell | null; count: number } {
-  let target: MonsterCell | null = null
-  let best = Infinity
-  let count = 0
-  for (const m of monsters.values()) {
-    if (isExcluded(m.mon) || ATTITUDE_CLASSES[m.mon.att ?? 0] !== 'hostile') continue
-    count++
-    const d = Math.max(Math.abs(m.x - from.x), Math.abs(m.y - from.y))
-    if (d < best) { best = d; target = m }
-  }
-  return { target, count }
+  const all = hostilesByDistance(monsters, from)
+  return { target: all[0] ?? null, count: all.length }
 }
 
 export function attackInput(target: { x: number; y: number }, from: { x: number; y: number }): ClientMsg {
@@ -69,7 +81,7 @@ export function attackInput(target: { x: number; y: number }, from: { x: number;
 export function lootSignal(text: string): 'here' | 'gone' | null {
   const t = text.trim()
   if (/^You see here /.test(t) || /^There are (several|many) (objects|items) here/.test(t)
-    || /^Things that are here:/.test(t)) return 'here'
+    || /^Things that are here:/.test(t) || /^Items here: /.test(t)) return 'here'
   if (/^[a-zA-Z] - /.test(t) || /^You (now have|pick up) /.test(t)
     || /^There (are no objects|is nothing) /.test(t)) return 'gone'
   return null
@@ -86,6 +98,11 @@ export class SpdIndicators {
   private lootHere = false
   private lootPos = ''
   private target: MonsterCell | null = null
+  // The monster the attack button sticks to (SPD's attack indicator):
+  // set by attacking, tapping it on the map, or holding the button to
+  // cycle; dropped when it leaves view.
+  private lockId: number | null = null
+  private hostiles: MonsterCell[] = []
   private from = { x: 0, y: 0 }
   private shownKey = ''
 
@@ -105,10 +122,31 @@ export class SpdIndicators {
     this.attack.type = 'button'
     this.attack.className = 'spd-ind spd-attack'
     bindPressedClass(this.attack)
+    let holdTimer: number | undefined
+    let held = false
+    this.attack.addEventListener('pointerdown', () => {
+      held = false
+      holdTimer = window.setTimeout(() => { held = true; this.cycleTarget() }, HOLD_MS)
+    })
+    const cancelHold = (): void => { if (holdTimer !== undefined) clearTimeout(holdTimer); holdTimer = undefined }
+    this.attack.addEventListener('pointerup', cancelHold)
+    this.attack.addEventListener('pointerleave', cancelHold)
+    this.attack.addEventListener('pointercancel', cancelHold)
+    this.attack.addEventListener('contextmenu', (e) => e.preventDefault())
     this.attack.addEventListener('click', () => {
-      if (!this.target) return
+      if (held) { held = false; return }
+      const t = this.target
+      if (!t) return
       if (!deps.canAct()) return
-      deps.send(attackInput(this.target, this.from))
+      this.lockId = t.mon.id ?? null
+      // Tab hits the nearest; a farther locked target is walked toward
+      // with a click on its cell (the engine paths one step).
+      if (distance(t, this.from) > 1 && t !== this.hostiles[0]) {
+        deps.send({ msg: 'click_cell', x: t.x, y: t.y, button: 1 })
+      } else {
+        deps.send(attackInput(t, this.from))
+      }
+      this.sync()
     })
 
     this.loot = document.createElement('button')
@@ -131,6 +169,8 @@ export class SpdIndicators {
     bindPressedClass(this.fire)
     this.fire.addEventListener('click', () => {
       if (!deps.canAct()) return
+      if (this.target) this.lockId = this.target.mon.id ?? null
+      deps.onFire?.()
       // A wielded launcher fires through the primary attack (v): f fires
       // whatever is quivered, and using a targeted ability (Hop, a spell)
       // quivers that instead of the ammo.
@@ -173,6 +213,29 @@ export class SpdIndicators {
     this.sync()
   }
 
+  // Lock onto this monster (a map tap on a hostile).
+  lockOn(id: number | null | undefined): void {
+    if (id == null) return
+    this.lockId = id
+  }
+
+  // The attack button's current target.
+  currentTarget(): MonsterCell | null {
+    return this.target
+  }
+
+  // Hold on the attack button: the next hostile, by distance.
+  private cycleTarget(): void {
+    if (this.hostiles.length < 2) return
+    const i = this.hostiles.findIndex(m => m === this.target)
+    const next = this.hostiles[(i + 1) % this.hostiles.length]
+    this.lockId = next.mon.id ?? null
+    this.onCycle?.()
+  }
+
+  // Repaints after a hold switches the target (set by update()).
+  private onCycle: (() => void) | null = null
+
   private hasQuiver(): boolean {
     return !!this.quiver.trim() && !/nothing (quivered|to fire)|^none$/i.test(this.quiver.trim())
   }
@@ -183,6 +246,7 @@ export class SpdIndicators {
     this.loot.hidden = !this.lootHere
     this.danger.hidden = !this.target
     this.attack.hidden = !this.target
+    this.attack.classList.toggle('locked', !!this.target && this.target.mon.id === this.lockId)
     this.fire.hidden = !this.target || (!this.launcher && !this.hasQuiver())
     if (!this.fire.hidden) this.fire.title = this.launcher ? tr('Fire') : `${tr('Fire')}: ${this.quiver}`
     this.element.hidden = !this.lootHere && !this.target
@@ -190,7 +254,12 @@ export class SpdIndicators {
 
   update(store: MapStore, loader: TileLoader | null, tiles: boolean): void {
     this.from = store.playerPos
-    const { target, count } = nearestHostile(store.getMonsters(), this.from)
+    this.onCycle = () => this.update(store, loader, tiles)
+    this.hostiles = hostilesByDistance(store.getMonsters(), this.from)
+    const count = this.hostiles.length
+    const locked = this.lockId === null ? undefined : this.hostiles.find(m => m.mon.id === this.lockId)
+    if (!locked) this.lockId = null
+    const target = locked ?? this.hostiles[0] ?? null
     this.target = target
     this.sync()
     if (!target) { this.shownKey = ''; return }

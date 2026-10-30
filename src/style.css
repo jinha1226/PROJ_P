@@ -7182,6 +7182,7 @@ html.map-hold, html.map-hold * {
   font-size: 1.2rem;
 }
 .spd-attack {
+  position: relative;
   width: 3.2rem;
   height: 3.2rem;
   border-radius: 0.5rem;
@@ -7530,3 +7531,12 @@ html.map-hold, html.map-hold * {
   padding-top: calc(0.6rem + var(--safe-top, 0px));
 }
 .spd-bag-card .spd-bag-detail { flex: 0 0 auto; max-height: 45%; overflow-y: auto; }
+
+/* Attack button locked onto a target (spd-indicators.ts lockId). */
+.spd-attack.locked::after {
+  content: '🔒';
+  position: absolute;
+  right: -0.25rem;
+  bottom: -0.25rem;
+  font-size: 0.7rem;
+}

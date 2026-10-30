@@ -60,7 +60,7 @@ import { MenuModel, isPromptFamily, type MenuMsg } from '../game/menu-model'
 import { compactPlace } from '../game/char-label'
 import { getPref, setPref, MONSTER_LIST_MODE_CHANGED_EVENT, RENDER_MODE_CHANGED_EVENT, MOVEMENT_MODE_CHANGED_EVENT, SPD_LAYOUT_CHANGED_EVENT } from '../prefs'
 import { SpdToolbar } from '../game/hud/spd-toolbar'
-import { SpdIndicators, isLauncherName } from '../game/hud/spd-indicators'
+import { SpdIndicators, isHostile, isLauncherName } from '../game/hud/spd-indicators'
 import { SpdHeroTabs } from '../game/hud/spd-hero-tabs'
 import { ioHook } from '../dwem/io-hook'
 import { TRANSLATION_CHANGED_EVENT } from '../dwem/translation-module'
@@ -682,6 +682,14 @@ export function buildGameView(opts: GameViewOptions): HTMLElement {
           conn.send({ msg: 'target_cursor', x: cell.x, y: cell.y })
           return
         }
+        // SPD: tapping a hostile makes it the attack button's target.
+        if (spdLayout && !aim) {
+          const mon = store.getMonsters().get(cellKey(cell.x, cell.y))
+          if (mon && isHostile(mon)) {
+            spdIndicators.lockOn(mon.mon.id)
+            updateSpdIndicators()
+          }
+        }
         conn.send({ msg: 'click_cell', x: cell.x, y: cell.y, button: 1 })
         return
       }
@@ -970,7 +978,12 @@ export function buildGameView(opts: GameViewOptions): HTMLElement {
       if (serverPromptActive() || monsterPanelOpen) return
       openMonsterPanel()
     },
+    onFire: () => {
+      const t = spdIndicators.currentTarget()
+      pendingLockAim = t ? { x: t.x, y: t.y } : null
+    },
   })
+  let pendingLockAim: { x: number; y: number } | null = null
   const heroTabs = new SpdHeroTabs({
     send: dispatchTouchInput,
     idle: () => idleAtCommandPrompt(),
@@ -2044,6 +2057,14 @@ export function buildGameView(opts: GameViewOptions): HTMLElement {
     touchControls.setCursorMode(!!cursors[0])
     if (spdLayout) {
       applyLayout()
+      // The fire button's targeting opens on the engine's own pick; move
+      // it onto the locked target once.
+      const lock = pendingLockAim
+      pendingLockAim = null
+      const aim = cursors[0]
+      if (lock && aim && id === 0 && (aim.x !== lock.x || aim.y !== lock.y)) {
+        conn.send({ msg: 'target_cursor', x: lock.x, y: lock.y })
+      }
       updateAimTarget()
     }
     // X mode follows id 2 only. While a text input has X stepped aside,

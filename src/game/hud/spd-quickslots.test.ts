@@ -101,6 +101,7 @@ describe('spd indicators', () => {
   it('reads underfoot items from the log', () => {
     expect(lootSignal('You see here a +0 dagger.')).toBe('here')
     expect(lootSignal('There are several objects here.')).toBe('here')
+    expect(lootSignal('Items here: ) ! ? ?.')).toBe('here')
     expect(lootSignal('d - 2 potions of curing')).toBe('gone')
     expect(lootSignal('You hit the rat.')).toBeNull()
   })
