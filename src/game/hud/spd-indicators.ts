@@ -34,6 +34,12 @@ const DIR_KEYS: Record<string, string> = {
 }
 const TAB_KEYCODE = 9
 const PENDING = '?'
+// Launcher names across versions (the engine's English item name).
+const LAUNCHER_RE = /\b(short ?bow|long ?bow|bow|crossbow|arbalest|sling|fustibalus|blowgun|hand cannon)\b/i
+
+export function isLauncherName(name: string): boolean {
+  return LAUNCHER_RE.test(name)
+}
 
 export function nearestHostile(
   monsters: ReadonlyMap<string, MonsterCell>, from: { x: number; y: number },
@@ -76,6 +82,7 @@ export class SpdIndicators {
   private readonly loot: HTMLButtonElement
   private readonly fire: HTMLButtonElement
   private quiver = ''
+  private launcher = false
   private lootHere = false
   private lootPos = ''
   private target: MonsterCell | null = null
@@ -124,7 +131,10 @@ export class SpdIndicators {
     bindPressedClass(this.fire)
     this.fire.addEventListener('click', () => {
       if (!deps.canAct()) return
-      deps.send({ msg: 'input', text: 'f' })
+      // A wielded launcher fires through the primary attack (v): f fires
+      // whatever is quivered, and using a targeted ability (Hop, a spell)
+      // quivers that instead of the ammo.
+      deps.send({ msg: 'input', text: this.launcher ? 'v' : 'f' })
     })
 
     root.appendChild(this.loot)
@@ -157,6 +167,12 @@ export class SpdIndicators {
     this.sync()
   }
 
+  // Whether the wielded weapon is a launcher (bow, crossbow, sling…).
+  setLauncher(on: boolean): void {
+    this.launcher = on
+    this.sync()
+  }
+
   private hasQuiver(): boolean {
     return !!this.quiver.trim() && !/nothing (quivered|to fire)|^none$/i.test(this.quiver.trim())
   }
@@ -167,8 +183,8 @@ export class SpdIndicators {
     this.loot.hidden = !this.lootHere
     this.danger.hidden = !this.target
     this.attack.hidden = !this.target
-    this.fire.hidden = !this.target || !this.hasQuiver()
-    if (!this.fire.hidden) this.fire.title = `${tr('Fire')}: ${this.quiver}`
+    this.fire.hidden = !this.target || (!this.launcher && !this.hasQuiver())
+    if (!this.fire.hidden) this.fire.title = this.launcher ? tr('Fire') : `${tr('Fire')}: ${this.quiver}`
     this.element.hidden = !this.lootHere && !this.target
   }
 

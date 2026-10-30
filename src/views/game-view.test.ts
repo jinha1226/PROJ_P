@@ -1259,6 +1259,20 @@ describe('SPD layout toolbar', () => {
     expect(fire().hidden).toBe(true)
   })
 
+  it('fires a wielded launcher with v, not the quivered ability', () => {
+    const h = playing()
+    const fire = () => h.view.querySelector<HTMLButtonElement>('.spd-fire')!
+    ioHook.handleMessage({ msg: 'player', quiver_desc: 'Hop', weapon_index: 0,
+      inv: { 0: { name: 'a +0 shortbow', base_type: 0, letter: 97 } } } as unknown as IncomingMessage)
+    h.dispatch({ msg: 'map', cells: [{ x: 4, y: 2, g: 'g', mon: { id: 7, name: 'goblin', att: 0 } }] })
+    fire().click()
+    expect(h.send.mock.calls.map(c => c[0])).toEqual([{ msg: 'input', text: 'v' }])
+    h.send.mockClear()
+    ioHook.handleMessage({ msg: 'player', weapon_index: -1 } as unknown as IncomingMessage)
+    fire().click()
+    expect(h.send.mock.calls.map(c => c[0])).toEqual([{ msg: 'input', text: 'f' }])
+  })
+
   it('pages the quickslots: eight slots, four to a page', () => {
     const h = playing()
     expect(bar(h).querySelectorAll('.spd-slot-page')).toHaveLength(2)

@@ -60,7 +60,7 @@ import { MenuModel, isPromptFamily, type MenuMsg } from '../game/menu-model'
 import { compactPlace } from '../game/char-label'
 import { getPref, setPref, MONSTER_LIST_MODE_CHANGED_EVENT, RENDER_MODE_CHANGED_EVENT, MOVEMENT_MODE_CHANGED_EVENT, SPD_LAYOUT_CHANGED_EVENT } from '../prefs'
 import { SpdToolbar } from '../game/hud/spd-toolbar'
-import { SpdIndicators } from '../game/hud/spd-indicators'
+import { SpdIndicators, isLauncherName } from '../game/hud/spd-indicators'
 import { SpdHeroTabs } from '../game/hud/spd-hero-tabs'
 import { ioHook } from '../dwem/io-hook'
 import { TRANSLATION_CHANGED_EVENT } from '../dwem/translation-module'
@@ -984,10 +984,20 @@ export function buildGameView(opts: GameViewOptions): HTMLElement {
   // (priority 0) rewrites it: the loot indicator's log lines and the quiver
   // the fire button keys on stay the engine's English. Higher priority runs
   // first (io-hook.ts HandlerList).
+  // The engine's item names and wielded index, for the launcher check.
+  const rawInvNames = new Map<number, string>()
+  let rawWeapon = -1
   ioHook.handle_message.before.addHandler('spd-raw', (m) => {
     if (m.msg === 'player') {
-      const quiver = (m as MsgOf<'player'>).quiver_desc
-      if (quiver !== undefined) spdIndicators.setQuiver(stripDcss(quiver))
+      const p = m as MsgOf<'player'>
+      if (p.quiver_desc !== undefined) spdIndicators.setQuiver(stripDcss(p.quiver_desc))
+      for (const [k, it] of Object.entries(p.inv ?? {})) {
+        if (it.name !== undefined) rawInvNames.set(Number(k), it.name)
+      }
+      if (p.weapon_index !== undefined) rawWeapon = p.weapon_index
+      else if (p.equip?.['0'] !== undefined) rawWeapon = p.equip['0']
+      const wielded = rawWeapon >= 0 ? rawInvNames.get(rawWeapon) : undefined
+      spdIndicators.setLauncher(wielded !== undefined && isLauncherName(wielded))
       return
     }
     if (m.msg !== 'msgs' || !spdLayout) return
